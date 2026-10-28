@@ -1,0 +1,98 @@
+[
+  {
+    "id": 101,
+    "name": "Water Line Leak",
+    "parent": 0,
+    "dept": 1,
+    "isPrivate": false,
+    "priorityValue": 2
+  },
+  {
+    "id": 102,
+    "name": "Water Main Break",
+    "parent": 0,
+    "dept": 1,
+    "isPrivate": false,
+    "priorityValue": 1
+  },
+  {
+    "id": 103,
+    "name": "Low Water Pressure",
+    "parent": 0,
+    "dept": 1,
+    "isPrivate": false,
+    "priorityValue": 3
+  },
+  {
+    "id": 104,
+    "name": "No Water",
+    "parent": 0,
+    "dept": 1,
+    "isPrivate": false,
+    "priorityValue": 1
+  },
+  {
+    "id": 105,
+    "name": "Water Meter Issue",
+    "parent": 0,
+    "dept": 1,
+    "isPrivate": false,
+    "priorityValue": 3
+  },
+  {
+    "id": 106,
+    "name": "Curb Stop",
+    "parent": 0,
+    "dept": 1,
+    "isPrivate": false,
+    "priorityValue": 3
+  },
+  {
+    "id": 201,
+    "name": "Sewer Issue",
+    "parent": 0,
+    "dept": 2,
+    "isPrivate": false,
+    "priorityValue": 2
+  },
+  {
+    "id": 202,
+    "name": "Sewer Odor",
+    "parent": 0,
+    "dept": 2,
+    "isPrivate": false,
+    "priorityValue": 3
+  },
+  {
+    "id": 203,
+    "name": "Lift Station Alarm",
+    "parent": 0,
+    "dept": 2,
+    "isPrivate": false,
+    "priorityValue": 1
+  },
+  {
+    "id": 204,
+    "name": "Force Main Break",
+    "parent": 0,
+    "dept": 2,
+    "isPrivate": false,
+    "priorityValue": 1
+  },
+  {
+    "id": 301,
+    "name": "Reclaimed Water Issue",
+    "parent": 0,
+    "dept": 3,
+    "isPrivate": false,
+    "priorityValue": 3
+  },
+  {
+    "id": 401,
+    "name": "Drainage / Flooding",
+    "parent": 0,
+    "dept": 4,
+    "isPrivate": false,
+    "priorityValue": 2
+  }
+]

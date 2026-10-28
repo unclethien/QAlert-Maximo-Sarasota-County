@@ -1,0 +1,152 @@
+[
+  {
+    "id": "0820417",
+    "username": "mreyes",
+    "firstName": "Maria",
+    "lastName": "Reyes",
+    "email": "maria.reyes@example.org",
+    "phone": "941-555-0100",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0820533",
+    "username": "dokafor",
+    "firstName": "Daniel",
+    "lastName": "Okafor",
+    "email": "daniel.okafor@example.org",
+    "phone": "941-555-0101",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0821106",
+    "username": "lchen",
+    "firstName": "Linda",
+    "lastName": "Chen",
+    "email": "linda.chen@example.org",
+    "phone": "941-555-0102",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0821942",
+    "username": "jbrooks",
+    "firstName": "Jordan",
+    "lastName": "Brooks",
+    "email": "jordan.brooks@example.org",
+    "phone": "941-555-0103",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0822318",
+    "username": "apatel",
+    "firstName": "Anita",
+    "lastName": "Patel",
+    "email": "anita.patel@example.org",
+    "phone": "941-555-0104",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0822775",
+    "username": "rmorales",
+    "firstName": "Ricardo",
+    "lastName": "Morales",
+    "email": "ricardo.morales@example.org",
+    "phone": "941-555-0105",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0823051",
+    "username": "kwhitfield",
+    "firstName": "Karen",
+    "lastName": "Whitfield",
+    "email": "karen.whitfield@example.org",
+    "phone": "941-555-0106",
+    "department": "Contact Center",
+    "active": false
+  },
+  {
+    "id": "0823690",
+    "username": "tbaxter",
+    "firstName": "Tyler",
+    "lastName": "Baxter",
+    "email": "tyler.baxter@example.org",
+    "phone": "941-555-0107",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0824012",
+    "username": "egarcia",
+    "firstName": "Elena",
+    "lastName": "Garcia",
+    "email": "elena.garcia@example.org",
+    "phone": "941-555-0108",
+    "department": "Contact Center",
+    "active": true
+  },
+  {
+    "id": "0815877",
+    "username": "hlawson",
+    "firstName": "Heather",
+    "lastName": "Lawson",
+    "email": "heather.lawson@example.org",
+    "phone": "941-555-0109",
+    "department": "Public Utilities Customer Service",
+    "active": true
+  },
+  {
+    "id": "0816249",
+    "username": "bfoster",
+    "firstName": "Brian",
+    "lastName": "Foster",
+    "email": "brian.foster@example.org",
+    "phone": "941-555-0110",
+    "department": "Public Utilities Customer Service",
+    "active": true
+  },
+  {
+    "id": "0816630",
+    "username": "ckim",
+    "firstName": "Christine",
+    "lastName": "Kim",
+    "email": "christine.kim@example.org",
+    "phone": "941-555-0111",
+    "department": "Public Utilities Customer Service",
+    "active": true
+  },
+  {
+    "id": "0817104",
+    "username": "pwalsh",
+    "firstName": "Patrick",
+    "lastName": "Walsh",
+    "email": "patrick.walsh@example.org",
+    "phone": "941-555-0112",
+    "department": "Public Utilities Customer Service",
+    "active": false
+  },
+  {
+    "id": "0817588",
+    "username": "nhughes",
+    "firstName": "Nina",
+    "lastName": "Hughes",
+    "email": "nina.hughes@example.org",
+    "phone": "941-555-0113",
+    "department": "Public Utilities Customer Service",
+    "active": true
+  },
+  {
+    "id": "0818023",
+    "username": "gdiaz",
+    "firstName": "Gabriel",
+    "lastName": "Diaz",
+    "email": "gabriel.diaz@example.org",
+    "phone": "941-555-0114",
+    "department": "Public Works Customer Service",
+    "active": true
+  }
+]
