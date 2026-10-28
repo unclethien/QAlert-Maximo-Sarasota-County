@@ -1,0 +1,11 @@
+# Real Sarasota pilot exports contain resident PII. Never commit them.
+Incomplete and Missing Data*
+*.xlsx
+*.xls
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
