@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "name": "Public Utilities - Water"
+  },
+  {
+    "id": 2,
+    "name": "Public Utilities - Wastewater"
+  },
+  {
+    "id": 3,
+    "name": "Public Utilities - Reclaimed Water"
+  },
+  {
+    "id": 4,
+    "name": "Public Works - Stormwater"
+  },
+  {
+    "id": 5,
+    "name": "Contact Center"
+  }
+]

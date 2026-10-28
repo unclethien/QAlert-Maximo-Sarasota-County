@@ -1,0 +1,1114 @@
+[
+  {
+    "id": 1,
+    "requestId": 700001,
+    "displayDate": "8/3/2026 8:57 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "lchen"
+  },
+  {
+    "id": 2,
+    "requestId": 700001,
+    "displayDate": "8/3/2026 8:58 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 3,
+    "requestId": 700002,
+    "displayDate": "8/3/2026 9:38 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 4,
+    "requestId": 700002,
+    "displayDate": "8/3/2026 9:39 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 5,
+    "requestId": 700003,
+    "displayDate": "8/4/2026 10:26 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "jbrooks"
+  },
+  {
+    "id": 6,
+    "requestId": 700003,
+    "displayDate": "8/4/2026 10:27 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 7,
+    "requestId": 700004,
+    "displayDate": "8/4/2026 10:51 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "tbaxter"
+  },
+  {
+    "id": 8,
+    "requestId": 700004,
+    "displayDate": "8/4/2026 10:52 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 9,
+    "requestId": 700005,
+    "displayDate": "8/6/2026 10:09 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "kwhitfield"
+  },
+  {
+    "id": 10,
+    "requestId": 700005,
+    "displayDate": "8/6/2026 10:10 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 11,
+    "requestId": 700006,
+    "displayDate": "8/8/2026 2:12 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "nhughes"
+  },
+  {
+    "id": 12,
+    "requestId": 700006,
+    "displayDate": "8/8/2026 2:13 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 13,
+    "requestId": 700006,
+    "displayDate": "8/9/2026 5:22 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 14,
+    "requestId": 700007,
+    "displayDate": "8/9/2026 4:20 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "hlawson"
+  },
+  {
+    "id": 15,
+    "requestId": 700007,
+    "displayDate": "8/9/2026 4:21 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 16,
+    "requestId": 700008,
+    "displayDate": "8/11/2026 9:42 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "bfoster"
+  },
+  {
+    "id": 17,
+    "requestId": 700008,
+    "displayDate": "8/11/2026 9:43 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 18,
+    "requestId": 700009,
+    "displayDate": "8/11/2026 4:17 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "tbaxter"
+  },
+  {
+    "id": 19,
+    "requestId": 700009,
+    "displayDate": "8/11/2026 4:18 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 20,
+    "requestId": 700008,
+    "displayDate": "8/11/2026 10:48 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 21,
+    "requestId": 700010,
+    "displayDate": "8/12/2026 2:36 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "pwalsh"
+  },
+  {
+    "id": 22,
+    "requestId": 700010,
+    "displayDate": "8/12/2026 2:37 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUReclaimed"
+  },
+  {
+    "id": 23,
+    "requestId": 700011,
+    "displayDate": "8/16/2026 9:10 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "egarcia"
+  },
+  {
+    "id": 24,
+    "requestId": 700011,
+    "displayDate": "8/16/2026 9:11 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 25,
+    "requestId": 700012,
+    "displayDate": "8/16/2026 3:47 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "lchen"
+  },
+  {
+    "id": 26,
+    "requestId": 700012,
+    "displayDate": "8/16/2026 3:48 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 27,
+    "requestId": 700013,
+    "displayDate": "8/17/2026 3:22 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "lchen"
+  },
+  {
+    "id": 28,
+    "requestId": 700013,
+    "displayDate": "8/17/2026 3:23 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 29,
+    "requestId": 700014,
+    "displayDate": "8/17/2026 3:58 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "gdiaz"
+  },
+  {
+    "id": 30,
+    "requestId": 700014,
+    "displayDate": "8/17/2026 3:59 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 31,
+    "requestId": 700015,
+    "displayDate": "8/19/2026 12:12 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 32,
+    "requestId": 700015,
+    "displayDate": "8/19/2026 12:13 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 33,
+    "requestId": 700015,
+    "displayDate": "8/19/2026 11:32 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 34,
+    "requestId": 700016,
+    "displayDate": "8/24/2026 3:53 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "bfoster"
+  },
+  {
+    "id": 35,
+    "requestId": 700016,
+    "displayDate": "8/24/2026 3:54 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 36,
+    "requestId": 700016,
+    "displayDate": "8/25/2026 6:05 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 37,
+    "requestId": 700017,
+    "displayDate": "8/25/2026 9:00 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 38,
+    "requestId": 700017,
+    "displayDate": "8/25/2026 9:01 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 39,
+    "requestId": 700018,
+    "displayDate": "8/25/2026 12:13 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "mreyes"
+  },
+  {
+    "id": 40,
+    "requestId": 700018,
+    "displayDate": "8/25/2026 12:14 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 41,
+    "requestId": 700017,
+    "displayDate": "8/25/2026 9:22 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 42,
+    "requestId": 700019,
+    "displayDate": "8/26/2026 5:04 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 43,
+    "requestId": 700019,
+    "displayDate": "8/26/2026 5:05 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 44,
+    "requestId": 700020,
+    "displayDate": "8/26/2026 9:05 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 45,
+    "requestId": 700020,
+    "displayDate": "8/26/2026 9:06 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 46,
+    "requestId": 700021,
+    "displayDate": "9/4/2026 8:08 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "tbaxter"
+  },
+  {
+    "id": 47,
+    "requestId": 700021,
+    "displayDate": "9/4/2026 8:09 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 48,
+    "requestId": 700022,
+    "displayDate": "9/7/2026 2:11 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "gdiaz"
+  },
+  {
+    "id": 49,
+    "requestId": 700022,
+    "displayDate": "9/7/2026 2:12 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 50,
+    "requestId": 700023,
+    "displayDate": "9/8/2026 7:31 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "gdiaz"
+  },
+  {
+    "id": 51,
+    "requestId": 700023,
+    "displayDate": "9/8/2026 7:32 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 52,
+    "requestId": 700024,
+    "displayDate": "9/8/2026 8:07 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 53,
+    "requestId": 700024,
+    "displayDate": "9/8/2026 8:08 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 54,
+    "requestId": 700022,
+    "displayDate": "9/8/2026 2:36 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 55,
+    "requestId": 700024,
+    "displayDate": "9/8/2026 6:17 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 56,
+    "requestId": 700025,
+    "displayDate": "9/10/2026 2:18 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "hlawson"
+  },
+  {
+    "id": 57,
+    "requestId": 700025,
+    "displayDate": "9/10/2026 2:19 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 58,
+    "requestId": 700026,
+    "displayDate": "9/10/2026 4:42 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 59,
+    "requestId": 700026,
+    "displayDate": "9/10/2026 4:43 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 60,
+    "requestId": 700026,
+    "displayDate": "9/11/2026 1:57 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 61,
+    "requestId": 700027,
+    "displayDate": "9/12/2026 8:48 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "nhughes"
+  },
+  {
+    "id": 62,
+    "requestId": 700027,
+    "displayDate": "9/12/2026 8:49 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 63,
+    "requestId": 700028,
+    "displayDate": "9/12/2026 8:50 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 64,
+    "requestId": 700028,
+    "displayDate": "9/12/2026 8:51 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 65,
+    "requestId": 700028,
+    "displayDate": "9/12/2026 3:10 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 66,
+    "requestId": 700029,
+    "displayDate": "9/12/2026 5:30 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "apatel"
+  },
+  {
+    "id": 67,
+    "requestId": 700029,
+    "displayDate": "9/12/2026 5:31 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 68,
+    "requestId": 700027,
+    "displayDate": "9/12/2026 7:58 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 69,
+    "requestId": 700030,
+    "displayDate": "9/14/2026 6:47 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 70,
+    "requestId": 700030,
+    "displayDate": "9/14/2026 6:48 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 71,
+    "requestId": 700031,
+    "displayDate": "9/14/2026 9:29 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "apatel"
+  },
+  {
+    "id": 72,
+    "requestId": 700031,
+    "displayDate": "9/14/2026 9:30 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 73,
+    "requestId": 700032,
+    "displayDate": "9/14/2026 12:17 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 74,
+    "requestId": 700032,
+    "displayDate": "9/14/2026 12:18 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 75,
+    "requestId": 700030,
+    "displayDate": "9/15/2026 8:28 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 76,
+    "requestId": 700033,
+    "displayDate": "9/15/2026 11:49 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "jbrooks"
+  },
+  {
+    "id": 77,
+    "requestId": 700033,
+    "displayDate": "9/15/2026 11:50 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 78,
+    "requestId": 700033,
+    "displayDate": "9/15/2026 11:21 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 79,
+    "requestId": 700034,
+    "displayDate": "9/16/2026 2:22 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 80,
+    "requestId": 700034,
+    "displayDate": "9/16/2026 2:23 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 81,
+    "requestId": 700035,
+    "displayDate": "9/17/2026 2:53 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "gdiaz"
+  },
+  {
+    "id": 82,
+    "requestId": 700035,
+    "displayDate": "9/17/2026 2:54 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 83,
+    "requestId": 700036,
+    "displayDate": "9/24/2026 8:26 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "bfoster"
+  },
+  {
+    "id": 84,
+    "requestId": 700036,
+    "displayDate": "9/24/2026 8:27 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 85,
+    "requestId": 700037,
+    "displayDate": "9/25/2026 11:55 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 86,
+    "requestId": 700037,
+    "displayDate": "9/25/2026 11:56 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 87,
+    "requestId": 700038,
+    "displayDate": "9/25/2026 3:03 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 88,
+    "requestId": 700038,
+    "displayDate": "9/25/2026 3:04 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 89,
+    "requestId": 700037,
+    "displayDate": "9/26/2026 9:21 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 90,
+    "requestId": 700039,
+    "displayDate": "9/26/2026 1:36 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "bfoster"
+  },
+  {
+    "id": 91,
+    "requestId": 700039,
+    "displayDate": "9/26/2026 1:37 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 92,
+    "requestId": 700039,
+    "displayDate": "9/26/2026 9:53 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 93,
+    "requestId": 700040,
+    "displayDate": "9/28/2026 9:08 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "jbrooks"
+  },
+  {
+    "id": 94,
+    "requestId": 700040,
+    "displayDate": "9/28/2026 9:09 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 95,
+    "requestId": 700041,
+    "displayDate": "9/28/2026 10:34 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "apatel"
+  },
+  {
+    "id": 96,
+    "requestId": 700041,
+    "displayDate": "9/28/2026 10:35 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 97,
+    "requestId": 700042,
+    "displayDate": "9/29/2026 12:47 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "egarcia"
+  },
+  {
+    "id": 98,
+    "requestId": 700042,
+    "displayDate": "9/29/2026 12:48 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 99,
+    "requestId": 700040,
+    "displayDate": "9/29/2026 6:43 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 100,
+    "requestId": 700043,
+    "displayDate": "9/29/2026 3:50 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "jbrooks"
+  },
+  {
+    "id": 101,
+    "requestId": 700043,
+    "displayDate": "9/29/2026 3:51 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 102,
+    "requestId": 700043,
+    "displayDate": "9/30/2026 3:42 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 103,
+    "requestId": 700044,
+    "displayDate": "10/5/2026 4:17 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "gdiaz"
+  },
+  {
+    "id": 104,
+    "requestId": 700044,
+    "displayDate": "10/5/2026 4:18 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 105,
+    "requestId": 700045,
+    "displayDate": "10/6/2026 10:47 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "apatel"
+  },
+  {
+    "id": 106,
+    "requestId": 700045,
+    "displayDate": "10/6/2026 10:48 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 107,
+    "requestId": 700046,
+    "displayDate": "10/7/2026 6:49 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "lchen"
+  },
+  {
+    "id": 108,
+    "requestId": 700046,
+    "displayDate": "10/7/2026 6:50 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 109,
+    "requestId": 700047,
+    "displayDate": "10/9/2026 7:27 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "egarcia"
+  },
+  {
+    "id": 110,
+    "requestId": 700047,
+    "displayDate": "10/9/2026 7:28 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 111,
+    "requestId": 700048,
+    "displayDate": "10/9/2026 12:43 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 112,
+    "requestId": 700048,
+    "displayDate": "10/9/2026 12:44 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 113,
+    "requestId": 700049,
+    "displayDate": "10/10/2026 2:04 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "ckim"
+  },
+  {
+    "id": 114,
+    "requestId": 700049,
+    "displayDate": "10/10/2026 2:05 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 115,
+    "requestId": 700050,
+    "displayDate": "10/11/2026 2:59 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 116,
+    "requestId": 700050,
+    "displayDate": "10/11/2026 3:00 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUReclaimed"
+  },
+  {
+    "id": 117,
+    "requestId": 700050,
+    "displayDate": "10/12/2026 3:04 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUReclaimed"
+  },
+  {
+    "id": 118,
+    "requestId": 700051,
+    "displayDate": "10/14/2026 6:52 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 119,
+    "requestId": 700051,
+    "displayDate": "10/14/2026 6:53 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 120,
+    "requestId": 700052,
+    "displayDate": "10/14/2026 1:30 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "tbaxter"
+  },
+  {
+    "id": 121,
+    "requestId": 700052,
+    "displayDate": "10/14/2026 1:31 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 122,
+    "requestId": 700053,
+    "displayDate": "10/21/2026 6:38 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "jbrooks"
+  },
+  {
+    "id": 123,
+    "requestId": 700053,
+    "displayDate": "10/21/2026 6:39 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 124,
+    "requestId": 700054,
+    "displayDate": "10/21/2026 7:49 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "apatel"
+  },
+  {
+    "id": 125,
+    "requestId": 700054,
+    "displayDate": "10/21/2026 7:50 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 126,
+    "requestId": 700055,
+    "displayDate": "10/21/2026 9:08 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "hlawson"
+  },
+  {
+    "id": 127,
+    "requestId": 700055,
+    "displayDate": "10/21/2026 9:09 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 128,
+    "requestId": 700053,
+    "displayDate": "10/22/2026 6:24 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 129,
+    "requestId": 700056,
+    "displayDate": "10/24/2026 10:03 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "bfoster"
+  },
+  {
+    "id": 130,
+    "requestId": 700056,
+    "displayDate": "10/24/2026 10:04 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 131,
+    "requestId": 700057,
+    "displayDate": "10/24/2026 5:08 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "egarcia"
+  },
+  {
+    "id": 132,
+    "requestId": 700057,
+    "displayDate": "10/24/2026 5:09 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 133,
+    "requestId": 700058,
+    "displayDate": "10/26/2026 8:08 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "hlawson"
+  },
+  {
+    "id": 134,
+    "requestId": 700058,
+    "displayDate": "10/26/2026 8:09 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 135,
+    "requestId": 700059,
+    "displayDate": "10/26/2026 11:21 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "dokafor"
+  },
+  {
+    "id": 136,
+    "requestId": 700059,
+    "displayDate": "10/26/2026 11:22 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 137,
+    "requestId": 700058,
+    "displayDate": "10/26/2026 4:30 PM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 138,
+    "requestId": 700060,
+    "displayDate": "10/27/2026 8:08 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "gdiaz"
+  },
+  {
+    "id": 139,
+    "requestId": 700060,
+    "displayDate": "10/27/2026 8:09 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  }
+]
