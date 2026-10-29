@@ -90,7 +90,7 @@ Dates are ISO 8601 with the Eastern offset (for example `2026-10-19T14:52:36-04:
 
 ## Mock QAlert data
 
-`requests.json` is a top-level array, matching the documented `requests/get` response. Field names follow the QAlert v1 evidence in [the API research](../plans/reports/researcher-261027-1254-qalert-api-schema.md).
+`requests.json` is a top-level array, matching the documented `requests/get` response. Field names follow the public QAlert v1 evidence: the City of Haverhill and City of Somerville QAlert client code and test fixtures.
 
 | Field(s) | Basis |
 |---|---|
