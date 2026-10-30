@@ -10,3 +10,7 @@ __pycache__/
 # OS
 .DS_Store
 plans/
+
+# Presentation build output
+node_modules/
+dist/
