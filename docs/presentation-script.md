@@ -4,13 +4,17 @@ A speaker script for the 11-slide deck in [`presentation/`](../presentation). It
 
 ## Before you present
 
+The deck is online at https://unclethien.github.io/QAlert-Maximo-Sarasota-County/. Open it in your browser and press **F** for full screen. Nothing to install.
+
+To run it from your own laptop instead, for example without internet:
+
 ```bash
 cd presentation
 npm install        # first time only
 npm run dev        # opens on http://localhost:5180
 ```
 
-Open the address in your browser and press **F** for full screen.
+Then open http://localhost:5180 and press **F**.
 
 - **Next slide:** right arrow, down arrow, Space, Enter, or Page Down (most presentation clickers send Page Down).
 - **Previous slide:** left arrow, up arrow, Backspace, or Page Up.

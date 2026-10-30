@@ -28,7 +28,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 | [`data/qalert/`](data/qalert) | The fake QAlert records, including the staff list (`employees.json`) used to look up who entered a request. |
 | [`data/reference/`](data/reference) | A stand-in for the County's address list. |
 | [`scripts/`](scripts) | The programs that create the data. You can ignore this folder. |
-| [`presentation/`](presentation) | A 10-minute slide deck about the dataset. Its speaker script is [`docs/presentation-script.md`](docs/presentation-script.md). |
+| [`presentation/`](presentation) | A 10-minute slide deck about the dataset. [View it online](https://unclethien.github.io/QAlert-Maximo-Sarasota-County/). Its speaker script is [`docs/presentation-script.md`](docs/presentation-script.md). |
 
 ## Reading the data
 
@@ -66,3 +66,5 @@ cd presentation
 npm install
 npm run dev     # http://localhost:5180, press F for full screen
 ```
+
+Every push to `main` that changes `presentation/` or `data/` republishes the deck to https://unclethien.github.io/QAlert-Maximo-Sarasota-County/. See [`docs/deployment.md`](docs/deployment.md).
