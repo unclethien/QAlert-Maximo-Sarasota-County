@@ -28,6 +28,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 | [`data/qalert/`](data/qalert) | The fake QAlert records, including the staff list (`employees.json`) used to look up who entered a request. |
 | [`data/reference/`](data/reference) | A stand-in for the County's address list. |
 | [`scripts/`](scripts) | The programs that create the data. You can ignore this folder. |
+| [`presentation/`](presentation) | A 10-minute slide deck about the dataset. Its speaker script is [`docs/presentation-script.md`](docs/presentation-script.md). |
 
 ## Reading the data
 
@@ -57,3 +58,11 @@ python3 scripts/validate_pilot_dataset.py   # checks the files; exits 1 if any c
 ```
 
 To change the data, edit `scripts/pilot_catalog.py` and run both commands again. The fields, scenarios, and assumptions are described in [`docs/sample-dataset.md`](docs/sample-dataset.md).
+
+The slide deck is a React app that reads its numbers from `data/`, so it stays in step with the dataset. It needs Node.js:
+
+```bash
+cd presentation
+npm install
+npm run dev     # http://localhost:5180, press F for full screen
+```
