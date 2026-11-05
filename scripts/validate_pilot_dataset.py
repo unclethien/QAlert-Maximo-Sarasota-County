@@ -27,6 +27,15 @@ EXPECTED_ALERTS = {
     "Related planned work": 4,
     "None": 20,
 }
+# Provisional channel mix: most requests come from residents through 311Connect (app or web),
+# about one in five from Contact Center staff (phone or email). Values are QAlert origin labels.
+STAFF_ORIGIN = "Control Panel"
+EXPECTED_CHANNELS = {
+    "311Connect mobile app": 30,
+    "311 web portal": 18,
+    "phone call to 311": 9,
+    "email to the Contact Center": 3,
+}
 EXPECTED_USE_CASES = {
     "Missing-Information Detection": 24,
     "Duplicate Identification": 15,
@@ -77,11 +86,18 @@ def main():
         rid = int(sr["EXTERNALSYSTEM_TICKETID"])
         check(rid in request_by_id, f"{sr['TICKETID']}: QAlert request {rid} missing")
         match = ENTERED_BY.search(sr["DESCRIPTION_LONGDESCRIPTION"])
-        check(match is not None, f"{sr['TICKETID']}: no 'Entered by' line")
-        if match and rid in request_by_id:
-            emp = match.group(1)
-            check(emp in employee_by_id, f"{sr['TICKETID']}: employee {emp} missing from employees.json")
-            check(request_by_id[rid]["employeeId"] == emp, f"{sr['TICKETID']}: Entered by differs from QAlert employeeId")
+        req = request_by_id.get(rid)
+        if req and req["origin"] == STAFF_ORIGIN:
+            check(match is not None, f"{sr['TICKETID']}: staff-entered SR has no 'Entered by' line")
+            check(req["intakeMethod"] in ("Phone", "Email"), f"{sr['TICKETID']}: staff-entered request needs an intakeMethod")
+            if match:
+                emp = match.group(1)
+                check(emp in employee_by_id, f"{sr['TICKETID']}: employee {emp} missing from employees.json")
+                check(req["employeeId"] == emp, f"{sr['TICKETID']}: Entered by differs from QAlert employeeId")
+        elif req:
+            check(match is None, f"{sr['TICKETID']}: resident-submitted SR must not have an 'Entered by' line")
+            check(req["employeeId"] is None and req["intakeMethod"] is None,
+                  f"{sr['TICKETID']}: resident-submitted request must not carry an employee or intake method")
         check(sr["REPORTEDBY"] == "MWQSCINT", f"{sr['TICKETID']}: reporter is not the integration account")
     for wo in wos:
         if wo["ORIGRECORDID"]:
@@ -99,13 +115,33 @@ def main():
     usernames = {e["username"] for e in employees}
     for a in activity:
         if a["codeDesc"] == "Created":
-            check(a["routeId"] in usernames, f"activity {a['id']}: creator {a['routeId']} is not a QAlert employee")
+            staff_entered = request_by_id[a["requestId"]]["origin"] == STAFF_ORIGIN
+            check((a["routeId"] in usernames) if staff_entered else a["routeId"] == "",
+                  f"activity {a['id']}: creator {a['routeId']!r} does not match the request origin")
     for r in requests:
         check(r["typeId"] in type_ids, f"request {r['id']}: unknown type {r['typeId']}")
 
     # Answer key coverage.
     check({a["TICKETID"] for a in answers} == sr_ids, "answer key must cover every SR exactly once")
+    request_by_ticket = {sr["TICKETID"]: request_by_id[int(sr["EXTERNALSYSTEM_TICKETID"])] for sr in srs}
     for a in answers:
+        req = request_by_ticket[a["TICKETID"]]
+        check(a["QALERT_ORIGIN"] == req["origin"], f"{a['TICKETID']}: QALERT_ORIGIN differs from the QAlert request")
+        check(bool(a["ENTERED_BY_EMPLOYEE_ID"]) == (req["origin"] == STAFF_ORIGIN),
+              f"{a['TICKETID']}: only staff-entered requests have an entered-by employee")
+        emp = employee_by_id.get(a["ENTERED_BY_EMPLOYEE_ID"])
+        if emp:
+            expected = "Entered-by employee" if emp["active"] else "Department supervisor"
+        elif req["phone"] or req["email"]:
+            expected = "Resident"
+            check((a["FOLLOW_UP_CONTACT_PHONE"], a["FOLLOW_UP_CONTACT_EMAIL"]) == (req["phone"], req["email"]),
+                  f"{a['TICKETID']}: resident contact differs from the QAlert request")
+        else:
+            expected = "Owning group supervisor"
+            check(a["FOLLOW_UP_CONTACT_PHONE"] in {p["PRIMARYPHONE"] for p in persons},
+                  f"{a['TICKETID']}: supervisor contact is not a Maximo person")
+        check(a["FOLLOW_UP_CONTACT_TYPE"] == expected,
+              f"{a['TICKETID']}: follow-up contact {a['FOLLOW_UP_CONTACT_TYPE']!r}, expected {expected!r}")
         for ref in filter(None, a["RELATED_RECORDS"].split(";")):
             check(ref in sr_ids or ref in wo_ids, f"{a['TICKETID']}: related record {ref} missing")
         emp = employee_by_id.get(a["ENTERED_BY_EMPLOYEE_ID"])
@@ -115,6 +151,8 @@ def main():
             check((a["ENTERED_BY_ACTIVE"] == "Y") == emp["active"], f"{a['TICKETID']}: ENTERED_BY_ACTIVE disagrees")
         if a["EXPECTED_ALERT"] == "Missing or incorrect information":
             check(bool(a["SUGGESTED_CLARIFICATION_QUESTION"]), f"{a['TICKETID']}: flagged SR needs a clarification question")
+    channels = Counter(a["SUBMITTED_VIA"] for a in answers)
+    check(channels == Counter(EXPECTED_CHANNELS), f"channel counts {dict(channels)} differ from {EXPECTED_CHANNELS}")
     alerts = Counter(a["EXPECTED_ALERT"] for a in answers)
     use_cases = Counter(a["USE_CASE"] for a in answers)
     check(alerts == Counter(EXPECTED_ALERTS), f"alert counts {dict(alerts)} differ from {EXPECTED_ALERTS}")
@@ -137,6 +175,8 @@ def main():
     used_unmapped = {a["ENTERED_BY_EMPLOYEE_ID"] for a in answers} & {e["id"] for e in unmapped}
     check(len(used_unmapped) >= 1, "at least one SR must be entered by an unmapped employee")
     check(any(a["ENTERED_BY_ACTIVE"] == "N" for a in answers), "at least one SR must be entered by an inactive employee")
+    check(any(a["FOLLOW_UP_CONTACT_TYPE"] == "Owning group supervisor" for a in answers),
+          "at least one resident request must be anonymous")
 
     # Synthetic-data safety: every phone and email uses the reserved fictional ranges.
     phones, emails = [], []
@@ -147,7 +187,8 @@ def main():
             phones.append(p["PRIMARYPHONE"])
         emails.append(p["PRIMARYEMAIL"])
     for r in requests:
-        phones.append(r["phone"])
+        if r["phone"]:
+            phones.append(r["phone"])
         if r["email"]:
             emails.append(r["email"])
     for sr in srs:
@@ -155,7 +196,8 @@ def main():
         emails += [e for e in LD_EMAILS.findall(sr["DESCRIPTION_LONGDESCRIPTION"]) if "google.com" not in e]
         emails.append(sr["REPORTEDEMAIL"])
     for a in answers:
-        phones.append(a["ENTERED_BY_PHONE"]); emails.append(a["ENTERED_BY_EMAIL"])
+        phones += filter(None, (a["ENTERED_BY_PHONE"], a["FOLLOW_UP_CONTACT_PHONE"]))
+        emails += filter(None, (a["ENTERED_BY_EMAIL"], a["FOLLOW_UP_CONTACT_EMAIL"]))
     for p in phones:
         check(bool(PHONE.match(p)), f"phone {p} is outside 941-555-0100..0199")
     for e in emails:
@@ -164,6 +206,7 @@ def main():
     print(f"SRs {len(srs)}, WOs {len(wos)}, work logs {len(logs)}, QAlert requests {len(requests)}, "
           f"activity {len(activity)}, employees {len(employees)} ({len(unmapped)} not in Maximo)")
     print("Use cases:", dict(sorted(use_cases.items())))
+    print("Channels:", dict(sorted(channels.items())))
     print("Expected alerts:", dict(sorted(alerts.items())))
     if failures:
         print(f"\nFAILED: {len(failures)} problem(s)")

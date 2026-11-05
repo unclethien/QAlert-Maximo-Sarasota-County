@@ -51,18 +51,25 @@ MAXIMO_PERSON_COLUMNS = [
 ADDRESS_COLUMNS = ["ADDRESS_ID", "STREETNO", "STREETNAME", "CITY", "STATE", "ZIP", "LATITUDE", "LONGITUDE", "PARCEL_ID"]
 ANSWER_KEY_COLUMNS = [
     "TICKETID", "QALERT_REQUEST_ID", "USE_CASE", "SCENARIO", "EXPECTED_ALERT", "ISSUE_SUMMARY",
-    "MISSING_INFORMATION", "ENTERED_BY_EMPLOYEE_ID", "ENTERED_BY_NAME", "ENTERED_BY_DEPARTMENT",
-    "ENTERED_BY_PHONE", "ENTERED_BY_EMAIL", "ENTERED_BY_ACTIVE", "ENTERED_BY_IN_MAXIMO",
+    "MISSING_INFORMATION", "QALERT_ORIGIN", "SUBMITTED_VIA", "ENTERED_BY_EMPLOYEE_ID", "ENTERED_BY_NAME",
+    "ENTERED_BY_DEPARTMENT", "ENTERED_BY_PHONE", "ENTERED_BY_EMAIL", "ENTERED_BY_ACTIVE", "ENTERED_BY_IN_MAXIMO",
+    "FOLLOW_UP_CONTACT_TYPE", "FOLLOW_UP_CONTACT_NAME", "FOLLOW_UP_CONTACT_PHONE", "FOLLOW_UP_CONTACT_EMAIL",
     "SUGGESTED_CLARIFICATION_QUESTION", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION",
 ]
 
-SR_REVIEW_NOTES = [
-    "Reviewed SR. Need more information before dispatch. Called customer, no answer, left voicemail.",
-    "Reviewed SR. Not enough detail to dispatch. Sent back to the contact center to clarify.",
-    "Reviewed. Holding for clarification from the customer.",
-    "Called customer twice, no answer. Will try again tomorrow.",
-    "Reviewed SR. Unclear what is being requested. Need callback from whoever took the call.",
-]
+# Planner notes on held SRs, by who entered the request.
+SR_REVIEW_NOTES = {
+    "resident": [
+        "Reviewed SR. Need more information before dispatch. Called customer, no answer, left voicemail.",
+        "Reviewed. Holding for clarification from the customer.",
+        "Called customer twice, no answer. Will try again tomorrow.",
+        "Reviewed SR. Unclear what is being requested. Asked the customer for more detail through 311Connect.",
+    ],
+    "staff": [
+        "Reviewed SR. Not enough detail to dispatch. Sent back to the contact center to clarify.",
+        "Reviewed SR. Unclear what is being requested. Need callback from whoever took the call.",
+    ],
+}
 
 
 # ---- formatting helpers --------------------------------------------------------------------
@@ -193,29 +200,32 @@ def assign_times(rng):
     return times
 
 
-def pick_entered_by(rng, scenario, staff_by_id, active_staff):
-    if scenario.get("entered_by"):
-        return staff_by_id[scenario["entered_by"]]
-    return rng.choice(active_staff)
+def make_resident(rng, name_pairs, phones, channel):
+    """A resident and the contact details QAlert holds for them.
 
-
-def make_resident(rng, name_pairs, phones):
+    App users sign in with an email, so app requests always carry one; the web portal and the
+    Contact Center may collect a phone, an email, or both.
+    """
     first, last = name_pairs.pop()
     name = f"{first} {last}"
     if rng.random() < 0.35:
         name = name.upper()
-    email = "" if rng.random() < 0.15 else f"{first[0]}{last}{rng.randint(10, 99)}@{rng.choice(['example.com', 'example.net'])}".lower()
-    return dict(name=name, email=email, phone=phones.take())
+    email = f"{first[0]}{last}{rng.randint(10, 99)}@{rng.choice(['example.com', 'example.net'])}".lower()
+    has_email = channel == "app" or rng.random() >= 0.15
+    has_phone = rng.random() < {"app": 0.7, "web": 0.6}.get(channel, 1.0) or not has_email
+    return dict(name=name, email=email if has_email else "", phone=phones.take() if has_phone else "")
 
 
 def long_description(resident, loc, text, employee_id):
-    customer = f"<div>Customer: {html_text(resident['name'])} {resident['email']} {resident['phone']}</div>"
+    contact = " ".join(filter(None, (html_text(resident["name"]), resident["email"], resident["phone"])))
+    customer = f"<div>Customer: {contact}</div>"
     if loc["lat"]:
         address = (f"<div>Address: {html_text(loc['line'])}, FL <a target=\"_blank\" "
                    f"href=\"https://www.google.com/maps/search/{loc['lat']},{loc['lon']}\">Map</a></div>")
     else:
         address = f"<div>Address: {html_text(loc['line'])}, FL</div>"
-    return f"{customer}{address}<div>{html_text(text)}</div><div>Entered by: {employee_id}</div>"
+    entered_by = f"<div>Entered by: {employee_id}</div>" if employee_id else ""
+    return f"{customer}{address}<div>{html_text(text)}</div>{entered_by}"
 
 
 def crew_for(discipline, field):
@@ -234,7 +244,6 @@ def build():
     phones = Phones()
     staff, field = build_people(phones)
     staff_by_id = {s["id"]: s for s in staff}
-    active_staff = [s for s in staff if s["active"]]
     water_leads = [f for f in field if f["discipline"] == "water" and f["title"].startswith("Crew Lead")]
 
     streets = collect_streets()
@@ -283,15 +292,19 @@ def build():
         type_id, dept_id, priority, discipline, cgroup, commodity, ownergroup, route = cat.REQUEST_TYPES[rtype]
         reported = times[key]
         created_in_qalert = reported - timedelta(minutes=rng.randint(2, 9))
-        employee = pick_entered_by(rng, s, staff_by_id, active_staff)
+        origins, intake, staff_entered, _ = cat.CHANNELS[s["channel"]]
+        origin = origins[sum(map(ord, key)) % len(origins)]
+        employee = staff_by_id[s["entered_by"]] if staff_entered else None
         if s.get("resident", "").startswith("same_as:"):
             resident = residents[s["resident"].split(":", 1)[1]]
+        elif s.get("anonymous"):
+            resident = dict(name="Anonymous", email="", phone="")
         else:
-            resident = make_resident(rng, name_pairs, phones)
+            resident = make_resident(rng, name_pairs, phones, s["channel"])
         residents[key] = resident
         loc = resolve_address(s["addr"], points, centroids)
         description = f"{rtype}, {loc['short']}" if loc["short"] else rtype
-        ld = long_description(resident, loc, s["text"], employee["id"])
+        ld = long_description(resident, loc, s["text"], employee and employee["id"])
         sup, lead, planner = crew_for(discipline, field)
 
         wo_spec = s.get("wo")
@@ -326,10 +339,12 @@ def build():
             "priorityToDisplay": priority, "hasLinks": False, "comments": s["text"],
             "streetNum": loc["num"], "streetName": loc["street"].upper(), "crossName": "",
             "cityName": loc["city"], "latitude": loc["lat"], "longitude": loc["lon"],
-            "origin": "Control Panel", "name": resident["name"], "email": resident["email"],
-            "phone": resident["phone"], "intakeMethod": s.get("intake", "Phone"), "employeeId": employee["id"],
+            "origin": origin, "name": resident["name"], "email": resident["email"],
+            "phone": resident["phone"], "intakeMethod": intake, "employeeId": employee and employee["id"],
         }))
-        activity.append(dict(key=key, at=created_in_qalert, codeDesc="Created", routeId=employee["username"]))
+        # Resident-submitted requests have no staff creator.
+        activity.append(dict(key=key, at=created_in_qalert, codeDesc="Created",
+                             routeId=employee["username"] if employee else ""))
         activity.append(dict(key=key, at=created_in_qalert + timedelta(minutes=1), codeDesc="Assigned", routeId=route))
         if qalert_status == QALERT_STATUS["closed"]:
             activity.append(dict(key=key, at=sr_status_date, codeDesc="Closed", routeId=route))
@@ -348,7 +363,8 @@ def build():
             pending_logs.append((reported + timedelta(hours=3), ("SR", key), planner["id"], "", note))
 
         if s["group"] == "missing" and "notes" not in s:
-            note = SR_REVIEW_NOTES[ord(key[-1]) % len(SR_REVIEW_NOTES)]
+            notes = SR_REVIEW_NOTES["staff" if staff_entered else "resident"]
+            note = notes[ord(key[-1]) % len(notes)]
             if wo_spec:
                 note = "Reviewed SR and dispatched to field crew."
             pending_logs.append((reported + timedelta(hours=1, minutes=rng.randrange(50)), ("SR", key), planner["id"], "", note))
@@ -357,7 +373,7 @@ def build():
         elif s.get("cluster") and key.endswith("1"):
             pending_logs.append((reported + timedelta(minutes=40), ("SR", key), planner["id"], "", "Priority call. Assigned to on-call crew."))
 
-        s["_employee"], s["_loc"] = employee, loc
+        s.update(_employee=employee, _loc=loc, _origin=origin, _resident=resident, _supervisor=sup)
 
     # Assign IDs in chronological order.
     for i, sr in enumerate(sorted(srs, key=lambda r: (r["reported"], r["key"]))):
@@ -434,19 +450,39 @@ def build():
 
 # ---- answer key ----------------------------------------------------------------------------
 
-def contact_sentence(emp):
-    sentence = (f"Contact {emp['firstName']} {emp['lastName']} ({emp['department']}, {emp['phone']}, "
-                f"{emp['email']}), who entered the request in QAlert as employee {emp['id']}")
-    if not emp["in_maximo"]:
-        sentence += "; this employee has no Maximo person record, so the contact details come from QAlert"
-    if not emp["active"]:
-        sentence = (f"The request was entered by {emp['firstName']} {emp['lastName']} (employee {emp['id']}), "
-                    f"who is no longer active; send the question to the {emp['department']} supervisor instead")
-    return sentence + "."
+def follow_up(s):
+    """Who to ask when a request needs clarification: (type, name, phone, email, sentence).
+
+    Residents who submitted through the app or web portal are asked directly. Phone and email
+    requests go back to the Contact Center employee who entered them, or to that employee's
+    supervisor once they are inactive. Anonymous requests go to the owning group's supervisor.
+    """
+    emp, res, sup = s["_employee"], s["_resident"], s["_supervisor"]
+    via = cat.CHANNELS[s["channel"]][3]
+    if emp and not emp["active"]:
+        name = f"{emp['department']} supervisor"
+        return ("Department supervisor", name, "", "",
+                f"The request was entered by {emp['firstName']} {emp['lastName']} (employee {emp['id']}), "
+                f"who is no longer active; send the question to the {name} instead.")
+    if emp:
+        sentence = (f"Contact {emp['firstName']} {emp['lastName']} ({emp['department']}, {emp['phone']}, "
+                    f"{emp['email']}), who took the {via} and entered it in QAlert as employee {emp['id']}")
+        if not emp["in_maximo"]:
+            sentence += "; this employee has no Maximo person record, so the contact details come from QAlert"
+        return ("Entered-by employee", f"{emp['firstName']} {emp['lastName']}", emp["phone"], emp["email"], sentence + ".")
+    if res["phone"] or res["email"]:
+        reach = " or ".join(filter(None, (res["phone"], res["email"])))
+        return ("Resident", res["name"], res["phone"], res["email"],
+                f"The resident submitted this through the {via}; contact {res['name']} directly ({reach}).")
+    name = f"{sup['first']} {sup['last']}"
+    return ("Owning group supervisor", name, sup["phone"], sup["email"],
+            f"The request was submitted anonymously through the {via} with no phone or email, so send the "
+            f"question to {name} ({sup['title']}, {sup['phone']}, {sup['email']}).")
 
 
 def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
     key, emp, group = s["key"], s["_employee"], s["group"]
+    contact_type, contact_name, contact_phone, contact_email, contact_sentence = follow_up(s)
     sr_id = sr_by_key[key]["id"]
     related, alert, recommendation = [], "None", ""
     use_case = {"missing": cat.USE_CASE_MISSING, "duplicate": cat.USE_CASE_DUPLICATE,
@@ -455,7 +491,7 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
 
     if group == "missing":
         alert = "Missing or incorrect information"
-        recommendation = f"Flag before dispatch: {s['issue']} {contact_sentence(emp)} Ask: \"{s['question']}\""
+        recommendation = f"Flag before dispatch: {s['issue']} {contact_sentence} Ask: \"{s['question']}\""
         if s.get("true_type"):
             recommendation += f" Suggested reclassification: {s['true_type']}."
         if key in wo_by_key:
@@ -473,7 +509,7 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
             related.append(sr_by_key[primary]["id"])
             alert = "Possible duplicate"
             hours = round((times[key] - times[primary]).total_seconds() / 3600)
-            recommendation = (f"Likely duplicate of {sr_by_key[primary]['id']} ({s['issue']} Reported {hours} hours later "
+            recommendation = (f"Likely duplicate of {sr_by_key[primary]['id']} ({s['issue']} Reported {hours} hour{'s' if hours != 1 else ''} later "
                               f"at the same or a neighboring address.) Link to the primary SR instead of dispatching again.")
             if primary in wo_by_key:
                 related.append(wo_by_key[primary]["id"])
@@ -500,10 +536,16 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
     return {
         "TICKETID": sr_id, "QALERT_REQUEST_ID": str(request_id_by_key[key]), "USE_CASE": use_case,
         "SCENARIO": s["scenario"], "EXPECTED_ALERT": alert, "ISSUE_SUMMARY": s.get("issue", "Complete request."),
-        "MISSING_INFORMATION": s.get("missing", ""), "ENTERED_BY_EMPLOYEE_ID": emp["id"],
-        "ENTERED_BY_NAME": f"{emp['firstName']} {emp['lastName']}", "ENTERED_BY_DEPARTMENT": emp["department"],
-        "ENTERED_BY_PHONE": emp["phone"], "ENTERED_BY_EMAIL": emp["email"],
-        "ENTERED_BY_ACTIVE": "Y" if emp["active"] else "N", "ENTERED_BY_IN_MAXIMO": "Y" if emp["in_maximo"] else "N",
+        "MISSING_INFORMATION": s.get("missing", ""), "QALERT_ORIGIN": s["_origin"],
+        "SUBMITTED_VIA": cat.CHANNELS[s["channel"]][3],
+        "ENTERED_BY_EMPLOYEE_ID": emp["id"] if emp else "",
+        "ENTERED_BY_NAME": f"{emp['firstName']} {emp['lastName']}" if emp else "",
+        "ENTERED_BY_DEPARTMENT": emp["department"] if emp else "",
+        "ENTERED_BY_PHONE": emp["phone"] if emp else "", "ENTERED_BY_EMAIL": emp["email"] if emp else "",
+        "ENTERED_BY_ACTIVE": ("Y" if emp["active"] else "N") if emp else "",
+        "ENTERED_BY_IN_MAXIMO": ("Y" if emp["in_maximo"] else "N") if emp else "",
+        "FOLLOW_UP_CONTACT_TYPE": contact_type, "FOLLOW_UP_CONTACT_NAME": contact_name,
+        "FOLLOW_UP_CONTACT_PHONE": contact_phone, "FOLLOW_UP_CONTACT_EMAIL": contact_email,
         "SUGGESTED_CLARIFICATION_QUESTION": s.get("question", ""), "RELATED_RECORDS": ";".join(related),
         "EXPECTED_RECOMMENDATION": recommendation,
     }
