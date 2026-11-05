@@ -19,7 +19,7 @@ def _empty_instance():
                                                        ("NEW", "QUEUED", "INPRG", "PENDING", "RESOLVED", "CLOSED")]},
             {"domainid": "WOSTATUS", "synonymdomain": [{"value": v, "maxvalue": v} for v in
                                                        ("WAPPR", "WSCH", "INPRG", "COMP", "CLOSE", "CAN")]},
-            {"domainid": "LOGTYPE", "alndomain": [{"value": "CLIENTNOTE"}, {"value": "UPDATE"}]},
+            {"domainid": "LOGTYPE", "alndomain": [{"value": "CLIENTNOTE"}]},
         ],
         "mxapiclassstructure": [],
         "mxapijobplan": [],
@@ -40,7 +40,7 @@ def test_inventory_on_an_empty_instance(fake_maximo):
     assert report["record_counts"] == {"status": "ok", "sr_at_site": 0, "wo_at_site": 0}
     assert report["domains"]["SRSTATUS"]["status"] == "ok"
     assert report["domains"]["WOSTATUS"]["missing"] == ["WCONT", "SCHED"]
-    assert report["domains"]["LOGTYPE"]["missing"] == ["RESOLUTION"]
+    assert report["domains"]["LOGTYPE"]["missing"] == ["UPDATE"]  # what RESOLUTION is written as
     assert report["work_types"]["status"] == "unknown"
     refs = report["reference_data"]
     assert len(refs["persons"]["missing"]) == 18 and "MWQSCINT" in refs["persons"]["missing"]
@@ -92,3 +92,13 @@ def test_classifications_are_matched_by_name(fake_maximo):
     report = inventory.run_inventory(fake_maximo(records).client())
     assert report["reference_data"]["classifications"]["status"] == "ok"
     assert report["sr_attributes"]["status"] == "ok"
+
+
+def test_log_types_are_found_in_a_synonym_domain(fake_maximo):
+    records = _empty_instance()
+    for d in records["mxapidomain"]:
+        if d["domainid"] == "LOGTYPE":
+            d.pop("alndomain", None)
+            d["synonymdomain"] = [{"value": "CLIENTNOTE", "maxvalue": "CLIENTNOTE"}, {"value": "UPDATE", "maxvalue": "UPDATE"}]
+    report = inventory.run_inventory(fake_maximo(records).client())
+    assert report["domains"]["LOGTYPE"]["status"] == "ok"

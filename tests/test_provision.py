@@ -182,3 +182,14 @@ def test_status_value_with_another_mapping_is_reported(fake_maximo):
 def test_new_site_gets_a_security_group_reminder(fake_maximo):
     p, _, _ = _run(fake_maximo(_instance()), apply=True, only=["org", "site"])
     assert any("Security Groups" in m for m in p.manual)
+
+
+def test_status_values_are_written_through_mxdomain_when_it_exists(fake_maximo):
+    records = _instance()
+    records["mxdomain"] = [{"domainid": d["domainid"], "synonymdomain": []} for d in records["mxapidomain"]]
+    fake = fake_maximo(records)
+    _, code, _ = _run(fake, apply=True, only=["statuses"])
+    assert code == 0
+    written = {s["value"] for d in fake.records["mxdomain"] for s in d["synonymdomain"]}
+    assert written == {"INPRG", "WCONT", "SCHED"}
+    assert all(s["orgid"] == "SRQ" for d in fake.records["mxdomain"] for s in d["synonymdomain"])

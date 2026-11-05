@@ -77,7 +77,7 @@ These steps run in order:
 
 - **Give the API user access to the site.** In Security Groups, give the API key user's group access to `SRQSITE`. Until you do, Maximo refuses every SR and WO for that site.
 - **Activate the organization.** A new organization stays inactive until someone sets its clearing account. In Organizations, open `SRQ`, set the clearing account, activate it, then run `provision --apply` again.
-- **Work log types.** One SR work log uses `LOGTYPE` `RESOLUTION`, as in the County's misrouted samples. `inventory` lists any work log type the instance lacks. If `RESOLUTION` is missing, add it to the `LOGTYPE` domain in Domains before the load.
+- **Work log types.** One SR work log uses the County's `LOGTYPE` `RESOLUTION`, from the misrouted samples. Standard Maximo has no such type, so the loader writes it as `UPDATE`. `inventory` lists any work log type the instance lacks.
 - **Work types.** Standard Maximo has no REST object structure for work types. Under Organizations > `SRQ` > Work Order Options > Work Type, make sure `CM`, `CS`, `IN` and `CP` exist.
 - **Job plans that were already there.** `provision` only activates job plans it created itself. A plan that was already there and isn't `ACTIVE` is listed for you to activate by hand.
 - **Teams, status values and work types, when the API is refused.** On the TechZone MAS 9 instance, Maximo refuses REST writes to person groups, domains and work types with `BMXAA0024E` ("The action ADD is not allowed"), even for a `MAXADMIN` user. `provision` then reports them as `FAILED`. Add them in the UI:
@@ -87,14 +87,19 @@ These steps run in order:
 
   Then run `provision --apply` again. It sees them as existing and creates the job plans, which need the teams.
 - **Failure codes.** The loader doesn't write the failure hierarchy. `provision` prints the failure classes and problem codes to add in Failure Codes. Until they exist, `load` sends work orders without `FAILURECODE` and `PROBLEMCODE`. Once they exist, pass `--keep-failure-codes` to `load` and `verify`.
+- **Service groups and services.** `load` doesn't send `COMMODITYGROUP` and `COMMODITY` by default. Two reasons: they must exist in Maximo first, and the County's codes (`WATER_PIPE`, `WATER_SERV`) are longer than standard Maximo's 8-character `COMMODITY`. Once they're set up, pass `--keep-commodities` to `load` and `verify`.
 
 ## What the load does with each column
 
 - **Not sent, because Maximo sets them:**
   - SR `CLASS`, `CREATEDBY` and `CREATIONDATE`;
+  - SR `REPORTEDNAME` and `AFFECTEDNAME`: Maximo clears them when `REPORTEDBY` and `AFFECTEDPERSON` are people, and shows those people's names instead;
   - work log `WORKLOGID`;
   - every `STATUSDATE`.
 - **Status.** Applied after create with `changeStatus`, through the usual steps. For example, a closed WO goes `INPRG`, then `COMP`, then `CLOSE`. The loader passes the dataset's status date. If Maximo refuses a back-dated status, the loader sets the status without the date and lists it under *Known limitations*.
+  - **SR "in progress".** The dataset uses `INPRG` for SRs, but Maximo's `changeStatus` refuses the `SRSTATUS` synonym `INPRG` ("not in the value list") even when the domain lists it. The loader therefore sends Maximo's standard `INPROG`, which is the same internal status. `verify` expects `INPROG`. WOs keep `INPRG`, which is standard on `WOSTATUS`.
+  - **Order.** When a follow-up WO starts, Maximo also moves its SR to in progress, and it refuses the WO's change while the SR is still queued. So the loader applies statuses in the order work happens: SRs go to in progress first, then the WOs run, then the SRs are resolved or closed. Maximo resolves some SRs itself when their WO completes.
+  - **Closing.** `CLOSED`, `CLOSE` and `CAN` put a record in history, and Maximo then refuses every change, new work logs included. If any of a record's work logs failed to load, the loader stops it one step short, reports the status as `FAILED`, and closes it on the run after the work log loads.
 - **Keys.** The loader sends our own `TICKETID` and `WONUM`. Each WO also gets `EXTERNALREFID` set to our WO number. If Maximo renumbers a record, `loader-state/manifest.json` records its number. `loader-state/answer-key-maximo.csv` then repeats the answer key with Maximo's numbers.
 - **Team codes.** Standard Maximo team codes (`PERSONGROUP`) hold 8 characters. The County's own code `SANCLINSP` has 9, so the loader writes it as `SANCLINS`. The dataset keeps `SANCLINSP`. `verify` uses the same mapping, and `loader-state/answer-key-maximo.csv` shows `SANCLINS`.
 - **Classification.** Maximo numbers classifications itself. The loader finds each classification by name, for example `WATER-LEAK`, and sends Maximo's number.
@@ -110,6 +115,7 @@ The run report starts with the full list of columns it didn't send, with the rea
 - Standard Maximo has no `EXTERNALSYSTEM` or `EXTERNALSYSTEM_TICKETID` on tickets. The loader puts the QAlert request ID from `EXTERNALSYSTEM_TICKETID` into the standard `EXTERNALRECID`, and doesn't send `EXTERNALSYSTEM`, which is always `QAlert`. To find a request's QAlert record in Maximo, read the SR's `EXTERNALRECID`.
 - The natural keys are `EXTERNALRECID` at site `SRQSITE` for SRs, and `EXTERNALREFID` for WOs. The inventory checks that SRs can be queried by `EXTERNALRECID`. The canary shows whether Maximo keeps the work log `CREATEDATE` we send, which the work log check depends on.
 - To remove loaded records, do it by hand in the Maximo UI. The loader can't delete.
+- **One work log is missing on the TechZone instance.** Work log `3000126` on `SR800061` is missing there, and `verify` reports it as the one difference. The first full load closed `SR800061` before the loader held back closing a record with a missing work log. At that point the work log had failed on its `RESOLUTION` type. A closed SR is in history, so Maximo now refuses the work log both through the SR and through `mxapiworklog` (`commlog#ownerNull`). A fresh load on another instance loads it.
 
 ## Tests
 

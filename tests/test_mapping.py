@@ -46,7 +46,8 @@ def test_worklog_payload_is_a_child_row():
 
 def test_dropped_column_report_names_every_unsent_column():
     sr = mapping.dropped_columns("sr", DATA.sr_header, set())
-    assert set(sr) == {"CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE", "EXTERNALSYSTEM"}
+    assert set(sr) == {"CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE", "EXTERNALSYSTEM",
+                       "REPORTEDNAME", "AFFECTEDNAME"}
     wo = mapping.dropped_columns("wo", DATA.wo_header, {"FAILURECODE", "PROBLEMCODE"})
     assert set(wo) == {"STATUS", "STATUSDATE", "FAILURECODE", "PROBLEMCODE"}
     assert set(mapping.dropped_columns("worklog", DATA.wl_header, set())) == {
@@ -89,3 +90,14 @@ def test_long_team_codes_are_written_under_their_maximo_code():
     payload = mapping.wo_payload(row, mapping.Remap(), drop={"FAILURECODE", "PROBLEMCODE"})
     assert payload["persongroup"] == "SANCLINS"
     assert all(len(mapping.maximo_team(g)) <= 8 for g in {w["PERSONGROUP"] for w in DATA.wos if w["PERSONGROUP"]})
+
+
+def test_sr_in_progress_uses_maximo_inprog_and_reads_back_as_ours():
+    assert mapping.maximo_status("sr", "INPRG") == "INPROG" and mapping.maximo_status("wo", "INPRG") == "INPRG"
+    assert mapping.dataset_status("sr", "INPROG") == "INPRG" and mapping.dataset_status("sr", "QUEUED") == "QUEUED"
+    assert mapping.status_steps("sr", "CLOSED", mapping.dataset_status("sr", "INPROG")) == ["RESOLVED", "CLOSED"]
+
+
+def test_resolution_notes_are_written_as_update():
+    row = next(w for w in DATA.worklogs if w["LOGTYPE"] == "RESOLUTION")
+    assert mapping.worklog_payload(row)["logtype"] == "UPDATE"

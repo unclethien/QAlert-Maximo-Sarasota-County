@@ -12,7 +12,7 @@ import sys
 
 from .client import MaximoClient, MaximoError
 from .config import Settings, load_settings
-from .load import DEFAULT_DROP
+from .load import COMMODITY_COLUMNS, FAILURE_CODE_COLUMNS
 from .provision import STEPS
 
 
@@ -54,7 +54,8 @@ def _ids(value: str) -> list[str]:
 
 
 def _drop(args: argparse.Namespace) -> list[str]:
-    return [] if args.keep_failure_codes else list(DEFAULT_DROP)
+    return ([] if args.keep_failure_codes else list(FAILURE_CODE_COLUMNS)) + \
+        ([] if args.keep_commodities else list(COMMODITY_COLUMNS))
 
 
 def cmd_load(args: argparse.Namespace) -> int:
@@ -94,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--limit", type=int, help="only the first N chains (an SR with its WOs, or a lone WO)")
         p.add_argument("--keep-failure-codes", action="store_true",
                        help="send FAILURECODE and PROBLEMCODE (only once they exist in Maximo)")
+        p.add_argument("--keep-commodities", action="store_true",
+                       help="send COMMODITYGROUP and COMMODITY (only once the service groups exist in Maximo)")
         p.set_defaults(func=func)
     args = parser.parse_args(argv)
     try:

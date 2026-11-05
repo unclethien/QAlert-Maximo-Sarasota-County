@@ -8,8 +8,8 @@ codes when provisioning left them as a manual step); every dropped column is rep
 from dataclasses import dataclass, field
 
 # CSV column -> attribute. Attributes are the lowercase column names, except those in RENAMED.
-SR_COLUMNS = ("TICKETID", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "REPORTEDBY", "REPORTEDNAME",
-              "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE", "AFFECTEDPERSON", "AFFECTEDNAME", "AFFECTEDEMAIL",
+SR_COLUMNS = ("TICKETID", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "REPORTEDBY",
+              "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE", "AFFECTEDPERSON", "AFFECTEDEMAIL",
               "EXTERNALSYSTEM_TICKETID", "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID",
               "OWNERGROUP", "SITEID", "ORGID")
 WO_COLUMNS = ("WONUM", "PARENT", "WORKTYPE", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "ORIGRECORDID",
@@ -36,7 +36,9 @@ DERIVED = {
     "sr": {"CLASS": "Maximo sets it from the object structure", "STATUS": "applied with changeStatus",
            "STATUSDATE": "set by changeStatus", "CREATEDBY": "the API key's user",
            "CREATIONDATE": "the time of the load",
-           "EXTERNALSYSTEM": "always QAlert; standard Maximo has no such ticket attribute"},
+           "EXTERNALSYSTEM": "always QAlert; standard Maximo has no such ticket attribute",
+           "REPORTEDNAME": "Maximo clears it when REPORTEDBY is a person and shows that person's name",
+           "AFFECTEDNAME": "Maximo clears it when AFFECTEDPERSON is a person and shows that person's name"},
     "wo": {"STATUS": "applied with changeStatus", "STATUSDATE": "set by changeStatus"},
     "worklog": {"WORKLOGID": "Maximo numbers work logs", "RECORDKEY": "the parent record",
                 "CLASS": "the parent record", "SITEID": "the parent record", "ORGID": "the parent record"},
@@ -84,8 +86,19 @@ def wo_payload(row: dict, remap: Remap, drop: set[str] = frozenset()) -> dict:
     return payload
 
 
+# The County's RESOLUTION note has no standard Maximo log type; UPDATE is the nearest.
+LOG_TYPES = {"RESOLUTION": "UPDATE"}
+
+
+def maximo_logtype(logtype: str) -> str:
+    return LOG_TYPES.get(logtype, logtype)
+
+
 def worklog_payload(row: dict) -> dict:
-    return _payload(row, WORKLOG_COLUMNS, set())
+    payload = _payload(row, WORKLOG_COLUMNS, set())
+    if payload.get("logtype"):
+        payload["logtype"] = maximo_logtype(payload["logtype"])
+    return payload
 
 
 def dropped_columns(kind: str, header, drop: set[str]) -> dict[str, str]:
@@ -107,8 +120,26 @@ def dropped_columns(kind: str, header, drop: set[str]) -> dict[str, str]:
 SR_STEPS = {"NEW": [], "QUEUED": ["QUEUED"], "INPRG": ["QUEUED", "INPRG"], "PENDING": ["QUEUED", "PENDING"],
             "RESOLVED": ["QUEUED", "INPRG", "RESOLVED"], "CLOSED": ["QUEUED", "INPRG", "RESOLVED", "CLOSED"]}
 INITIAL_STATUS = {"sr": "NEW", "wo": "WAPPR"}
+SR_IN_PROGRESS = "INPRG"
+# Statuses that put a record in history: Maximo refuses every later change, work logs included.
+HISTORY_STATUSES = {"sr": {"CLOSED"}, "wo": {"CLOSE", "CAN"}}
 WO_STEPS = {"WCONT": ["WCONT"], "SCHED": ["SCHED"], "INPRG": ["INPRG"], "COMP": ["INPRG", "COMP"],
             "CLOSE": ["INPRG", "COMP", "CLOSE"], "CAN": ["CAN"]}
+
+
+# Maximo refuses the SRSTATUS synonym INPRG in changeStatus ("not in the value list"), even
+# once the synonym exists, so SRs move through the standard INPROG. WOs keep INPRG, which is
+# standard on WOSTATUS. The dataset, the manifest and the step lists stay in dataset terms.
+STATUS_CODES = {"sr": {"INPRG": "INPROG"}, "wo": {}}
+
+
+def maximo_status(kind: str, status: str) -> str:
+    return STATUS_CODES[kind].get(status, status)
+
+
+def dataset_status(kind: str, status: str | None) -> str | None:
+    """A status as Maximo reports it, in the dataset's terms."""
+    return next((ours for ours, theirs in STATUS_CODES[kind].items() if theirs == status), status)
 
 
 def status_steps(kind: str, final: str, current: str | None = None) -> list[str]:
