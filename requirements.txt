@@ -1,0 +1,6 @@
+# Maximo loader only. The dataset generator and validator use the standard library.
+requests>=2.32
+python-dotenv>=1.0
+
+# Testing
+pytest>=8.0
