@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import {
   answerSamples,
+  channelGroups,
   countWord,
   duplicateExample,
   missingPatterns,
@@ -9,6 +10,9 @@ import {
   pastExample,
   plannedExample,
   requestExample,
+  residentSubmitted,
+  staffEntered,
+  staffExample,
   totals,
   useCaseGroups,
 } from './deck-data'
@@ -27,6 +31,31 @@ function TypeTag({ type }: { type: string }) {
   return <span className={`type-tag type-${discipline(type)}`}>{type}</span>
 }
 
+// One bar split into labeled groups, with a legend underneath. Used for channels and use cases.
+function StackedBar({ groups }: { groups: readonly { key: string; label: string; note: string; count: number }[] }) {
+  const total = groups.reduce((sum, g) => sum + g.count, 0)
+  return (
+    <>
+      <div className="stack-bar" role="img" aria-label={groups.map((g) => `${g.label}: ${g.count}`).join(', ')}>
+        {groups.map((g, i) => (
+          <div key={g.key} className={`stack-seg seg-${i}`} style={{ flexGrow: g.count / total }}>
+            <span className="stack-count">{g.count}</span>
+          </div>
+        ))}
+      </div>
+      <div className="stack-legend">
+        {groups.map((g, i) => (
+          <div key={g.key} className="legend-item" style={{ flexGrow: Math.max(g.count / total, 0.18) }}>
+            <span className={`legend-swatch seg-${i}`} />
+            <span className="legend-label">{g.label}</span>
+            <span className="legend-note">{g.note}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 /* 1 */
 function TitleSlide() {
   return (
@@ -42,7 +71,7 @@ function TitleSlide() {
       <div className="title-stub" aria-hidden="true">
         <span className="stub-id">{requestExample.id}</span>
         <span className="stub-summary">{requestExample.summary}</span>
-        <mark className="flag-mark">{requestExample.enteredByLine}</mark>
+        <mark className="flag-mark">Came in through the {requestExample.via}</mark>
       </div>
     </div>
   )
@@ -54,7 +83,7 @@ function TodaySlide() {
   return (
     <div className="layout-split">
       <div>
-        <h2 className="display-lg">Today, Maximo loses who took the call</h2>
+        <h2 className="display-lg">Today, Maximo can’t tell who to ask</h2>
         <figure className="record bracketed">
           <figcaption className="record-head">
             <span>Service request {r.id}</span>
@@ -82,9 +111,10 @@ function TodaySlide() {
       </div>
       <ul className="callouts">
         <li>
-          <strong>Reported by</strong> is always the integration account, never the staff member who took the call.
+          <strong>Reported by</strong> is always the integration account, never the resident or the staff member who
+          entered it.
         </li>
-        <li>The caller, the address, and the problem all sit in one text field.</li>
+        <li>Nothing says whether it came from the app, the web portal, or a 311 call.</li>
         <li>To follow up, staff have to find the same request again in QAlert.</li>
       </ul>
     </div>
@@ -92,35 +122,33 @@ function TodaySlide() {
 }
 
 /* 3 */
+function ChannelsSlide() {
+  return (
+    <div className="layout-band channels">
+      <h2 className="display-lg">Most requests come from residents</h2>
+      <p className="lede narrow">
+        Sarasota’s 311 has four ways in. In the dataset, {residentSubmitted} of {totals.serviceRequests} requests come
+        from residents and {staffEntered} from the Contact Center. The mix is our assumption.
+      </p>
+      <StackedBar groups={channelGroups} />
+    </div>
+  )
+}
+
+/* 4 */
 function UseCasesSlide() {
-  const total = useCaseGroups.reduce((sum, g) => sum + g.count, 0)
   return (
     <div className="layout-band">
       <h2 className="display-lg">
         {totals.serviceRequests} requests, four kinds of test
       </h2>
       <p className="lede narrow">Each request was written to test one thing the AI should notice, or to have nothing to notice.</p>
-      <div className="stack-bar" role="img" aria-label={useCaseGroups.map((g) => `${g.label}: ${g.count}`).join(', ')}>
-        {useCaseGroups.map((g, i) => (
-          <div key={g.key} className={`stack-seg seg-${i}`} style={{ flexGrow: g.count / total }}>
-            <span className="stack-count">{g.count}</span>
-          </div>
-        ))}
-      </div>
-      <div className="stack-legend">
-        {useCaseGroups.map((g, i) => (
-          <div key={g.key} className="legend-item" style={{ flexGrow: Math.max(g.count / total, 0.18) }}>
-            <span className={`legend-swatch seg-${i}`} />
-            <span className="legend-label">{g.label}</span>
-            <span className="legend-note">{g.note}</span>
-          </div>
-        ))}
-      </div>
+      <StackedBar groups={useCaseGroups} />
     </div>
   )
 }
 
-/* 4 */
+/* 5 */
 function DatasetSlide() {
   const maximo = [
     [totals.serviceRequests, 'service requests'],
@@ -131,7 +159,7 @@ function DatasetSlide() {
   const qalert = [
     [totals.qalertRequests, 'requests, one behind each Maximo request'],
     [totals.qalertHistory, 'history entries'],
-    [totals.qalertStaff, 'staff who enter requests'],
+    [totals.qalertStaff, 'Contact Center staff who enter phone and email requests'],
   ] as const
   const extras = [
     [totals.addressPoints, 'address points, a stand-in for the County address list'],
@@ -166,48 +194,76 @@ function DatasetSlide() {
   )
 }
 
-/* 5 */
+/* 6 */
+function BridgeArrow() {
+  return (
+    <svg className="bridge-link" viewBox="0 0 160 40" aria-hidden="true">
+      <line x1="0" y1="20" x2="148" y2="20" />
+      <polyline points="138 10 150 20 138 30" />
+    </svg>
+  )
+}
+
 function BridgeSlide() {
-  const r = requestExample
+  const resident = requestExample
+  const staffed = staffExample
+  const staff = staffed.staff
   return (
     <div className="layout-bridge">
-      <h2 className="display-lg">One extra line connects the two</h2>
-      <div className="bridge">
-        <figure className="record bracketed">
-          <figcaption className="record-head">
-            <span>{r.id} details in Maximo</span>
-          </figcaption>
-          <div className="record-body">
-            {r.detailLines.map((line) => (
-              <span key={line} className="detail-line">
-                {line}
-              </span>
-            ))}
-            <mark className="flag-mark bridge-source">{r.enteredByLine}</mark>
+      <h2 className="display-lg">Where it came from decides who to ask</h2>
+      <div className="bridge-rows">
+        <div className="bridge">
+          <figure className="record bracketed">
+            <figcaption className="record-head">
+              <span>{resident.id} in Maximo</span>
+              <span className="record-status">QAlert origin: {resident.origin}</span>
+            </figcaption>
+            <div className="record-body">
+              <mark className="flag-mark bridge-source">{resident.customerLine}</mark>
+              <span className="muted">No “Entered by” line: the resident used the {resident.via}.</span>
+            </div>
+          </figure>
+          <BridgeArrow />
+          <figure className="contact-card">
+            <figcaption className="contact-source">Ask the resident</figcaption>
+            <p className="contact-name">{resident.contact.name}</p>
+            {resident.contact.phone && <p className="tabular">{resident.contact.phone}</p>}
+            {resident.contact.email && <p>{resident.contact.email}</p>}
+          </figure>
+        </div>
+        {staff && (
+          <div className="bridge">
+            <figure className="record bracketed">
+              <figcaption className="record-head">
+                <span>{staffed.id} in Maximo</span>
+                <span className="record-status">QAlert origin: {staffed.origin}</span>
+              </figcaption>
+              <div className="record-body">
+                <mark className="flag-mark bridge-source">{staffed.enteredByLine}</mark>
+                <span className="muted">Added for staff-entered requests: this one was a {staffed.via}.</span>
+              </div>
+            </figure>
+            <BridgeArrow />
+            <figure className="contact-card">
+              <figcaption className="contact-source">Ask the staff member who took the call</figcaption>
+              <p className="contact-name">{staff.name}</p>
+              <p className="tabular">
+                {staff.department} · {staff.phone}
+              </p>
+              {!staff.inMaximo && <p className="muted">From QAlert: no Maximo person record</p>}
+            </figure>
           </div>
-        </figure>
-        <svg className="bridge-link" viewBox="0 0 160 40" aria-hidden="true">
-          <line x1="0" y1="20" x2="148" y2="20" />
-          <polyline points="138 10 150 20 138 30" />
-        </svg>
-        <figure className="contact-card">
-          <figcaption className="contact-source">QAlert staff record {r.staff.id}</figcaption>
-          <p className="contact-name">{r.staff.name}</p>
-          <p>{r.staff.department}</p>
-          <p className="tabular">{r.staff.phone}</p>
-          <p>{r.staff.email}</p>
-          <p className="muted">{r.staff.active ? 'Active' : 'No longer active'}</p>
-        </figure>
+        )}
       </div>
-      <p className="lede narrow">
-        {totals.staffWithoutMaximoRecord} of {totals.qalertStaff} QAlert staff have no Maximo person record, and{' '}
-        {totals.inactiveStaff} are no longer active. The dataset includes both cases on purpose.
+      <p className="lede">
+        Also included: {totals.staffWithoutMaximoRecord} staff not in Maximo, {totals.inactiveStaff} no longer active, and
+        one anonymous web request.
       </p>
     </div>
   )
 }
 
-/* 6 */
+/* 7 */
 function MissingSlide() {
   const max = Math.max(...missingPatterns.map((p) => p.count))
   return (
@@ -235,12 +291,12 @@ function MissingSlide() {
   )
 }
 
-/* 7 */
+/* 8 */
 function StepsSlide() {
   const r = requestExample
   const steps = [
     { verb: 'Spot the gap', body: r.gap },
-    { verb: 'Find who entered it', body: `${r.enteredByLine}, which is ${r.staff.name} in the ${r.staff.department}.` },
+    { verb: 'Check the source', body: `QAlert says the ${r.via}, so the resident can be asked directly.` },
     { verb: 'Ask one question', body: `“${r.question}”` },
     { verb: 'Then dispatch', body: 'Send a crew once the address is confirmed.' },
   ]
@@ -260,7 +316,7 @@ function StepsSlide() {
   )
 }
 
-/* 8 */
+/* 9 */
 function DuplicatesSlide() {
   const { members, groups, lookAlikes } = duplicateExample
   const times = members.map((m) => new Date(m.reportedAt).getTime())
@@ -275,7 +331,7 @@ function DuplicatesSlide() {
   return (
     <div className="layout-timeline">
       <h2 className="display-lg">
-        <span className="capitalize">{countWord(members.length)}</span> calls, one outage
+        <span className="capitalize">{countWord(members.length)}</span> reports, one outage
       </h2>
       <p className="lede narrow">{members[0]?.date}</p>
       <div className="timeline">
@@ -308,7 +364,7 @@ function DuplicatesSlide() {
   )
 }
 
-/* 9 */
+/* 10 */
 function HistorySlide() {
   const past = pastExample
   const plan = plannedExample
@@ -364,7 +420,14 @@ function HistorySlide() {
   )
 }
 
-/* 10 */
+/* 11 */
+const CONTACT_LABELS: Record<string, string> = {
+  Resident: 'resident',
+  'Entered-by employee': 'took the call',
+  'Department supervisor': 'supervisor',
+  'Owning group supervisor': 'supervisor',
+}
+
 function AnswerKeySlide() {
   return (
     <div className="layout-table">
@@ -386,7 +449,9 @@ function AnswerKeySlide() {
             <tr key={a.id}>
               <td className="tabular">{a.id}</td>
               <td>{a.alert === 'None' ? <span className="muted">Nothing</span> : a.alert}</td>
-              <td>{a.contact}</td>
+              <td>
+                {a.contact} <span className="muted">({CONTACT_LABELS[a.contactType] ?? a.contactType})</span>
+              </td>
               <td className="tabular">{a.related || <span className="muted">None</span>}</td>
             </tr>
           ))}
@@ -396,13 +461,13 @@ function AnswerKeySlide() {
   )
 }
 
-/* 11 */
+/* 12 */
 function NextSlide() {
   const assumptions = [
-    'QAlert and Maximo use the same employee ID.',
-    'Only County staff enter requests in QAlert.',
-    'The employee ID can come across as an “Entered by” line.',
-    'QAlert can return each staff member’s name, phone, email, and department.',
+    'Most requests come from residents through 311Connect; about one in five through the Contact Center.',
+    'QAlert records where each request came from, and who entered phone and email requests.',
+    'QAlert and Maximo share the employee ID, and it can come across as an “Entered by” line.',
+    'The QAlert origin labels in the data are placeholders until we see real ones.',
   ]
   return (
     <div className="layout-close">
@@ -431,10 +496,11 @@ function NextSlide() {
 
 export const slides: { title: string; Component: () => ReactElement }[] = [
   { title: 'A practice dataset for the Sarasota AI pilot', Component: TitleSlide },
-  { title: 'Today, Maximo loses who took the call', Component: TodaySlide },
+  { title: 'Today, Maximo can’t tell who to ask', Component: TodaySlide },
+  { title: 'Where requests come from', Component: ChannelsSlide },
   { title: 'Four kinds of test', Component: UseCasesSlide },
   { title: 'Two systems, linked like the real ones', Component: DatasetSlide },
-  { title: 'One extra line connects the two', Component: BridgeSlide },
+  { title: 'Where it came from decides who to ask', Component: BridgeSlide },
   { title: 'Missing information', Component: MissingSlide },
   { title: 'What the AI should do with one request', Component: StepsSlide },
   { title: 'Duplicates', Component: DuplicatesSlide },

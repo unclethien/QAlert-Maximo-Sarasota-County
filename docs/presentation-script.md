@@ -1,6 +1,6 @@
 # Presentation script: Sprint 2 sample dataset
 
-A speaker script for the 11-slide deck in [`presentation/`](../presentation). It runs about 10 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
+A speaker script for the 12-slide deck in [`presentation/`](../presentation). It runs about 10 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
 
 ## Before you present
 
@@ -28,7 +28,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ## 1. A practice dataset for the Sarasota AI pilot (about 30 seconds)
 
-**On screen:** the title, and the line "Entered by: 0821106" highlighted in orange.
+**On screen:** the title, and request SR800001 with "Came in through the 311Connect mobile app" highlighted in orange.
 
 **Say:**
 
@@ -36,111 +36,123 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > It's practice data. Nothing in it comes from real County records. We built it so we can test whether the AI catches the problems we care about, before we ever point it at real requests.
 >
-> Keep an eye on that orange line at the bottom right. It's the one small change this whole dataset is built around, and we'll come back to it.
+> Keep an eye on that orange line at the bottom right. Where a request came from turns out to decide who the AI should ask, and we'll come back to it.
 
-## 2. Today, Maximo loses who took the call (about 1 minute)
+## 2. Today, Maximo can't tell who to ask (about 45 seconds)
 
-**On screen:** service request SR800001 as Maximo shows it today.
+**On screen:** service request SR800001 as Maximo shows it today, with three notes on the right.
 
 **Say:**
 
 > This is what a request looks like in Maximo today, after it comes over from QAlert.
 >
-> First, "Reported by" always says "QAlert Integration". That's the system account, not the person who took the call.
+> "Reported by" always says "QAlert Integration". That's the system account, not a person.
 >
-> Second, everything else, the caller, the address, and the problem, is packed into one text field.
+> Nothing in Maximo says whether the request came from the app, the web portal, or a call to 311. The resident's name and contact details are packed into one text field with everything else.
 >
-> So when something's missing, like here where there's a street name but no house number, nobody in Maximo can tell who to ask. Staff have to go back into QAlert, find the same request, and work out who entered it. That's the gap this pilot is trying to close.
+> So when something's missing, like here where there's a street name but no house number, staff have to go back into QAlert and find the same request to work out who to ask. That's the gap this pilot is trying to close.
 
-## 3. 60 requests, four kinds of test (about 45 seconds)
+## 3. Most requests come from residents (about 1 minute)
+
+**On screen:** one bar split into four channels: 30 from the 311Connect app, 18 from the 311 web portal, 9 phone calls to 311, and 3 emails.
+
+**Say:**
+
+> Sarasota's 311 has four ways in. Residents can use the 311Connect app or the 311 web portal themselves. Or they can call 311, or 941-861-5000 from outside the County, or email the Contact Center, and a staff member enters the request for them.
+>
+> We've heard that most requests now come in through the app and the website, and only a small share through the Contact Center. So in the dataset, 48 of the 60 requests come straight from residents and 12 were entered by Contact Center staff. That's about one in five.
+>
+> That split is our assumption, not a measured number. If you have the real figures, we'll adjust.
+>
+> It matters because it changes who the AI should ask. If the resident sent it, ask the resident. If staff entered it, ask the staff member who took the call or the email.
+
+## 4. 60 requests, four kinds of test (about 40 seconds)
 
 **On screen:** one bar split into four groups: 24, 15, 9, and 12.
 
 **Say:**
 
-> The dataset has 60 service requests, and each one was written on purpose to test one thing.
+> Each of the 60 requests was written on purpose to test one thing.
 >
-> 24 are missing information: no address, too little detail, or the wrong request type.
+> 24 are missing information: no address, too little detail, or the wrong request type. 15 are about duplicates, where several people report the same problem. 9 have related past or planned work at the same place.
 >
-> 15 are about duplicates, where several people call about the same problem.
->
-> 9 have related past or planned work at the same place.
->
-> And 12 are complete requests with nothing wrong. Those matter too: they check that the AI doesn't raise false alarms.
+> And 12 are complete requests with nothing wrong. Those check that the AI doesn't raise false alarms.
 
-## 4. Two systems, linked like the real ones (about 45 seconds)
+## 5. Two systems, linked like the real ones (about 40 seconds)
 
 **On screen:** three columns of counts: Maximo, QAlert, and "Also included".
 
 **Say:**
 
-> Here's what's in the dataset. On the Maximo side: 60 service requests, 41 work orders, 125 work log notes, and 18 person records.
+> On the Maximo side: 60 service requests, 41 work orders, 125 work log notes, and 18 person records.
 >
-> On the QAlert side, which is our mock: the 60 matching requests, 139 history entries, and 15 staff members who enter requests.
+> On the QAlert side, which is our mock: the 60 matching requests, 139 history entries, and 15 Contact Center staff who enter phone and email requests.
 >
 > We also added a stand-in for the County's address list, with 236 points, so we can test whether an address is real. And an answer key, which I'll show you in a minute.
 >
-> Everything here is made up: names, phone numbers, emails, and street names. Only the city names and ZIP codes are real, so the addresses look local.
+> Everything is made up: names, phone numbers, emails, and street names. Only the city names and ZIP codes are real, so the addresses look local.
 
-## 5. One extra line connects the two (about 1 minute 15 seconds)
+## 6. Where it came from decides who to ask (about 1 minute 15 seconds)
 
-**On screen:** the request details with "Entered by: 0821106" highlighted, an arrow, and Linda Chen's QAlert staff record.
+**On screen:** two requests side by side with who to ask. SR800001 came from the app, so ask the resident, Theresa Sheffield. SR800008 was a phone call, with "Entered by: 0820533", so ask Daniel Okafor in the Contact Center.
 
 **Say:**
 
-> This is the key idea. We add one line to the bottom of each request: "Entered by", followed by the employee ID of the staff member who took the call.
+> This is the key idea. The AI looks up the request in QAlert, which records where it came from.
 >
-> With that ID, the AI can look the person up in QAlert. Here it's Linda Chen in the Contact Center, with her phone and email. Now there's a real person to ask.
+> In the top example, the resident sent it through the 311Connect app. Their name, phone, and email are already in the request, so the AI suggests contacting them directly.
 >
-> We also built in the harder cases on purpose. 6 of the 15 QAlert staff have no person record in Maximo, so their contact details can only come from QAlert. And 2 are no longer active, so the AI should send the question to the supervisor instead.
+> In the bottom example, someone called 311. For staff-entered requests only, we add one line: "Entered by", followed by the employee ID. With that ID, the AI finds Daniel Okafor in the Contact Center, the person who took the call. He has no person record in Maximo, so his details come from QAlert.
 >
-> I want to be clear that this is our assumption about how the ID could come across. We need your help to confirm it, and I'll come back to that at the end.
+> We built in the harder cases on purpose: 6 staff with no Maximo record, 2 who are no longer active, so the question goes to their supervisor, and one anonymous web request with no contact details at all, which goes to the crew's supervisor.
+>
+> The "Entered by" line is our assumption about how the ID could come across. We need your help to confirm it.
 
-## 6. 24 requests are missing something (about 1 minute)
+## 7. 24 requests are missing something (about 50 seconds)
 
 **On screen:** seven bars, one for each kind of missing information, and the number 8 in orange.
 
 **Say:**
 
-> Let's look at the biggest group. The 24 missing-information requests fall into seven patterns: no usable address, too little detail, the wrong request type, an address that doesn't exist, unclear what's wrong, two problems in one request, and problems that are likely private plumbing.
+> The 24 missing-information requests fall into seven patterns: no usable address, too little detail, the wrong request type, an address that doesn't exist, unclear what's wrong, two problems in one request, and likely private plumbing.
 >
 > The example under each bar is the kind of thing the AI should notice.
 >
-> And look at the 8 on the left. In 8 of these, a crew had already been sent out. In real life those are trips that one phone call could have saved. That's the value we're after.
+> And look at the 8 on the left. In 8 of these, a crew had already been sent out. Those are trips that one question could have saved. That's the value we're after.
 
-## 7. What the AI should do with SR800001 (about 1 minute)
+## 8. What the AI should do with SR800001 (about 50 seconds)
 
-**On screen:** four steps: spot the gap, find who entered it, ask one question, then dispatch.
+**On screen:** four steps: spot the gap, check the source, ask one question, then dispatch.
 
 **Say:**
 
-> Here's what we expect the AI to do with that first request, step by step.
+> Here's what we expect the AI to do with that first request.
 >
 > One: spot the gap. There's a street, but no house number.
 >
-> Two: find who entered it. The "Entered by" line points to Linda Chen in the Contact Center.
+> Two: check the source. QAlert says it came from the 311Connect app, so the resident can be asked directly.
 >
-> Three: suggest one clear question for her to ask the caller: can they give the house number, or describe the closest house to the leak?
+> Three: suggest one clear question: can you give the house number, or describe the closest house to the leak?
 >
 > Four: only then send a crew.
 >
 > The AI doesn't change the request itself. It gives staff a recommendation they can act on.
 
-## 8. Three calls, one outage (about 1 minute)
+## 9. Three reports, one outage (about 50 seconds)
 
-**On screen:** a timeline of October 21, with three calls at 6:40, 7:58, and 9:11 AM on Bramblewick Lane.
+**On screen:** a timeline of October 21, with three reports at 6:40, 7:58, and 9:11 AM on Bramblewick Lane.
 
 **Say:**
 
-> Now duplicates. On the morning of October 21, three households on Bramblewick Lane called within about two and a half hours.
+> Now duplicates. On the morning of October 21, three households on Bramblewick Lane reported a problem within about two and a half hours.
 >
 > The first two came in as "No Water". The third was filed as "Low Water Pressure", but it's the same outage.
 >
-> The AI should spot that these belong together and suggest linking the second and third requests to the first, instead of sending three crews.
+> The AI should suggest linking the second and third requests to the first, instead of sending three crews.
 >
-> Overall the dataset has five groups like this. It also has three look-alikes: requests on the same street or the same night that are actually different problems. The AI should not link those.
+> Overall there are five groups like this, plus three look-alikes: requests on the same street or the same night that are actually different problems. The AI should not link those.
 
-## 9. Some places already have history (about 1 minute)
+## 10. Some places already have history (about 50 seconds)
 
 **On screen:** past work at 1382 Larkspur Bay Drive, and a planned project on Starling Cove Drive.
 
@@ -148,23 +160,23 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 > The third use case is history.
 >
-> On the left, 1382 Larkspur Bay Drive. There was a service line leak in February, another in July, and a new leak reported in September. That's the third in a year, so the AI should point that out. It's probably more than a quick repair.
+> On the left, 1382 Larkspur Bay Drive. A service line leak in February, another in July, and a new leak reported in September. That's the third in a year, so the AI should point that out. It's probably more than a quick repair.
 >
 > On the right, Starling Cove Drive. A water main replacement is scheduled from November 16 to December 18. When a new request comes in on that street, the AI should point to the project rather than open separate repair work.
 
-## 10. An answer key for every request (about 45 seconds)
+## 11. An answer key for every request (about 40 seconds)
 
-**On screen:** a table of five sample rows from the answer key.
+**On screen:** a table of five sample rows from the answer key, including who to contact and why.
 
 **Say:**
 
 > To check the AI, we wrote down the right answer for every one of the 60 requests: what it should flag, who to contact, and which other records are related.
 >
-> When the AI runs on this data, we compare what it says against this file, one request at a time. That gives us a clear, honest score instead of a gut feeling.
+> Notice the contact column. For app and web requests it's the resident. For phone and email requests it's the staff member who took it.
 >
-> The last row is a complete request. There the right answer is "nothing to flag".
+> When the AI runs on this data, we compare what it says against this file, one request at a time. That gives us a clear, honest score instead of a gut feeling.
 
-## 11. Please check these assumptions (about 1 minute 15 seconds)
+## 12. Please check these assumptions (about 1 minute 10 seconds)
 
 **On screen:** four assumptions with checkboxes, and the next steps.
 
@@ -172,12 +184,12 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 > This is where we need your help. The dataset is built on our assumptions, and we need you to confirm or correct them:
 >
-> - Do QAlert and Maximo use the same employee ID?
-> - Is it true that only County staff enter requests in QAlert?
-> - Could the employee ID come across as an "Entered by" line, or is there a better place for it?
-> - Can QAlert give us each staff member's name, phone, email, and department?
+> - Is it right that most requests come from residents through the app and web portal, and about one in five through the Contact Center?
+> - Does QAlert record where each request came from, and who entered phone and email requests?
+> - Do QAlert and Maximo share the employee ID, and could it come across as an "Entered by" line?
+> - The labels we use for where a request came from are placeholders. What does QAlert actually call them?
 >
-> Next, we'll build a mock QAlert service and its API guide, so the AI can look people up the way it would in production.
+> Next, we'll build a mock QAlert service and its API guide, so the AI can look up requests and people the way it would in production.
 >
 > Two open questions for the group: where should that mock service run, and what can the real QAlert API return, and how do we get access?
 >

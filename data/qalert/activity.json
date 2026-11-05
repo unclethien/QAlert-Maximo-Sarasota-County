@@ -5,7 +5,7 @@
     "displayDate": "8/3/2026 8:57 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "lchen"
+    "routeId": ""
   },
   {
     "id": 2,
@@ -21,7 +21,7 @@
     "displayDate": "8/3/2026 9:38 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 4,
@@ -34,15 +34,15 @@
   {
     "id": 5,
     "requestId": 700003,
-    "displayDate": "8/4/2026 10:26 AM",
+    "displayDate": "8/4/2026 10:25 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "jbrooks"
+    "routeId": "egarcia"
   },
   {
     "id": 6,
     "requestId": 700003,
-    "displayDate": "8/4/2026 10:27 AM",
+    "displayDate": "8/4/2026 10:26 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -50,15 +50,15 @@
   {
     "id": 7,
     "requestId": 700004,
-    "displayDate": "8/4/2026 10:51 AM",
+    "displayDate": "8/4/2026 10:47 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "tbaxter"
+    "routeId": ""
   },
   {
     "id": 8,
     "requestId": 700004,
-    "displayDate": "8/4/2026 10:52 AM",
+    "displayDate": "8/4/2026 10:48 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -66,7 +66,7 @@
   {
     "id": 9,
     "requestId": 700005,
-    "displayDate": "8/6/2026 10:09 AM",
+    "displayDate": "8/6/2026 10:10 AM",
     "code": 1,
     "codeDesc": "Created",
     "routeId": "kwhitfield"
@@ -74,7 +74,7 @@
   {
     "id": 10,
     "requestId": 700005,
-    "displayDate": "8/6/2026 10:10 AM",
+    "displayDate": "8/6/2026 10:11 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
@@ -82,15 +82,15 @@
   {
     "id": 11,
     "requestId": 700006,
-    "displayDate": "8/8/2026 2:12 PM",
+    "displayDate": "8/8/2026 2:13 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "nhughes"
+    "routeId": ""
   },
   {
     "id": 12,
     "requestId": 700006,
-    "displayDate": "8/8/2026 2:13 PM",
+    "displayDate": "8/8/2026 2:14 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -98,7 +98,7 @@
   {
     "id": 13,
     "requestId": 700006,
-    "displayDate": "8/9/2026 5:22 AM",
+    "displayDate": "8/8/2026 8:59 PM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -106,15 +106,15 @@
   {
     "id": 14,
     "requestId": 700007,
-    "displayDate": "8/9/2026 4:20 PM",
+    "displayDate": "8/9/2026 4:16 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "hlawson"
+    "routeId": ""
   },
   {
     "id": 15,
     "requestId": 700007,
-    "displayDate": "8/9/2026 4:21 PM",
+    "displayDate": "8/9/2026 4:17 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -122,15 +122,15 @@
   {
     "id": 16,
     "requestId": 700008,
-    "displayDate": "8/11/2026 9:42 AM",
+    "displayDate": "8/11/2026 9:41 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "bfoster"
+    "routeId": "dokafor"
   },
   {
     "id": 17,
     "requestId": 700008,
-    "displayDate": "8/11/2026 9:43 AM",
+    "displayDate": "8/11/2026 9:42 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -138,15 +138,15 @@
   {
     "id": 18,
     "requestId": 700009,
-    "displayDate": "8/11/2026 4:17 PM",
+    "displayDate": "8/11/2026 4:19 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "tbaxter"
+    "routeId": ""
   },
   {
     "id": 19,
     "requestId": 700009,
-    "displayDate": "8/11/2026 4:18 PM",
+    "displayDate": "8/11/2026 4:20 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -154,7 +154,7 @@
   {
     "id": 20,
     "requestId": 700008,
-    "displayDate": "8/11/2026 10:48 PM",
+    "displayDate": "8/12/2026 5:45 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -162,7 +162,7 @@
   {
     "id": 21,
     "requestId": 700010,
-    "displayDate": "8/12/2026 2:36 PM",
+    "displayDate": "8/12/2026 2:34 PM",
     "code": 1,
     "codeDesc": "Created",
     "routeId": "pwalsh"
@@ -170,7 +170,7 @@
   {
     "id": 22,
     "requestId": 700010,
-    "displayDate": "8/12/2026 2:37 PM",
+    "displayDate": "8/12/2026 2:35 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUReclaimed"
@@ -178,15 +178,15 @@
   {
     "id": 23,
     "requestId": 700011,
-    "displayDate": "8/16/2026 9:10 AM",
+    "displayDate": "8/16/2026 9:09 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "egarcia"
+    "routeId": ""
   },
   {
     "id": 24,
     "requestId": 700011,
-    "displayDate": "8/16/2026 9:11 AM",
+    "displayDate": "8/16/2026 9:10 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
@@ -194,15 +194,15 @@
   {
     "id": 25,
     "requestId": 700012,
-    "displayDate": "8/16/2026 3:47 PM",
+    "displayDate": "8/16/2026 3:51 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "lchen"
+    "routeId": ""
   },
   {
     "id": 26,
     "requestId": 700012,
-    "displayDate": "8/16/2026 3:48 PM",
+    "displayDate": "8/16/2026 3:52 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -210,15 +210,15 @@
   {
     "id": 27,
     "requestId": 700013,
-    "displayDate": "8/17/2026 3:22 PM",
+    "displayDate": "8/17/2026 3:25 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "lchen"
+    "routeId": ""
   },
   {
     "id": 28,
     "requestId": 700013,
-    "displayDate": "8/17/2026 3:23 PM",
+    "displayDate": "8/17/2026 3:26 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -226,15 +226,15 @@
   {
     "id": 29,
     "requestId": 700014,
-    "displayDate": "8/17/2026 3:58 PM",
+    "displayDate": "8/17/2026 4:00 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "gdiaz"
+    "routeId": ""
   },
   {
     "id": 30,
     "requestId": 700014,
-    "displayDate": "8/17/2026 3:59 PM",
+    "displayDate": "8/17/2026 4:01 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -242,15 +242,15 @@
   {
     "id": 31,
     "requestId": 700015,
-    "displayDate": "8/19/2026 12:12 PM",
+    "displayDate": "8/19/2026 12:15 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": "jbrooks"
   },
   {
     "id": 32,
     "requestId": 700015,
-    "displayDate": "8/19/2026 12:13 PM",
+    "displayDate": "8/19/2026 12:16 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -258,7 +258,7 @@
   {
     "id": 33,
     "requestId": 700015,
-    "displayDate": "8/19/2026 11:32 PM",
+    "displayDate": "8/20/2026 1:35 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -266,15 +266,15 @@
   {
     "id": 34,
     "requestId": 700016,
-    "displayDate": "8/24/2026 3:53 PM",
+    "displayDate": "8/24/2026 3:51 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "bfoster"
+    "routeId": ""
   },
   {
     "id": 35,
     "requestId": 700016,
-    "displayDate": "8/24/2026 3:54 PM",
+    "displayDate": "8/24/2026 3:52 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -282,7 +282,7 @@
   {
     "id": 36,
     "requestId": 700016,
-    "displayDate": "8/25/2026 6:05 AM",
+    "displayDate": "8/25/2026 4:12 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -290,15 +290,15 @@
   {
     "id": 37,
     "requestId": 700017,
-    "displayDate": "8/25/2026 9:00 AM",
+    "displayDate": "8/25/2026 8:57 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 38,
     "requestId": 700017,
-    "displayDate": "8/25/2026 9:01 AM",
+    "displayDate": "8/25/2026 8:58 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -306,41 +306,41 @@
   {
     "id": 39,
     "requestId": 700018,
-    "displayDate": "8/25/2026 12:13 PM",
+    "displayDate": "8/25/2026 12:15 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "mreyes"
+    "routeId": ""
   },
   {
     "id": 40,
     "requestId": 700018,
-    "displayDate": "8/25/2026 12:14 PM",
+    "displayDate": "8/25/2026 12:16 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
   },
   {
     "id": 41,
-    "requestId": 700017,
-    "displayDate": "8/25/2026 9:22 PM",
-    "code": 15,
-    "codeDesc": "Closed",
-    "routeId": "PUWater"
-  },
-  {
-    "id": 42,
     "requestId": 700019,
     "displayDate": "8/26/2026 5:04 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": "bfoster"
   },
   {
-    "id": 43,
+    "id": 42,
     "requestId": 700019,
     "displayDate": "8/26/2026 5:05 AM",
     "code": 4,
     "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 43,
+    "requestId": 700017,
+    "displayDate": "8/26/2026 6:08 AM",
+    "code": 15,
+    "codeDesc": "Closed",
     "routeId": "PUWater"
   },
   {
@@ -349,7 +349,7 @@
     "displayDate": "8/26/2026 9:05 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": ""
   },
   {
     "id": 45,
@@ -362,15 +362,15 @@
   {
     "id": 46,
     "requestId": 700021,
-    "displayDate": "9/4/2026 8:08 AM",
+    "displayDate": "9/4/2026 8:03 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "tbaxter"
+    "routeId": ""
   },
   {
     "id": 47,
     "requestId": 700021,
-    "displayDate": "9/4/2026 8:09 AM",
+    "displayDate": "9/4/2026 8:04 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
@@ -381,7 +381,7 @@
     "displayDate": "9/7/2026 2:11 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "gdiaz"
+    "routeId": ""
   },
   {
     "id": 49,
@@ -394,15 +394,15 @@
   {
     "id": 50,
     "requestId": 700023,
-    "displayDate": "9/8/2026 7:31 AM",
+    "displayDate": "9/8/2026 7:35 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "gdiaz"
+    "routeId": ""
   },
   {
     "id": 51,
     "requestId": 700023,
-    "displayDate": "9/8/2026 7:32 AM",
+    "displayDate": "9/8/2026 7:36 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -410,15 +410,15 @@
   {
     "id": 52,
     "requestId": 700024,
-    "displayDate": "9/8/2026 8:07 AM",
+    "displayDate": "9/8/2026 8:11 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 53,
     "requestId": 700024,
-    "displayDate": "9/8/2026 8:08 AM",
+    "displayDate": "9/8/2026 8:12 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -426,7 +426,7 @@
   {
     "id": 54,
     "requestId": 700022,
-    "displayDate": "9/8/2026 2:36 PM",
+    "displayDate": "9/8/2026 8:53 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWastewater"
@@ -434,7 +434,7 @@
   {
     "id": 55,
     "requestId": 700024,
-    "displayDate": "9/8/2026 6:17 PM",
+    "displayDate": "9/9/2026 7:08 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -442,15 +442,15 @@
   {
     "id": 56,
     "requestId": 700025,
-    "displayDate": "9/10/2026 2:18 PM",
+    "displayDate": "9/10/2026 2:22 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "hlawson"
+    "routeId": ""
   },
   {
     "id": 57,
     "requestId": 700025,
-    "displayDate": "9/10/2026 2:19 PM",
+    "displayDate": "9/10/2026 2:23 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
@@ -458,15 +458,15 @@
   {
     "id": 58,
     "requestId": 700026,
-    "displayDate": "9/10/2026 4:42 PM",
+    "displayDate": "9/10/2026 4:44 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": "lchen"
   },
   {
     "id": 59,
     "requestId": 700026,
-    "displayDate": "9/10/2026 4:43 PM",
+    "displayDate": "9/10/2026 4:45 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -474,7 +474,7 @@
   {
     "id": 60,
     "requestId": 700026,
-    "displayDate": "9/11/2026 1:57 AM",
+    "displayDate": "9/11/2026 6:54 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -482,15 +482,15 @@
   {
     "id": 61,
     "requestId": 700027,
-    "displayDate": "9/12/2026 8:48 AM",
+    "displayDate": "9/12/2026 8:53 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "nhughes"
+    "routeId": ""
   },
   {
     "id": 62,
     "requestId": 700027,
-    "displayDate": "9/12/2026 8:49 AM",
+    "displayDate": "9/12/2026 8:54 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -498,37 +498,29 @@
   {
     "id": 63,
     "requestId": 700028,
-    "displayDate": "9/12/2026 8:50 AM",
+    "displayDate": "9/12/2026 8:56 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 64,
     "requestId": 700028,
-    "displayDate": "9/12/2026 8:51 AM",
+    "displayDate": "9/12/2026 8:57 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
   },
   {
     "id": 65,
-    "requestId": 700028,
-    "displayDate": "9/12/2026 3:10 PM",
-    "code": 15,
-    "codeDesc": "Closed",
-    "routeId": "PUWater"
-  },
-  {
-    "id": 66,
     "requestId": 700029,
     "displayDate": "9/12/2026 5:30 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "apatel"
+    "routeId": ""
   },
   {
-    "id": 67,
+    "id": 66,
     "requestId": 700029,
     "displayDate": "9/12/2026 5:31 PM",
     "code": 4,
@@ -536,9 +528,17 @@
     "routeId": "PUWater"
   },
   {
-    "id": 68,
+    "id": 67,
     "requestId": 700027,
-    "displayDate": "9/12/2026 7:58 PM",
+    "displayDate": "9/13/2026 4:57 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 68,
+    "requestId": 700028,
+    "displayDate": "9/13/2026 7:59 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -546,15 +546,15 @@
   {
     "id": 69,
     "requestId": 700030,
-    "displayDate": "9/14/2026 6:47 AM",
+    "displayDate": "9/14/2026 6:53 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 70,
     "requestId": 700030,
-    "displayDate": "9/14/2026 6:48 AM",
+    "displayDate": "9/14/2026 6:54 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -565,7 +565,7 @@
     "displayDate": "9/14/2026 9:29 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "apatel"
+    "routeId": ""
   },
   {
     "id": 72,
@@ -578,15 +578,15 @@
   {
     "id": 73,
     "requestId": 700032,
-    "displayDate": "9/14/2026 12:17 PM",
+    "displayDate": "9/14/2026 12:12 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": "hlawson"
   },
   {
     "id": 74,
     "requestId": 700032,
-    "displayDate": "9/14/2026 12:18 PM",
+    "displayDate": "9/14/2026 12:13 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -594,7 +594,7 @@
   {
     "id": 75,
     "requestId": 700030,
-    "displayDate": "9/15/2026 8:28 AM",
+    "displayDate": "9/14/2026 2:58 PM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -605,7 +605,7 @@
     "displayDate": "9/15/2026 11:49 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "jbrooks"
+    "routeId": ""
   },
   {
     "id": 77,
@@ -629,7 +629,7 @@
     "displayDate": "9/16/2026 2:22 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": "mreyes"
   },
   {
     "id": 80,
@@ -645,7 +645,7 @@
     "displayDate": "9/17/2026 2:53 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "gdiaz"
+    "routeId": ""
   },
   {
     "id": 82,
@@ -661,7 +661,7 @@
     "displayDate": "9/24/2026 8:26 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "bfoster"
+    "routeId": ""
   },
   {
     "id": 84,
@@ -677,7 +677,7 @@
     "displayDate": "9/25/2026 11:55 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": ""
   },
   {
     "id": 86,
@@ -693,7 +693,7 @@
     "displayDate": "9/25/2026 3:03 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "rmorales"
+    "routeId": ""
   },
   {
     "id": 88,
@@ -706,7 +706,7 @@
   {
     "id": 89,
     "requestId": 700037,
-    "displayDate": "9/26/2026 9:21 AM",
+    "displayDate": "9/26/2026 12:09 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -717,7 +717,7 @@
     "displayDate": "9/26/2026 1:36 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "bfoster"
+    "routeId": ""
   },
   {
     "id": 91,
@@ -741,7 +741,7 @@
     "displayDate": "9/28/2026 9:08 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "jbrooks"
+    "routeId": ""
   },
   {
     "id": 94,
@@ -757,7 +757,7 @@
     "displayDate": "9/28/2026 10:34 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "apatel"
+    "routeId": ""
   },
   {
     "id": 96,
@@ -770,15 +770,15 @@
   {
     "id": 97,
     "requestId": 700042,
-    "displayDate": "9/29/2026 12:47 AM",
+    "displayDate": "9/29/2026 12:43 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "egarcia"
+    "routeId": ""
   },
   {
     "id": 98,
     "requestId": 700042,
-    "displayDate": "9/29/2026 12:48 AM",
+    "displayDate": "9/29/2026 12:44 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
@@ -797,7 +797,7 @@
     "displayDate": "9/29/2026 3:50 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "jbrooks"
+    "routeId": ""
   },
   {
     "id": 101,
@@ -810,7 +810,7 @@
   {
     "id": 102,
     "requestId": 700043,
-    "displayDate": "9/30/2026 3:42 AM",
+    "displayDate": "9/29/2026 11:12 PM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWastewater"
@@ -821,7 +821,7 @@
     "displayDate": "10/5/2026 4:17 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "gdiaz"
+    "routeId": ""
   },
   {
     "id": 104,
@@ -834,15 +834,15 @@
   {
     "id": 105,
     "requestId": 700045,
-    "displayDate": "10/6/2026 10:47 AM",
+    "displayDate": "10/6/2026 10:42 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "apatel"
+    "routeId": ""
   },
   {
     "id": 106,
     "requestId": 700045,
-    "displayDate": "10/6/2026 10:48 AM",
+    "displayDate": "10/6/2026 10:43 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -853,7 +853,7 @@
     "displayDate": "10/7/2026 6:49 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "lchen"
+    "routeId": "apatel"
   },
   {
     "id": 108,
@@ -866,15 +866,15 @@
   {
     "id": 109,
     "requestId": 700047,
-    "displayDate": "10/9/2026 7:27 AM",
+    "displayDate": "10/9/2026 7:26 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "egarcia"
+    "routeId": ""
   },
   {
     "id": 110,
     "requestId": 700047,
-    "displayDate": "10/9/2026 7:28 AM",
+    "displayDate": "10/9/2026 7:27 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -882,15 +882,15 @@
   {
     "id": 111,
     "requestId": 700048,
-    "displayDate": "10/9/2026 12:43 PM",
+    "displayDate": "10/9/2026 12:48 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": "ckim"
   },
   {
     "id": 112,
     "requestId": 700048,
-    "displayDate": "10/9/2026 12:44 PM",
+    "displayDate": "10/9/2026 12:49 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -901,7 +901,7 @@
     "displayDate": "10/10/2026 2:04 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "ckim"
+    "routeId": ""
   },
   {
     "id": 114,
@@ -914,15 +914,15 @@
   {
     "id": 115,
     "requestId": 700050,
-    "displayDate": "10/11/2026 2:59 PM",
+    "displayDate": "10/11/2026 2:58 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 116,
     "requestId": 700050,
-    "displayDate": "10/11/2026 3:00 PM",
+    "displayDate": "10/11/2026 2:59 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUReclaimed"
@@ -930,7 +930,7 @@
   {
     "id": 117,
     "requestId": 700050,
-    "displayDate": "10/12/2026 3:04 AM",
+    "displayDate": "10/12/2026 1:00 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUReclaimed"
@@ -938,15 +938,15 @@
   {
     "id": 118,
     "requestId": 700051,
-    "displayDate": "10/14/2026 6:52 AM",
+    "displayDate": "10/14/2026 6:53 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 119,
     "requestId": 700051,
-    "displayDate": "10/14/2026 6:53 AM",
+    "displayDate": "10/14/2026 6:54 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -957,7 +957,7 @@
     "displayDate": "10/14/2026 1:30 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "tbaxter"
+    "routeId": ""
   },
   {
     "id": 121,
@@ -970,15 +970,15 @@
   {
     "id": 122,
     "requestId": 700053,
-    "displayDate": "10/21/2026 6:38 AM",
+    "displayDate": "10/21/2026 6:37 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "jbrooks"
+    "routeId": ""
   },
   {
     "id": 123,
     "requestId": 700053,
-    "displayDate": "10/21/2026 6:39 AM",
+    "displayDate": "10/21/2026 6:38 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -986,15 +986,15 @@
   {
     "id": 124,
     "requestId": 700054,
-    "displayDate": "10/21/2026 7:49 AM",
+    "displayDate": "10/21/2026 7:56 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "apatel"
+    "routeId": ""
   },
   {
     "id": 125,
     "requestId": 700054,
-    "displayDate": "10/21/2026 7:50 AM",
+    "displayDate": "10/21/2026 7:57 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -1005,7 +1005,7 @@
     "displayDate": "10/21/2026 9:08 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "hlawson"
+    "routeId": ""
   },
   {
     "id": 127,
@@ -1018,7 +1018,7 @@
   {
     "id": 128,
     "requestId": 700053,
-    "displayDate": "10/22/2026 6:24 AM",
+    "displayDate": "10/22/2026 12:10 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -1029,7 +1029,7 @@
     "displayDate": "10/24/2026 10:03 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "bfoster"
+    "routeId": ""
   },
   {
     "id": 130,
@@ -1042,15 +1042,15 @@
   {
     "id": 131,
     "requestId": 700057,
-    "displayDate": "10/24/2026 5:08 PM",
+    "displayDate": "10/24/2026 5:01 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "egarcia"
+    "routeId": ""
   },
   {
     "id": 132,
     "requestId": 700057,
-    "displayDate": "10/24/2026 5:09 PM",
+    "displayDate": "10/24/2026 5:02 PM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWastewater"
@@ -1058,15 +1058,15 @@
   {
     "id": 133,
     "requestId": 700058,
-    "displayDate": "10/26/2026 8:08 AM",
+    "displayDate": "10/26/2026 8:10 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "hlawson"
+    "routeId": "tbaxter"
   },
   {
     "id": 134,
     "requestId": 700058,
-    "displayDate": "10/26/2026 8:09 AM",
+    "displayDate": "10/26/2026 8:11 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -1074,15 +1074,15 @@
   {
     "id": 135,
     "requestId": 700059,
-    "displayDate": "10/26/2026 11:21 AM",
+    "displayDate": "10/26/2026 11:27 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "dokafor"
+    "routeId": ""
   },
   {
     "id": 136,
     "requestId": 700059,
-    "displayDate": "10/26/2026 11:22 AM",
+    "displayDate": "10/26/2026 11:28 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
@@ -1090,7 +1090,7 @@
   {
     "id": 137,
     "requestId": 700058,
-    "displayDate": "10/26/2026 4:30 PM",
+    "displayDate": "10/27/2026 4:10 AM",
     "code": 15,
     "codeDesc": "Closed",
     "routeId": "PUWater"
@@ -1098,15 +1098,15 @@
   {
     "id": 138,
     "requestId": 700060,
-    "displayDate": "10/27/2026 8:08 AM",
+    "displayDate": "10/27/2026 8:11 AM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "gdiaz"
+    "routeId": ""
   },
   {
     "id": 139,
     "requestId": 700060,
-    "displayDate": "10/27/2026 8:09 AM",
+    "displayDate": "10/27/2026 8:12 AM",
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"

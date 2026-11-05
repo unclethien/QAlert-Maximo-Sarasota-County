@@ -25,7 +25,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 | [`docs/sample-dataset.md`](docs/sample-dataset.md) | **Start here.** A plain-language guide to the whole dataset. |
 | [`data/answer-key.csv`](data/answer-key.csv) | **The most useful file.** One row per service request: what the AI should flag, who to contact, and what to ask. |
 | [`data/maximo/`](data/maximo) | The fake Maximo records: service requests (`sr.csv`), work orders (`wo.csv`), work logs (`worklog.csv`), and people (`person.csv`). |
-| [`data/qalert/`](data/qalert) | The fake QAlert records, including the staff list (`employees.json`) used to look up who entered a request. |
+| [`data/qalert/`](data/qalert) | The fake QAlert records, including where each request came from (app, web portal, phone, or email) and the staff list (`employees.json`) used to look up who entered phone and email requests. |
 | [`data/reference/`](data/reference) | A stand-in for the County's address list. |
 | [`scripts/`](scripts) | The programs that create the data. You can ignore this folder. |
 | [`presentation/`](presentation) | A 10-minute slide deck about the dataset. [View it online](https://unclethien.github.io/QAlert-Maximo-Sarasota-County/). Its speaker script is [`docs/presentation-script.md`](docs/presentation-script.md). |
