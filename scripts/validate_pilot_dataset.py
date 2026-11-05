@@ -236,6 +236,11 @@ def main():
     check(any(a["FOLLOW_UP_CONTACT_TYPE"] == "Owning group supervisor" for a in answers),
           "at least one resident request must be anonymous")
 
+    # Maximo field lengths: PERSON.TITLE and PERSON.DEPARTMENT hold 30 characters.
+    for p in persons:
+        for col in ("TITLE", "DEPARTMENT"):
+            check(len(p[col]) <= 30, f"person {p['PERSONID']}: {col} longer than Maximo's 30 characters")
+
     # Synthetic-data safety: every phone and email uses the reserved fictional ranges.
     phones, emails = [], []
     for e in employees:

@@ -594,7 +594,7 @@ def main():
     d = build()
     persons = [{"PERSONID": cat.INTEGRATION_ACCOUNT["id"], "DISPLAYNAME": cat.INTEGRATION_ACCOUNT["name"],
                 "FIRSTNAME": "", "LASTNAME": "", "PRIMARYEMAIL": cat.INTEGRATION_ACCOUNT["email"], "PRIMARYPHONE": "",
-                "DEPARTMENT": "Enterprise Information Technology", "TITLE": "Integration service account", "STATUS": "ACTIVE"}]
+                "DEPARTMENT": "Information Technology", "TITLE": "Integration service account", "STATUS": "ACTIVE"}]
     for f in d["field"]:
         persons.append({"PERSONID": f["id"], "DISPLAYNAME": f"{f['first']} {f['last']}", "FIRSTNAME": f["first"],
                         "LASTNAME": f["last"], "PRIMARYEMAIL": f["email"], "PRIMARYPHONE": f["phone"],
@@ -603,7 +603,9 @@ def main():
         if s["in_maximo"]:
             persons.append({"PERSONID": s["id"], "DISPLAYNAME": f"{s['firstName']} {s['lastName']}",
                             "FIRSTNAME": s["firstName"], "LASTNAME": s["lastName"], "PRIMARYEMAIL": s["email"],
-                            "PRIMARYPHONE": s["phone"], "DEPARTMENT": s["department"], "TITLE": "Customer Service Representative",
+                            "PRIMARYPHONE": s["phone"],
+                            "DEPARTMENT": cat.MAXIMO_DEPARTMENT.get(s["department"], s["department"]),
+                            "TITLE": "Customer Service Rep",
                             "STATUS": "ACTIVE" if s["active"] else "INACTIVE"})
     persons.sort(key=lambda p: p["PERSONID"])
 

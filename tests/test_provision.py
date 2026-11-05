@@ -71,7 +71,7 @@ def test_payloads():
     assert cls["classificationid"] == "WATER-LEAK" and cls["hierarchypath"] == "WATER-LEAK"
     assert {u["objectname"] for u in cls["classusewith"]} == {"SR", "WORKORDER"}
     jp = prov.job_plan_payload("SAN INSP", "0830581", "0831893")
-    assert jp["persongroup"] == "SANCLINSP" and jp["orgid"] == "SRQ" and jp["siteid"] == "SRQSITE"
+    assert jp["persongroup"] == "SANCLINS" and jp["orgid"] == "SRQ" and jp["siteid"] == "SRQSITE"
 
 
 # -- runs against the fake --------------------------------------------------------------
@@ -99,7 +99,8 @@ def test_apply_then_rerun_creates_nothing_new(fake_maximo):
     org = next(o for o in fake.records["mxapiorganization"] if o["orgid"] == "SRQ")
     assert org["site"][0]["siteid"] == "SRQSITE"
     wostatus = next(d for d in fake.records["mxapidomain"] if d["domainid"] == "WOSTATUS")
-    assert {"value": "SCHED", "maxvalue": "WSCH", "description": "Scheduled", "defaults": False} in wostatus["synonymdomain"]
+    assert {"value": "SCHED", "maxvalue": "WSCH", "description": "Scheduled", "defaults": False,
+            "orgid": "SRQ"} in wostatus["synonymdomain"]
 
     # Maximo would list the new site; the fake keeps it as a child, so mirror it for the re-run.
     fake.records["mxapisite"].append({"href": "x", "siteid": "SRQSITE", "orgid": "SRQ", "active": True})
@@ -140,6 +141,20 @@ def test_org_needs_an_item_set(fake_maximo):
     p = prov.Provisioner(fake.client(), Settings(url="u", api_key="k"), apply=True, log=lines.append)
     assert p.run(["org"]) == 1
     assert any("MAXIMO_ITEMSETID" in line for line in lines) and fake.writes() == []
+
+
+def test_new_item_set_copies_company_set_from_an_active_usd_org(fake_maximo):
+    fake = fake_maximo(_instance(mxapiorganization=[
+        {"orgid": "EAGLESA", "active": True, "itemsetid": "SET2", "companysetid": "COMPSET1", "basecurrency1": "PESO"},
+        {"orgid": "EAGLENA", "active": True, "itemsetid": "SET1", "companysetid": "COMPSET1", "basecurrency1": "USD"},
+    ]))
+    lines = []
+    p = prov.Provisioner(fake.client(), Settings(url="u", api_key="k", itemsetid="SRQSET"), apply=True,
+                         log=lines.append)
+    assert p.run(["org"]) == 0
+    org = next(o for o in fake.records["mxapiorganization"] if o["orgid"] == "SRQ")
+    assert (org["itemsetid"], org["companysetid"], org["basecurrency1"]) == ("SRQSET", "COMPSET1", "USD")
+    assert any("copied from EAGLENA" in line for line in lines)
 
 
 def test_cli_rejects_unknown_steps():

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .client import MaximoClient, MaximoError, quote_list
 from .config import DATA_DIR, ORGID, SITEID, STATE_DIR, cat
+from .mapping import maximo_team
 
 # Object structures the loader uses. Failure codes have no standard API structure, so a few
 # candidate names are probed and whichever answers is recorded.
@@ -79,8 +80,6 @@ def check_record_counts(client: MaximoClient) -> dict:
         "status": "ok",
         "sr_at_site": client.count("mxapisr", f'siteid="{SITEID}"'),
         "wo_at_site": client.count("mxapiwodetail", f'siteid="{SITEID}"'),
-        # Earlier QAlert demo data anywhere on the instance, not only at our site.
-        "sr_from_qalert_anywhere": client.count("mxapisr", 'externalsystem="QAlert"'),
     }
 
 
@@ -111,7 +110,7 @@ def check_work_types(client: MaximoClient, structures: dict) -> dict:
 
 def check_reference_data(client: MaximoClient) -> dict:
     persons = dataset_person_ids()
-    groups = list(cat.PERSON_GROUPS)
+    groups = [maximo_team(g) for g in cat.PERSON_GROUPS]
     plans = list(cat.JOB_PLANS)
     classes = [name for name, _ in cat.CLASSIFICATIONS.values()]
     return {
@@ -133,9 +132,8 @@ def check_reference_data(client: MaximoClient) -> dict:
 
 
 def check_sr_attributes(client: MaximoClient) -> dict:
-    """The load finds earlier SRs by EXTERNALSYSTEM + EXTERNALSYSTEM_TICKETID. Both must be queryable."""
-    client.query("mxapisr", where='externalsystem="QAlert" and externalsystem_ticketid="0"',
-                 select="ticketid,externalsystem,externalsystem_ticketid", page_size=1, limit=1)
+    """The load finds earlier SRs by EXTERNALRECID (the QAlert request id). It must be queryable."""
+    client.query("mxapisr", where='externalrecid="0"', select="ticketid,externalrecid", page_size=1, limit=1)
     return {"status": "ok"}
 
 
@@ -196,8 +194,7 @@ def summarize(report: dict) -> str:
     else:
         out.append(f"  {'SRs at site':<24} {counts['sr_at_site']}")
         out.append(f"  {'WOs at site':<24} {counts['wo_at_site']}")
-        out.append(f"  {'QAlert SRs anywhere':<24} {counts['sr_from_qalert_anywhere']}")
-    out.append(_line("SR external-system keys", report["sr_attributes"]))
+    out.append(_line("SR key (externalrecid)", report["sr_attributes"]))
     out.append("Configuration values:")
     domains = report["domains"]
     if domains.get("status") == "error":

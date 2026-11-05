@@ -18,6 +18,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable
 
 from .client import JsonDict, MaximoClient, MaximoError, quote_list
+from .mapping import maximo_team
 from .config import DATA_DIR, ORGID, SITEID, Settings, cat
 
 STEPS = ("org", "site", "persons", "person_groups", "statuses", "work_types", "classifications",
@@ -98,7 +99,7 @@ def person_payload(row: dict) -> JsonDict:
 
 
 def person_group_payload(group: str, members: list[str]) -> JsonDict:
-    payload: JsonDict = {"persongroup": group, "description": cat.PERSON_GROUPS[group][0]}
+    payload: JsonDict = {"persongroup": maximo_team(group), "description": cat.PERSON_GROUPS[group][0]}
     if members:
         payload["persongroupteam"] = [{"respparty": p, "resppartyseq": i, "groupdefault": i == 1}
                                       for i, p in enumerate(members, start=1)]
@@ -116,7 +117,7 @@ def classification_payload(classid: str) -> JsonDict:
 
 def job_plan_payload(jpnum: str, supervisor: str, lead: str) -> JsonDict:
     description, group, _ = cat.JOB_PLANS[jpnum]
-    payload: JsonDict = {"jpnum": jpnum, "description": description, "persongroup": group,
+    payload: JsonDict = {"jpnum": jpnum, "description": description, "persongroup": maximo_team(group),
                          "orgid": ORGID, "siteid": SITEID}
     if supervisor:
         payload["supervisor"] = supervisor
@@ -193,13 +194,19 @@ class Provisioner:
             self._line("FAILED", f"organization {ORGID}", "set MAXIMO_ITEMSETID in .env (run inventory to see "
                                                           "the item sets in use)")
             return
-        sibling = next((o for o in orgs if o.get("itemsetid") == itemsetid), None)
+        # Company set and currency come from an org that shares the item set. A new item set
+        # (made in the Sets application) has no such org yet, so fall back to an active USD org.
+        sibling = (next((o for o in orgs if o.get("itemsetid") == itemsetid), None)
+                   or next((o for o in orgs if o.get("active") and o.get("basecurrency1") == "USD"
+                            and o.get("companysetid")), None))
         if sibling is None:
-            self._line("FAILED", f"organization {ORGID}", f"no existing org uses item set {itemsetid}")
+            self._line("FAILED", f"organization {ORGID}", f"no existing org to copy a company set from for item "
+                                                          f"set {itemsetid}")
             return
         payload = org_payload(itemsetid, sibling.get("companysetid") or "", sibling.get("basecurrency1") or "USD")
         if self._create("mxapiorganization", f"organization {ORGID}", payload,
-                        f"item set {itemsetid}, company set {payload['companysetid']}") is not None:
+                        f"item set {itemsetid}, company set {payload['companysetid']} "
+                        f"(copied from {sibling.get('orgid')})") is not None:
             found = self._find("mxapiorganization", f'orgid="{ORGID}"', "orgid")
             self.org_href = found[0].get("href") if found else None
             self._manual(f"organization {ORGID}", "created inactive: set its clearing account in Organizations, "
@@ -250,10 +257,11 @@ class Provisioner:
         members = team_members(self.wo_rows)
         groups = list(cat.PERSON_GROUPS)
         existing = {g.get("persongroup") for g in self._find(
-            "mxapipersongroup", f"persongroup in {quote_list(groups)}", "persongroup")}
+            "mxapipersongroup", f"persongroup in {quote_list([maximo_team(g) for g in groups])}", "persongroup")}
         for group in groups:
-            what = f"person group {group}"
-            if group in existing:
+            ours = maximo_team(group)
+            what = f"person group {ours}" + (f" (dataset {group})" if ours != group else "")
+            if ours in existing:
                 self._exists(what)
             else:
                 self._create("mxapipersongroup", what, person_group_payload(group, members[group]),
@@ -282,18 +290,19 @@ class Provisioner:
                 elif length is not None and len(value) > length:
                     self._line("FAILED", what, f"longer than the domain's {length} characters")
                 else:
+                    # Scoped to our org: the domain is shared by every org on the instance.
                     additions.append((what, {"value": value, "maxvalue": maxvalue, "description": description,
-                                             "defaults": False}))
+                                             "defaults": False, "orgid": ORGID}))
             if not additions:
                 continue
             if not self.apply:
                 for what, a in additions:
-                    self._line("PLAN", what, f"synonym of {a['maxvalue']}")
+                    self._line("PLAN", what, f"synonym of {a['maxvalue']}, for org {ORGID} only")
                 continue
             try:
                 self.client.merge(domain["href"], {"synonymdomain": [a for _, a in additions]})
                 for what, a in additions:
-                    self._line("CREATED", what, f"synonym of {a['maxvalue']}")
+                    self._line("CREATED", what, f"synonym of {a['maxvalue']}, for org {ORGID} only")
             except MaximoError as e:
                 for what, _ in additions:
                     self._line("FAILED", what, str(e))

@@ -49,10 +49,14 @@ QALERT_STAFF = [
     ("0818023", "gdiaz", "Gabriel", "Diaz", "Public Works Customer Service", True, False),
 ]
 
+# Maximo PERSON.TITLE and PERSON.DEPARTMENT hold 30 characters, so a QAlert department that is
+# longer gets a shorter Maximo name.
+MAXIMO_DEPARTMENT = {"Public Utilities Customer Service": "Utilities Customer Service"}
+
 # Maximo-only field staff. (person id, first, last, title, discipline)
 FIELD_STAFF = [
-    ("0830144", "Raymond", "Castillo", "Supervisor - Water Distribution", "water"),
-    ("0830581", "Denise", "Holloway", "Supervisor - Wastewater Collection", "wastewater"),
+    ("0830144", "Raymond", "Castillo", "Supervisor - Water", "water"),
+    ("0830581", "Denise", "Holloway", "Supervisor - Wastewater", "wastewater"),
     ("0831027", "Marcus", "Bell", "Crew Lead - Water", "water"),
     ("0831460", "Owen", "Price", "Crew Lead - Water", "water"),
     ("0831893", "Felix", "Romero", "Crew Lead - Wastewater", "wastewater"),

@@ -20,7 +20,7 @@ from .manifest import Manifest
 
 DEFAULT_DROP = ("FAILURECODE", "PROBLEMCODE")  # provisioning leaves failure codes as a manual step
 STATUS_MEMO = "Loaded from the synthetic Sarasota pilot dataset"
-SR_SELECT = "ticketid,status,externalsystem,externalsystem_ticketid,siteid"
+SR_SELECT = "ticketid,status,externalrecid,siteid"
 WO_SELECT = "wonum,status,externalrefid,siteid"
 
 
@@ -120,8 +120,7 @@ class Loader:
     # -- natural-key lookups (read only) ------------------------------------------
     def _find_sr(self, row: dict) -> dict | None:
         found = self.client.query("mxapisr", select=SR_SELECT, page_size=5, where=(
-            f'externalsystem="QAlert" and externalsystem_ticketid={oslc_str(row["EXTERNALSYSTEM_TICKETID"])} '
-            f'and siteid="{SITEID}"'))
+            f'externalrecid={oslc_str(row["EXTERNALSYSTEM_TICKETID"])} and siteid="{SITEID}"'))
         return found[0] if found else None
 
     def _find_wo(self, row: dict) -> tuple[dict | None, str]:
@@ -351,17 +350,22 @@ class Loader:
 
 
 def write_answer_key(data: Dataset, remap: mapping.Remap, path=STATE_DIR / "answer-key-maximo.csv"):
-    """The answer key with every SR and WO id replaced by Maximo's (identical when keys were kept)."""
+    """The answer key with every SR and WO id, and every team code, as Maximo holds it."""
     ids = {**remap.tickets, **remap.wonums}
 
     def swap(text: str) -> str:  # one pass, whole ids only, so a renumbered id is never swapped twice
         return re.sub(r"\b(?:SR|WO)\d+\b", lambda m: ids.get(m.group(), m.group()), text)
+
+    def team(text: str) -> str:
+        return re.sub(r"\b(?:" + "|".join(mapping.TEAM_CODES) + r")\b", lambda m: mapping.maximo_team(m.group()), text)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=data.answer_header)
         writer.writeheader()
         for row in data.answers:
-            writer.writerow({k: swap(v) if k in ("TICKETID", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION") else v
+            row = {k: swap(v) if k in ("TICKETID", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION") else v
+                   for k, v in row.items()}
+            writer.writerow({k: team(v) if k in ("EXPECTED_PERSONGROUP", "EXPECTED_RECOMMENDATION") else v
                              for k, v in row.items()})
     return path
