@@ -629,6 +629,46 @@ ol {
   color: var(--n-300);
 }
 
+/* Two paths, one per row: resident-submitted, then staff-entered */
+.layout-bridge .display-lg {
+  max-width: none;
+}
+
+.bridge-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+  margin-bottom: var(--s-6);
+}
+
+.bridge-rows .bridge {
+  margin-bottom: 0;
+}
+
+.bridge-rows .bridge-source {
+  font-size: var(--t-2);
+}
+
+.bridge-rows .contact-card {
+  padding: var(--s-5) var(--s-6);
+}
+
+.bridge-rows .contact-name {
+  font-size: var(--t-3);
+}
+
+/* ---------- 3. Channels: residents dark, Contact Center light; no flag color ---------- */
+
+.channels .seg-0 {
+  background: var(--n-900);
+  color: var(--n-0);
+}
+
+.channels .seg-2 {
+  background: var(--n-300);
+  color: var(--n-950);
+}
+
 /* ---------- 6. Missing information ---------- */
 
 .layout-bars {

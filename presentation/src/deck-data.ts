@@ -11,6 +11,11 @@ import qalertActivity from '../../data/qalert/activity.json'
 import qalertEmployees from '../../data/qalert/employees.json'
 import { parseCsv, type Row } from './parse-csv'
 
+interface QalertRequest {
+  id: number
+  origin: string
+}
+
 interface Employee {
   id: string
   username: string
@@ -36,6 +41,7 @@ const srById = indexBy(srRows, (r) => r.TICKETID)
 const woById = indexBy(woRows, (r) => r.WONUM)
 const answerById = indexBy(answerRows, (r) => r.TICKETID)
 const staffById = indexBy(staffList, (e) => e.id)
+const requestById = indexBy(qalertRequests as QalertRequest[], (r) => String(r.id))
 
 function need<T>(map: Map<string, T>, id: string): T {
   const value = map.get(id)
@@ -116,6 +122,25 @@ export const totals = {
   answerKeyRows: answerRows.length,
 }
 
+/* ---------- Channels ---------- */
+
+// How requests reach QAlert. Residents submit app and web requests; Contact Center staff
+// enter phone calls and emails.
+const CHANNELS = [
+  { key: '311Connect mobile app', label: '311Connect app', note: 'The resident submits it', staff: false },
+  { key: '311 web portal', label: '311 web portal', note: 'The resident submits it', staff: false },
+  { key: 'phone call to 311', label: 'Phone call to 311', note: 'Contact Center staff enter it', staff: true },
+  { key: 'email to the Contact Center', label: 'Email', note: 'Contact Center staff enter it', staff: true },
+] as const
+
+export const channelGroups = CHANNELS.map((c) => ({
+  ...c,
+  count: answerRows.filter((r) => r.SUBMITTED_VIA === c.key).length,
+}))
+
+export const residentSubmitted = channelGroups.filter((c) => !c.staff).reduce((sum, c) => sum + c.count, 0)
+export const staffEntered = channelGroups.filter((c) => c.staff).reduce((sum, c) => sum + c.count, 0)
+
 /* ---------- Use cases ---------- */
 
 const USE_CASES = [
@@ -156,15 +181,14 @@ const relatedIds = (row: Row) => row.RELATED_RECORDS.split(';').filter(Boolean)
 export const missingTotal = missingRows.length
 export const missingWithCrewSent = missingRows.filter((r) => relatedIds(r).some((id) => id.startsWith('WO'))).length
 
-/* ---------- Worked example: one request ---------- */
+/* ---------- Worked examples: one resident request, one staff-entered request ---------- */
 
 function buildRequestExample(ticketId: string) {
   const sr = need(srById, ticketId)
   const answer = need(answerById, ticketId)
   const lines = descriptionLines(sr.DESCRIPTION_LONGDESCRIPTION)
   const enteredByLine = lines.find((l) => l.startsWith('Entered by:')) ?? ''
-  const enteredById = enteredByLine.replace('Entered by:', '').trim()
-  const staff = need(staffById, enteredById)
+  const staff = staffById.get(answer.ENTERED_BY_EMPLOYEE_ID)
   return {
     id: sr.TICKETID,
     qalertId: sr.EXTERNALSYSTEM_TICKETID,
@@ -175,15 +199,27 @@ function buildRequestExample(ticketId: string) {
     reportedBy: sr.REPORTEDBY,
     reportedPhone: sr.REPORTEDPHONE,
     detailLines: lines.filter((l) => l !== enteredByLine),
+    customerLine: lines.find((l) => l.startsWith('Customer:')) ?? '',
     enteredByLine,
-    enteredById,
-    staff: { ...staff, name: `${staff.firstName} ${staff.lastName}` },
+    origin: need(requestById, sr.EXTERNALSYSTEM_TICKETID).origin,
+    via: answer.SUBMITTED_VIA,
+    staff: staff && { ...staff, name: `${staff.firstName} ${staff.lastName}`, inMaximo: mappedPersonIds.has(staff.id) },
+    contact: {
+      type: answer.FOLLOW_UP_CONTACT_TYPE,
+      name: answer.FOLLOW_UP_CONTACT_NAME,
+      phone: answer.FOLLOW_UP_CONTACT_PHONE,
+      email: answer.FOLLOW_UP_CONTACT_EMAIL,
+    },
     gap: answer.ISSUE_SUMMARY,
     question: answer.SUGGESTED_CLARIFICATION_QUESTION,
   }
 }
 
+const firstMissing = (contactType: string) =>
+  missingRows.find((r) => r.FOLLOW_UP_CONTACT_TYPE === contactType)?.TICKETID ?? ''
+
 export const requestExample = buildRequestExample('SR800001')
+export const staffExample = buildRequestExample(firstMissing('Entered-by employee'))
 
 /* ---------- Duplicates ---------- */
 
@@ -246,14 +282,15 @@ export const plannedExample = buildContextExample('SR800004')
 
 const firstControl = answerRows.find((r) => r.USE_CASE === USE_CASES[3].key)
 
-export const answerSamples = ['SR800001', 'SR800054', 'SR800036', 'SR800004', firstControl?.TICKETID ?? '']
+export const answerSamples = [requestExample.id, staffExample.id, 'SR800054', 'SR800004', firstControl?.TICKETID ?? '']
   .filter(Boolean)
   .map((id) => {
     const r = need(answerById, id)
     return {
       id,
       alert: r.EXPECTED_ALERT,
-      contact: r.ENTERED_BY_NAME,
+      contact: r.FOLLOW_UP_CONTACT_NAME,
+      contactType: r.FOLLOW_UP_CONTACT_TYPE,
       related: relatedIds(r).join(', '),
     }
   })
