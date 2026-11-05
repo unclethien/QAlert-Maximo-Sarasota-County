@@ -1,6 +1,6 @@
 # Presentation script: Sprint 2 sample dataset
 
-A speaker script for the 12-slide deck in [`presentation/`](../presentation). It runs about 10 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
+A speaker script for the 13-slide deck in [`presentation/`](../presentation). It runs about 11 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
 
 ## Before you present
 
@@ -86,7 +86,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 > On the Maximo side: 60 service requests, 41 work orders, 125 work log notes, and 18 person records.
 >
-> On the QAlert side, which is our mock: the 60 matching requests, 139 history entries, and 15 Contact Center staff who enter phone and email requests.
+> On the QAlert side, which is our mock: the 60 matching requests, 138 history entries, and 15 Contact Center staff who enter phone and email requests.
 >
 > We also added a stand-in for the County's address list, with 236 points, so we can test whether an address is real. And an answer key, which I'll show you in a minute.
 >
@@ -164,7 +164,23 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > On the right, Starling Cove Drive. A water main replacement is scheduled from November 16 to December 18. When a new request comes in on that street, the AI should point to the project rather than open separate repair work.
 
-## 11. An answer key for every request (about 40 seconds)
+## 11. Requests arrive with no team (about 50 seconds)
+
+**On screen:** SR800024 with a blank team, the team the AI suggests, then work order WO2900020 with job plan LEAK, team WTRPIPE, and its crew lead and supervisor.
+
+**Say:**
+
+> One more thing the AI can help with: who does the work.
+>
+> At the top is a request as it arrives in Maximo: a water line leak at 1984 Ashcombe Drive. The team field is blank. In Sarasota, the team isn't on the request. It's set later, on the work order.
+>
+> Today a person decides which crew gets it. We want the AI to suggest the team, here the water distribution pipe crew, WTRPIPE, and a planner approves it.
+>
+> At the bottom is what happens next. The planner applies a job plan, here LEAK, and the job plan fills in the team, the supervisor, and the crew lead on the work order.
+>
+> The answer key records the right team for 59 of the 60 requests. The last one is a drainage request, which belongs to Public Works.
+
+## 12. An answer key for every request (about 40 seconds)
 
 **On screen:** a table of five sample rows from the answer key, including who to contact and why.
 
@@ -176,7 +192,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > When the AI runs on this data, we compare what it says against this file, one request at a time. That gives us a clear, honest score instead of a gut feeling.
 
-## 12. Please check these assumptions (about 1 minute 10 seconds)
+## 13. Please check these assumptions (about 1 minute 10 seconds)
 
 **On screen:** four assumptions with checkboxes, and the next steps.
 
@@ -197,4 +213,4 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ---
 
-**Total:** about 10 minutes, plus questions.
+**Total:** about 11 minutes, plus questions.

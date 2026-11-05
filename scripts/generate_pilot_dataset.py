@@ -33,11 +33,12 @@ MAXIMO_SR_COLUMNS = [
     "TICKETID", "CLASS", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "STATUS", "STATUSDATE",
     "REPORTEDBY", "REPORTEDNAME", "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE",
     "AFFECTEDPERSON", "AFFECTEDNAME", "AFFECTEDEMAIL", "EXTERNALSYSTEM", "EXTERNALSYSTEM_TICKETID",
-    "COMMODITYGROUP", "COMMODITY", "OWNERGROUP", "SITEID", "ORGID", "CREATEDBY", "CREATIONDATE",
+    "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID", "OWNERGROUP", "SITEID", "ORGID", "CREATEDBY", "CREATIONDATE",
 ]
 MAXIMO_WO_COLUMNS = [
     "WONUM", "PARENT", "STATUS", "STATUSDATE", "WORKTYPE", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION",
-    "ORIGRECORDID", "ORIGRECORDCLASS", "REPORTEDBY", "REPORTDATE", "OWNERGROUP", "SUPERVISOR", "LEAD",
+    "ORIGRECORDID", "ORIGRECORDCLASS", "REPORTEDBY", "REPORTDATE", "CLASSSTRUCTUREID", "JPNUM",
+    "PERSONGROUP", "OWNERGROUP", "SUPERVISOR", "LEAD", "FAILURECODE", "PROBLEMCODE",
     "SCHEDSTART", "SCHEDFINISH", "ACTSTART", "ACTFINISH", "SITEID", "ORGID",
 ]
 MAXIMO_WORKLOG_COLUMNS = [
@@ -54,7 +55,7 @@ ANSWER_KEY_COLUMNS = [
     "MISSING_INFORMATION", "QALERT_ORIGIN", "SUBMITTED_VIA", "ENTERED_BY_EMPLOYEE_ID", "ENTERED_BY_NAME",
     "ENTERED_BY_DEPARTMENT", "ENTERED_BY_PHONE", "ENTERED_BY_EMAIL", "ENTERED_BY_ACTIVE", "ENTERED_BY_IN_MAXIMO",
     "FOLLOW_UP_CONTACT_TYPE", "FOLLOW_UP_CONTACT_NAME", "FOLLOW_UP_CONTACT_PHONE", "FOLLOW_UP_CONTACT_EMAIL",
-    "SUGGESTED_CLARIFICATION_QUESTION", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION",
+    "SUGGESTED_CLARIFICATION_QUESTION", "EXPECTED_PERSONGROUP", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION",
 ]
 
 # Planner notes on held SRs, by who entered the request.
@@ -262,7 +263,7 @@ def build():
     # Historical and planned work orders, kept for ID assignment after sorting.
     work_orders = []
     for street, city, house, rtype, months_ago, short, notes in cat.HISTORICAL_WOS:
-        _, _, _, discipline, _, _, ownergroup, _ = cat.REQUEST_TYPES[rtype]
+        discipline = cat.REQUEST_TYPES[rtype]["discipline"]
         sup, lead, _ = crew_for(discipline, field)
         if discipline == "water":
             lead = water_leads[(months_ago + len(street)) % len(water_leads)]
@@ -271,30 +272,30 @@ def build():
         addr = f"{points[(street, house)]['STREETNO']} {street}" if house is not None else street
         work_orders.append(dict(kind="historical", street=street, house=house, date=start, rtype=rtype,
                                 desc=f"{addr}:  {short}", ld=f"<div>{html_text(addr)}, {city}, FL</div><div>{html_text(short.capitalize())}</div>",
-                                worktype="CM", status="CLOSE", ownergroup=ownergroup, sup=sup, lead=lead,
+                                worktype="IN" if "INSPECTION" in short else "CM", status="CLOSE", sup=sup, lead=lead,
                                 actstart=start, actfinish=start + timedelta(hours=rng.randint(2, 5)), notes=notes,
                                 closing="Work complete. Site restored and cleaned up."))
     for street, city, rtype, status, start, finish, desc, scope, notes in cat.PLANNED_WOS:
-        _, _, _, discipline, _, _, ownergroup, _ = cat.REQUEST_TYPES[rtype]
-        sup, _, planner = crew_for(discipline, field)
+        sup, _, planner = crew_for(cat.REQUEST_TYPES[rtype]["discipline"], field)
         sched_start = datetime.strptime(start, "%Y-%m-%d").replace(hour=7, tzinfo=TZ)
         sched_finish = datetime.strptime(finish, "%Y-%m-%d").replace(hour=16, tzinfo=TZ)
         created = min(sched_start, AS_OF) - timedelta(days=rng.randint(20, 45))
         work_orders.append(dict(kind="planned", street=street, house=None, date=created, rtype=rtype,
                                 desc=desc, ld=f"<div>{html_text(scope)}</div>", worktype="CP", status=status,
-                                ownergroup=ownergroup, sup=sup, lead=planner, schedstart=sched_start,
+                                sup=sup, lead=planner, schedstart=sched_start,
                                 schedfinish=sched_finish, actstart=sched_start if status == "INPRG" else None,
                                 notes=notes, author=planner))
 
     # Service requests, QAlert requests, follow-up work orders.
     for s in scenarios:
         key, rtype = s["key"], s["type"]
-        type_id, dept_id, priority, discipline, cgroup, commodity, ownergroup, route = cat.REQUEST_TYPES[rtype]
+        rt = cat.REQUEST_TYPES[rtype]
+        discipline, route = rt["discipline"], rt["route"]
         reported = times[key]
         created_in_qalert = reported - timedelta(minutes=rng.randint(2, 9))
         origins, intake, staff_entered, _ = cat.CHANNELS[s["channel"]]
         origin = origins[sum(map(ord, key)) % len(origins)]
-        employee = staff_by_id[s["entered_by"]] if staff_entered else None
+        employee = staff_by_id[s["entered_by"]] if staff_entered and not s.get("unattributed") else None
         if s.get("resident", "").startswith("same_as:"):
             resident = residents[s["resident"].split(":", 1)[1]]
         elif s.get("anonymous"):
@@ -311,11 +312,19 @@ def build():
         if wo_spec:
             dispatched = reported + timedelta(hours=rng.randint(1, 20), minutes=rng.randrange(60))
             finished = dispatched + timedelta(hours=rng.randint(1, 4), minutes=rng.randrange(60))
-            sr_status = "CLOSED" if wo_spec["status"] in ("CLOSE", "CAN") else "RESOLVED"
-            sr_status_date = finished + timedelta(hours=1)
+            if wo_spec["status"] == "INPRG":
+                sr_status, sr_status_date = "INPRG", dispatched
+            else:
+                sr_status = "CLOSED" if wo_spec["status"] in ("CLOSE", "CAN") else "RESOLVED"
+                sr_status_date = finished + timedelta(hours=1)
         else:
-            sr_status, sr_status_date = "QUEUED", reported
-        qalert_status = QALERT_STATUS["closed"] if sr_status in ("CLOSED", "RESOLVED") else QALERT_STATUS["open"]
+            sr_status, sr_status_date = s.get("sr_status", "QUEUED"), reported
+        if sr_status in ("CLOSED", "RESOLVED"):
+            qalert_status = QALERT_STATUS["closed"]
+        elif sr_status == "INPRG":
+            qalert_status = QALERT_STATUS["in_progress"]
+        else:
+            qalert_status = QALERT_STATUS["open"]
 
         sr = dict(key=key, reported=reported, row={
             "CLASS": "SR", "DESCRIPTION": description, "DESCRIPTION_LONGDESCRIPTION": ld,
@@ -324,23 +333,24 @@ def build():
             "REPORTEDPHONE": "", "REPORTEDEMAIL": cat.INTEGRATION_ACCOUNT["email"], "REPORTDATE": maximo_date(reported),
             "AFFECTEDPERSON": cat.INTEGRATION_ACCOUNT["id"], "AFFECTEDNAME": cat.INTEGRATION_ACCOUNT["name"],
             "AFFECTEDEMAIL": cat.INTEGRATION_ACCOUNT["email"], "EXTERNALSYSTEM": "QAlert",
-            "COMMODITYGROUP": cgroup, "COMMODITY": commodity, "OWNERGROUP": ownergroup,
+            "COMMODITYGROUP": rt["cgroup"], "COMMODITY": rt["commodity"], "CLASSSTRUCTUREID": rt["classid"],
+            "OWNERGROUP": "",
             "SITEID": cat.SITEID, "ORGID": cat.ORGID, "CREATEDBY": cat.INTEGRATION_ACCOUNT["id"],
             "CREATIONDATE": maximo_date(reported),
         })
         srs.append(sr)
         sr_by_key[key] = sr
 
-        last_action = sr_status_date if qalert_status == QALERT_STATUS["closed"] else created_in_qalert + timedelta(minutes=1)
+        last_action = sr_status_date if qalert_status != QALERT_STATUS["open"] else created_in_qalert + timedelta(minutes=1)
         requests.append(dict(key=key, created=created_in_qalert, row={
             "status": qalert_status, "createDate": qalert_date(created_in_qalert),
             "createDateUnix": int(created_in_qalert.timestamp()), "lastAction": qalert_date(last_action),
-            "lastActionUnix": int(last_action.timestamp()), "typeId": type_id, "typeName": rtype,
-            "priorityToDisplay": priority, "hasLinks": False, "comments": s["text"],
+            "lastActionUnix": int(last_action.timestamp()), "typeId": rt["type_id"], "typeName": rtype,
+            "priorityToDisplay": rt["priority"], "hasLinks": False, "comments": s["text"],
             "streetNum": loc["num"], "streetName": loc["street"].upper(), "crossName": "",
             "cityName": loc["city"], "latitude": loc["lat"], "longitude": loc["lon"],
             "origin": origin, "name": resident["name"], "email": resident["email"],
-            "phone": resident["phone"], "intakeMethod": intake, "employeeId": employee and employee["id"],
+            "phone": resident["phone"], "intakeMethod": intake, "employeeId": employee["id"] if employee else None,
         }))
         # Resident-submitted requests have no staff creator.
         activity.append(dict(key=key, at=created_in_qalert, codeDesc="Created",
@@ -356,7 +366,7 @@ def build():
             short_addr = loc["short"] or loc["city"]
             work_orders.append(dict(kind="followup", key=key, street=loc["street"], house=None, date=reported,
                                     rtype=rtype, desc=f"{short_addr}:  {wo_spec['short']}", ld=ld,
-                                    worktype=wo_spec["worktype"], status=wo_spec["status"], ownergroup=ownergroup,
+                                    worktype=wo_spec["worktype"], status=wo_spec["status"],
                                     sup=sup, lead=wo_lead, actstart=dispatched, actfinish=finished,
                                     statusdate=sr_status_date, notes=wo_spec["logs"]))
         for note in s.get("notes", []):
@@ -394,18 +404,25 @@ def build():
     for wo in work_orders:
         is_followup = wo["kind"] == "followup"
         statusdate = wo.get("statusdate") or wo.get("actfinish") or wo["date"]
+        # The WO keeps the classification and team it was actually given, even when the request was
+        # misclassified: that record is what shows the AI how routing went.
+        rt = cat.REQUEST_TYPES[wo["rtype"]]
+        corrective = wo["kind"] != "planned"
+        finished = wo.get("actfinish") and wo["kind"] != "planned" and wo["status"] != "INPRG"
         wos.append({
             "WONUM": wo["id"], "PARENT": "", "STATUS": wo["status"], "STATUSDATE": maximo_date(statusdate),
             "WORKTYPE": wo["worktype"], "DESCRIPTION": wo["desc"], "DESCRIPTION_LONGDESCRIPTION": wo["ld"],
             "ORIGRECORDID": sr_by_key[wo["key"]]["id"] if is_followup else "",
             "ORIGRECORDCLASS": "SR" if is_followup else "",
             "REPORTEDBY": cat.INTEGRATION_ACCOUNT["id"] if is_followup else wo["sup"]["id"],
-            "REPORTDATE": maximo_date(wo["date"]), "OWNERGROUP": wo["ownergroup"],
-            "SUPERVISOR": wo["sup"]["id"], "LEAD": wo["lead"]["id"],
+            "REPORTDATE": maximo_date(wo["date"]), "CLASSSTRUCTUREID": rt["classid"],
+            "JPNUM": rt["jpnum"] if corrective else "", "PERSONGROUP": rt["persongroup"],
+            "OWNERGROUP": rt["persongroup"], "SUPERVISOR": wo["sup"]["id"], "LEAD": wo["lead"]["id"],
+            "FAILURECODE": rt["failure"] if corrective else "", "PROBLEMCODE": rt["problem"] if corrective else "",
             "SCHEDSTART": maximo_date(wo["schedstart"]) if wo.get("schedstart") else "",
             "SCHEDFINISH": maximo_date(wo["schedfinish"]) if wo.get("schedfinish") else "",
             "ACTSTART": maximo_date(wo["actstart"]) if wo.get("actstart") else "",
-            "ACTFINISH": maximo_date(wo["actfinish"]) if wo.get("actfinish") and wo["kind"] != "planned" else "",
+            "ACTFINISH": maximo_date(wo["actfinish"]) if finished else "",
             "SITEID": cat.SITEID, "ORGID": cat.ORGID,
         })
         author = wo.get("author") or wo["lead"]
@@ -455,10 +472,15 @@ def follow_up(s):
 
     Residents who submitted through the app or web portal are asked directly. Phone and email
     requests go back to the Contact Center employee who entered them, or to that employee's
-    supervisor once they are inactive. Anonymous requests go to the owning group's supervisor.
+    supervisor once they are inactive. A staff-entered request that records no employee goes back
+    to the Contact Center as a team. Anonymous requests go to the owning group's supervisor.
     """
     emp, res, sup = s["_employee"], s["_resident"], s["_supervisor"]
     via = cat.CHANNELS[s["channel"]][3]
+    if s.get("unattributed"):
+        return ("Contact Center", "Contact Center", "", "",
+                f"The request came in as a {via}, but neither the SR nor QAlert records who entered it; "
+                f"send the question to the Contact Center to find the call.")
     if emp and not emp["active"]:
         name = f"{emp['department']} supervisor"
         return ("Department supervisor", name, "", "",
@@ -546,7 +568,9 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
         "ENTERED_BY_IN_MAXIMO": ("Y" if emp["in_maximo"] else "N") if emp else "",
         "FOLLOW_UP_CONTACT_TYPE": contact_type, "FOLLOW_UP_CONTACT_NAME": contact_name,
         "FOLLOW_UP_CONTACT_PHONE": contact_phone, "FOLLOW_UP_CONTACT_EMAIL": contact_email,
-        "SUGGESTED_CLARIFICATION_QUESTION": s.get("question", ""), "RELATED_RECORDS": ";".join(related),
+        "SUGGESTED_CLARIFICATION_QUESTION": s.get("question", ""),
+        "EXPECTED_PERSONGROUP": cat.REQUEST_TYPES[s.get("true_type") or s["type"]]["persongroup"],
+        "RELATED_RECORDS": ";".join(related),
         "EXPECTED_RECOMMENDATION": recommendation,
     }
 
@@ -596,8 +620,8 @@ def main():
         {k: s[k] for k in ("id", "username", "firstName", "lastName", "email", "phone", "department", "active")}
         for s in d["staff"]])
     write_json(DATA / "qalert" / "types.json", [
-        {"id": t[0], "name": name, "parent": 0, "dept": t[1], "isPrivate": False, "priorityValue": t[2]}
-        for name, t in sorted(cat.REQUEST_TYPES.items(), key=lambda kv: kv[1][0])])
+        {"id": t["type_id"], "name": name, "parent": 0, "dept": t["dept"], "isPrivate": False, "priorityValue": t["priority"]}
+        for name, t in sorted(cat.REQUEST_TYPES.items(), key=lambda kv: kv[1]["type_id"])])
     write_json(DATA / "qalert" / "departments.json", [{"id": i, "name": n} for i, n in cat.DEPARTMENTS])
 
     print(f"SRs: {len(d['srs'])}  WOs: {len(d['wos'])}  work logs: {len(d['logs'])}  "

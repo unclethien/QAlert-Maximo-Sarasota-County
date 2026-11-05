@@ -94,8 +94,8 @@ function descriptionLines(html: string): string[] {
 }
 
 const WO_STATUS: Record<string, string> = {
-  WSCH: 'Scheduled',
-  APPR: 'Approved',
+  SCHED: 'Scheduled',
+  WCONT: 'Waiting for a contract',
   INPRG: 'In progress',
   COMP: 'Completed',
   CLOSE: 'Closed',
@@ -277,6 +277,46 @@ function buildContextExample(ticketId: string) {
 
 export const pastExample = buildContextExample('SR800036')
 export const plannedExample = buildContextExample('SR800004')
+
+/* ---------- Teams ---------- */
+
+// Descriptions of the person groups in the dataset (WTRPIPE, SANCLINSP and LSCENT appear in the
+// County's sample records; WTRMETER and RECLAIM are illustrative).
+const TEAM_LABELS: Record<string, string> = {
+  WTRPIPE: 'Water distribution pipe crew',
+  SANCLINSP: 'Sanitary collection and inspection crew',
+  LSCENT: 'Lift station crew',
+  WTRMETER: 'Meter services crew',
+  RECLAIM: 'Reclaimed water crew',
+}
+
+const personById = indexBy(personRows, (p) => p.PERSONID)
+
+function buildTeamExample(workOrderId: string) {
+  const wo = need(woById, workOrderId)
+  const sr = need(srById, wo.ORIGRECORDID)
+  const answer = need(answerById, sr.TICKETID)
+  return {
+    srId: sr.TICKETID,
+    ...splitSummary(sr.DESCRIPTION),
+    srTeam: sr.OWNERGROUP,
+    suggestedTeam: answer.EXPECTED_PERSONGROUP,
+    suggestedLabel: TEAM_LABELS[answer.EXPECTED_PERSONGROUP] ?? '',
+    woId: wo.WONUM,
+    jobPlan: wo.JPNUM,
+    team: wo.PERSONGROUP,
+    supervisor: need(personById, wo.SUPERVISOR).DISPLAYNAME,
+    lead: need(personById, wo.LEAD).DISPLAYNAME,
+  }
+}
+
+export const teamExample = buildTeamExample('WO2900020')
+export const teamTotals = {
+  requestsWithoutTeam: srRows.filter((r) => !r.OWNERGROUP).length,
+  withSuggestedTeam: answerRows.filter((r) => r.EXPECTED_PERSONGROUP).length,
+  teams: new Set(answerRows.map((r) => r.EXPECTED_PERSONGROUP).filter(Boolean)).size,
+  jobPlans: new Set(woRows.map((w) => w.JPNUM).filter(Boolean)).size,
+}
 
 /* ---------- Answer key ---------- */
 

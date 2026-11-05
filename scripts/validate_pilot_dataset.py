@@ -13,6 +13,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import pilot_catalog as cat
+
 DATA = Path(__file__).resolve().parent.parent / "data"
 PHONE = re.compile(r"^941-555-01\d\d$")
 EMAIL = re.compile(r"^[a-z0-9.]+@example\.(com|org|net)$")
@@ -81,6 +83,7 @@ def main():
     known_addresses = {(p["STREETNO"], p["STREETNAME"].upper(), p["CITY"]) for p in points}
 
     # Links between files.
+    unattributed = []
     check(len(sr_ids) == len(srs) == 60, f"expected 60 unique SRs, found {len(srs)}")
     for sr in srs:
         rid = int(sr["EXTERNALSYSTEM_TICKETID"])
@@ -88,7 +91,12 @@ def main():
         match = ENTERED_BY.search(sr["DESCRIPTION_LONGDESCRIPTION"])
         req = request_by_id.get(rid)
         if req and req["origin"] == STAFF_ORIGIN:
-            check(match is not None, f"{sr['TICKETID']}: staff-entered SR has no 'Entered by' line")
+            # A staff-entered request either names its employee in both systems or in neither.
+            if req["employeeId"] is None:
+                unattributed.append(sr["TICKETID"])
+                check(match is None, f"{sr['TICKETID']}: unattributed SR must not have an 'Entered by' line")
+            else:
+                check(match is not None, f"{sr['TICKETID']}: staff-entered SR has no 'Entered by' line")
             check(req["intakeMethod"] in ("Phone", "Email"), f"{sr['TICKETID']}: staff-entered request needs an intakeMethod")
             if match:
                 emp = match.group(1)
@@ -115,8 +123,9 @@ def main():
     usernames = {e["username"] for e in employees}
     for a in activity:
         if a["codeDesc"] == "Created":
-            staff_entered = request_by_id[a["requestId"]]["origin"] == STAFF_ORIGIN
-            check((a["routeId"] in usernames) if staff_entered else a["routeId"] == "",
+            req = request_by_id[a["requestId"]]
+            staff_named = req["origin"] == STAFF_ORIGIN and req["employeeId"] is not None
+            check((a["routeId"] in usernames) if staff_named else a["routeId"] == "",
                   f"activity {a['id']}: creator {a['routeId']!r} does not match the request origin")
     for r in requests:
         check(r["typeId"] in type_ids, f"request {r['id']}: unknown type {r['typeId']}")
@@ -127,11 +136,13 @@ def main():
     for a in answers:
         req = request_by_ticket[a["TICKETID"]]
         check(a["QALERT_ORIGIN"] == req["origin"], f"{a['TICKETID']}: QALERT_ORIGIN differs from the QAlert request")
-        check(bool(a["ENTERED_BY_EMPLOYEE_ID"]) == (req["origin"] == STAFF_ORIGIN),
-              f"{a['TICKETID']}: only staff-entered requests have an entered-by employee")
+        check(bool(a["ENTERED_BY_EMPLOYEE_ID"]) == (req["origin"] == STAFF_ORIGIN and req["employeeId"] is not None),
+              f"{a['TICKETID']}: only attributed staff-entered requests have an entered-by employee")
         emp = employee_by_id.get(a["ENTERED_BY_EMPLOYEE_ID"])
         if emp:
             expected = "Entered-by employee" if emp["active"] else "Department supervisor"
+        elif req["origin"] == STAFF_ORIGIN:
+            expected = "Contact Center"
         elif req["phone"] or req["email"]:
             expected = "Resident"
             check((a["FOLLOW_UP_CONTACT_PHONE"], a["FOLLOW_UP_CONTACT_EMAIL"]) == (req["phone"], req["email"]),
@@ -157,6 +168,53 @@ def main():
     use_cases = Counter(a["USE_CASE"] for a in answers)
     check(alerts == Counter(EXPECTED_ALERTS), f"alert counts {dict(alerts)} differ from {EXPECTED_ALERTS}")
     check(use_cases == Counter(EXPECTED_USE_CASES), f"use case counts {dict(use_cases)} differ from {EXPECTED_USE_CASES}")
+
+    # Records match the shapes of the County's Maximo samples.
+    check(len(unattributed) == 1, f"expected exactly one unattributed staff-entered SR, found {unattributed}")
+    class_ids = set(cat.CLASSIFICATIONS)
+    sr_statuses = Counter(sr["STATUS"] for sr in srs)
+    check(set(sr_statuses) <= set(cat.SR_STATUSES), f"unexpected SR statuses {sorted(set(sr_statuses) - set(cat.SR_STATUSES))}")
+    for status in ("NEW", "INPRG", "PENDING"):
+        check(sr_statuses[status] >= 1, f"at least one SR must be {status}")
+    sr_logged = {log["RECORDKEY"] for log in logs if log["CLASS"] == "SR"}
+    for sr in srs:
+        check(sr["OWNERGROUP"] == "", f"{sr['TICKETID']}: SRs carry no team; OWNERGROUP must be blank")
+        check(sr["CLASSSTRUCTUREID"] in class_ids, f"{sr['TICKETID']}: unknown classification {sr['CLASSSTRUCTUREID']!r}")
+        if sr["STATUS"] == "NEW":
+            check(sr["TICKETID"] not in sr_logged, f"{sr['TICKETID']}: a NEW SR has not been reviewed, so it has no work log")
+    work_types = Counter(wo["WORKTYPE"] for wo in wos)
+    check(set(work_types) <= set(cat.WORK_TYPES), f"unexpected work types {sorted(set(work_types) - set(cat.WORK_TYPES))}")
+    check(work_types["IN"] >= 1, "at least one WO must be an inspection (IN)")
+    sr_status_by_id = {sr["TICKETID"]: sr["STATUS"] for sr in srs}
+    for wo in wos:
+        tag = wo["WONUM"]
+        check(wo["STATUS"] in cat.WO_STATUSES, f"{tag}: unexpected status {wo['STATUS']!r}")
+        check(wo["PERSONGROUP"] in cat.PERSON_GROUPS, f"{tag}: unknown person group {wo['PERSONGROUP']!r}")
+        check(wo["OWNERGROUP"] == wo["PERSONGROUP"], f"{tag}: OWNERGROUP should match PERSONGROUP")
+        check(wo["CLASSSTRUCTUREID"] in class_ids, f"{tag}: unknown classification {wo['CLASSSTRUCTUREID']!r}")
+        if wo["WORKTYPE"] == "CP":
+            check(wo["JPNUM"] == "" and wo["FAILURECODE"] == "" and wo["PROBLEMCODE"] == "",
+                  f"{tag}: planned capital work has no job plan or failure codes")
+        else:
+            plan = cat.JOB_PLANS.get(wo["JPNUM"])
+            check(plan is not None, f"{tag}: unknown job plan {wo['JPNUM']!r}")
+            if plan:
+                check(wo["PERSONGROUP"] == plan[1], f"{tag}: person group differs from job plan {wo['JPNUM']}")
+            check(wo["FAILURECODE"] in cat.FAILURE_CODES, f"{tag}: unknown failure code {wo['FAILURECODE']!r}")
+            check(wo["PROBLEMCODE"] in cat.PROBLEM_CODES, f"{tag}: unknown problem code {wo['PROBLEMCODE']!r}")
+        check(bool(wo["ACTFINISH"]) == (wo["STATUS"] in ("COMP", "CLOSE", "CAN") and wo["WORKTYPE"] != "CP"),
+              f"{tag}: ACTFINISH must be set exactly when field work finished")
+        if wo["ORIGRECORDID"] and wo["STATUS"] == "INPRG":
+            check(sr_status_by_id.get(wo["ORIGRECORDID"]) == "INPRG", f"{tag}: origin SR should be INPRG while the WO is")
+    for sr in srs:
+        if sr["DESCRIPTION"].split(",")[0] in ("Low Water Pressure", "Curb Stop"):
+            check(sr["COMMODITY"] == "WATER_PIPE", f"{sr['TICKETID']}: Low Water Pressure and Curb Stop use WATER_PIPE")
+    for a in answers:
+        group = a["EXPECTED_PERSONGROUP"]
+        check(group == "" or group in cat.PERSON_GROUPS, f"{a['TICKETID']}: unknown expected team {group!r}")
+        if not group:
+            check("Drainage / Flooding" in a["EXPECTED_RECOMMENDATION"],
+                  f"{a['TICKETID']}: only non-Utilities requests have no expected team")
 
     # Location scenarios agree with the GIS stand-in.
     scenario_by_ticket = {a["TICKETID"]: a["SCENARIO"] for a in answers}

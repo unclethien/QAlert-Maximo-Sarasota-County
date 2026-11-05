@@ -27,7 +27,7 @@ Residents submit app and web requests themselves. Contact Center staff type phon
 
 When a request needs clarification, who to ask depends on the channel:
 - **App and web requests:** ask the resident, using the contact details they gave.
-- **Phone and email requests:** ask the staff member who entered the request.
+- **Phone and email requests:** ask the staff member who entered the request. One phone request records no employee anywhere, like many of the County's staff-written samples; its question goes back to the Contact Center as a team.
 
 No value in the dataset comes from real Sarasota County records:
 - People, phone numbers, emails, and street names are invented.
@@ -51,8 +51,12 @@ The validator checks the following:
 - Scenario counts match the catalog.
 - Location scenarios agree with the GIS stand-in.
 - The channel mix matches the table above.
-- Only staff-entered SRs carry an "Entered by" line.
+- Only staff-entered SRs carry an "Entered by" line. The one unattributed request carries none, and has no employee in QAlert either.
 - The answer key's follow-up contact matches each request's channel.
+- Records follow the County's Maximo shapes:
+  - SRs have no team, and every SR and WO has a known classification;
+  - every non-capital WO has a job plan, its team, and failure and problem codes;
+  - statuses and work types come from the Sarasota sets below.
 - The Maximo person-record gap, an inactive employee, and an anonymous request are all represented.
 - Every phone number and email stays in the fictional ranges.
 
@@ -65,11 +69,11 @@ The validator checks the following:
 | `data/maximo/worklog.csv` | 125 | Field notes on WOs and planner notes on SRs |
 | `data/maximo/person.csv` | 18 | Maximo PERSON records: the integration account, field staff, and 9 of the 15 QAlert staff |
 | `data/qalert/requests.json` | 60 | The QAlert requests behind each SR, including the channel each one came from (`origin`) |
-| `data/qalert/activity.json` | 139 | QAlert request history (Created, Assigned, Closed) |
+| `data/qalert/activity.json` | 138 | QAlert request history (Created, Assigned, Closed) |
 | `data/qalert/employees.json` | 15 | QAlert staff who enter phone and email requests; this is the contact lookup target for those requests |
 | `data/qalert/types.json` / `departments.json` | 12 / 5 | QAlert request types and departments |
 | `data/reference/address-points.csv` | 236 | A stand-in for the County GIS address layer, used to validate locations |
-| `data/answer-key.csv` | 60 | The expected scenario, alert, channel, follow-up contact, clarification question, related records, and recommendation for every SR |
+| `data/answer-key.csv` | 60 | The expected scenario, alert, channel, follow-up contact, clarification question, expected team, related records, and recommendation for every SR |
 
 ## How the files link
 
@@ -115,7 +119,53 @@ Other details of the long description:
 - The `Customer` line lists only the contact details the resident gave. One web request is anonymous (`Customer: Anonymous`).
 - When there is no usable address, the map link is omitted.
 
-Dates are ISO 8601 with the Eastern offset (for example `2026-10-19T14:52:36-04:00`). SR report dates run from 2026-08-03 to 2026-10-27. 41 SRs are `QUEUED` (awaiting review); the rest are `RESOLVED` or `CLOSED`, each with a follow-up WO.
+Dates are ISO 8601 with the Eastern offset (for example `2026-10-19T14:52:36-04:00`). SR report dates run from 2026-08-03 to 2026-10-27.
+
+SR statuses use Sarasota's values:
+
+| Status | SRs | Meaning |
+|---|---|---|
+| `NEW` | 2 | Just arrived, not reviewed yet (no work log) |
+| `QUEUED` | 36 | Waiting for review or for a crew |
+| `PENDING` | 3 | Held while staff wait for the requester |
+| `INPRG` | 1 | Its follow-up WO is in progress |
+| `RESOLVED` | 15 | Its follow-up WO is complete |
+| `CLOSED` | 3 | Its follow-up WO is closed or cancelled |
+
+`CLASSSTRUCTUREID` holds a synthetic classification for the request type as submitted. A misclassified SR keeps the wrong one, which is what the AI should catch.
+
+## Teams: on the work order, not the request
+
+In Sarasota, the team that does the work is set on the work order, not the service request. A planner reads the request and applies a job plan, and the job plan fills in the team (`PERSONGROUP`), `SUPERVISOR` and `LEAD`. The planner often changes the lead afterwards. The County's real SRs leave `OWNERGROUP` blank, so ours do too.
+
+What the dataset holds:
+- **New requests** have no team. Suggesting one is part of what MAS AI is tested on.
+- **Work orders** that were assigned, including closed ones, keep their team. That history is what the AI learns from.
+- **The answer key** holds the correct team for each SR (`EXPECTED_PERSONGROUP`). A misclassified request's expected team is the team for its correct type.
+
+## Maximo WOs
+
+Each WO has `PERSONGROUP` (copied to `OWNERGROUP`), `SUPERVISOR`, `LEAD`, `CLASSSTRUCTUREID`, and, except for planned capital work, `JPNUM`, `FAILURECODE` and `PROBLEMCODE`. A follow-up WO keeps the classification and team it was actually given, even when its SR was misclassified, so the record shows how routing really went.
+
+| Field | Values |
+|---|---|
+| `STATUS` | `WCONT` (waiting for a contract), `SCHED`, `INPRG`, `COMP`, `CLOSE`, `CAN` |
+| `WORKTYPE` | `CM` corrective maintenance (23), `CS` customer service (8), `IN` inspection (2), `CP` planned capital project (8) |
+
+The job plan decides the team:
+
+| Job plan | Team | Request types |
+|---|---|---|
+| `LEAK` | `WTRPIPE` | Water Line Leak, Water Main Break, Curb Stop |
+| `PRESSURE` | `WTRPIPE` | Low Water Pressure |
+| `NOWATER` | `WTRPIPE` | No Water |
+| `METER` | `WTRMETER` | Water Meter Issue |
+| `SAN INSP` | `SANCLINSP` | Sewer Issue, Sewer Odor |
+| `FORCEMAIN` | `SANCLINSP` | Force Main Break |
+| `LSALARM` | `LSCENT` | Lift Station Alarm |
+| `RECLAIM` | `RECLAIM` | Reclaimed Water Issue |
+
+`scripts/pilot_catalog.py` holds these tables, the failure and problem codes, and the classifications. Each entry is marked as a real County code or our own illustrative value.
 
 ## Mock QAlert data
 
@@ -144,7 +194,7 @@ Other conventions:
 - The `id` uses the same 7-digit format as Maximo PERSONID. This reflects the pilot assumption that employee IDs are shared across QAlert and Maximo.
 - Six of the 15 employees have no Maximo PERSON record. This reproduces the "requester does not map to a Maximo person" gap.
 - Two employees are inactive.
-- Twelve SRs are staff-entered. The other 48 have no employee.
+- Twelve SRs are staff-entered. Eleven name their employee; one records no employee anywhere. The other 48 have no employee.
 
 ## Scenarios
 
@@ -172,8 +222,10 @@ Several missing-information SRs also have a follow-up WO in which the crew found
 - `ISSUE_SUMMARY` and `MISSING_INFORMATION`.
 - `QALERT_ORIGIN` and `SUBMITTED_VIA`: the channel the request came in through.
 - For staff-entered requests, the QAlert employee who entered the request: ID, name, department, phone, email, active flag, and whether that employee has a Maximo PERSON record. These columns are empty for app and web requests.
-- `FOLLOW_UP_CONTACT_TYPE`, `FOLLOW_UP_CONTACT_NAME`, `FOLLOW_UP_CONTACT_PHONE`, and `FOLLOW_UP_CONTACT_EMAIL`: who to ask if the request needs clarification. The type is `Resident`, `Entered-by employee`, `Department supervisor`, or `Owning group supervisor`.
-- `SUGGESTED_CLARIFICATION_QUESTION`, `RELATED_RECORDS`, and `EXPECTED_RECOMMENDATION`.
+- `FOLLOW_UP_CONTACT_TYPE`, `FOLLOW_UP_CONTACT_NAME`, `FOLLOW_UP_CONTACT_PHONE`, and `FOLLOW_UP_CONTACT_EMAIL`: who to ask if the request needs clarification. The type is `Resident`, `Entered-by employee`, `Department supervisor`, `Contact Center`, or `Owning group supervisor`.
+- `SUGGESTED_CLARIFICATION_QUESTION`.
+- `EXPECTED_PERSONGROUP`: the team that should handle the request. It is blank only for the stormwater request, which belongs to Public Works.
+- `RELATED_RECORDS` and `EXPECTED_RECOMMENDATION`.
 
 Here is an example of the expected output for a missing-location SR submitted through the app:
 
@@ -187,10 +239,12 @@ Special cases:
 - When the employee who entered the request is inactive, the question goes to the department supervisor.
 - When the employee has no Maximo person record, the recommendation notes that the contact details came from QAlert.
 - When a resident gave no phone or email, the question goes to the supervisor of the group that owns the work.
+- When a staff-entered request records no employee, the question goes to the Contact Center.
 
 Of the 24 missing-information SRs:
 - 17 go to the resident;
-- 4 go to the staff member who entered the request;
+- 3 go to the staff member who entered the request;
+- 1 goes to the Contact Center, because nobody recorded who took the call;
 - 2 go to a department supervisor, because that staff member is inactive;
 - 1 goes to the owning group's supervisor, because the request was anonymous.
 
@@ -204,9 +258,12 @@ The recommendations encode the team's assumptions. Stakeholders should review th
 - QAlert employee IDs equal Maximo PERSONIDs.
 - For staff-entered requests, the employee ID reaches Maximo as an "Entered by" line in the long description. In production, a dedicated field would be cleaner.
 - The QAlert `employees.json` schema and the fields `phone`, `intakeMethod`, and `employeeId` are provisional until Sarasota confirms what the QAlert API returns.
+- These Maximo values come from the County's sample records: the SR statuses, `WCONT` and `SCHED`; the work types `CM`, `CS` and `IN`; the teams `WTRPIPE`, `SANCLINSP` and `LSCENT`; the job plans `LEAK`, `PRESSURE` and `SAN INSP`; the failure codes `SERVLINE` and `SERVICELATERAL`; and the problem codes `LEAKBROKEN`, `LOWPRESSURE`, `CURBSTOP` and `CUSTCOMPLAINT`. The meanings of `SANCLINSP`, `LSCENT` and `WCONT` are read from the code names and are unconfirmed.
 - These Maximo values are illustrative, not Sarasota's actual configuration:
-  - `OWNERGROUP` codes other than `WTRPIPE`;
-  - the `CP` work type for planned projects;
+  - the teams `WTRMETER` and `RECLAIM`, and the job plans `NOWATER`, `METER`, `FORCEMAIN`, `LSALARM` and `RECLAIM`;
+  - the other failure and problem codes;
+  - the `CP` work type for planned capital projects (we assume the County tracks this work as its own type);
+  - all classification IDs (`9101`–`9401`); the County's numeric IDs only mean something on its own instance;
   - `COMMODITY` values other than `WATER_PIPE`, `WATER_SERV`, and `COLLECTION`.
 - Street names were invented and checked only by eye. Rename any that match a real Sarasota County street.
 - The CSVs use Maximo attribute names. Loading them into the TechZone environment may require column mapping for MXLoader or the REST API.

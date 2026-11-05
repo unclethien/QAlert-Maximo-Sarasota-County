@@ -13,6 +13,8 @@ import {
   residentSubmitted,
   staffEntered,
   staffExample,
+  teamExample,
+  teamTotals,
   totals,
   useCaseGroups,
 } from './deck-data'
@@ -421,11 +423,70 @@ function HistorySlide() {
 }
 
 /* 11 */
+function TeamSlide() {
+  const t = teamExample
+  return (
+    <div className="layout-bridge">
+      <h2 className="display-lg">Requests arrive with no team</h2>
+      <div className="bridge-rows">
+        <div className="bridge">
+          <figure className="record bracketed">
+            <figcaption className="record-head">
+              <span>{t.srId} in Maximo</span>
+              <span className="record-status">
+                <TypeTag type={t.type} />
+              </span>
+            </figcaption>
+            <div className="record-body">
+              <span>{t.address}</span>
+              <mark className="flag-mark bridge-source">Team: {t.srTeam || 'blank'}</mark>
+              <span className="muted">Someone has to decide which crew gets the work.</span>
+            </div>
+          </figure>
+          <BridgeArrow />
+          <figure className="contact-card">
+            <figcaption className="contact-source">The AI suggests</figcaption>
+            <p className="contact-name">{t.suggestedTeam}</p>
+            <p>{t.suggestedLabel}</p>
+            <p className="muted">A planner approves it</p>
+          </figure>
+        </div>
+        <div className="bridge">
+          <figure className="record bracketed">
+            <figcaption className="record-head">
+              <span>{t.woId} in Maximo</span>
+              <span className="record-status">Job plan {t.jobPlan}</span>
+            </figcaption>
+            <div className="record-body">
+              <mark className="flag-mark bridge-source">Team: {t.team}</mark>
+              <span className="muted">The planner applies a job plan, and the job plan sets the team on the work order.</span>
+            </div>
+          </figure>
+          <BridgeArrow />
+          <figure className="contact-card">
+            <figcaption className="contact-source">Who goes out</figcaption>
+            <p className="contact-name">{t.lead}</p>
+            <p>Crew lead</p>
+            <p className="muted">Supervisor: {t.supervisor}</p>
+          </figure>
+        </div>
+      </div>
+      <p className="lede">
+        The answer key gives the right team for {teamTotals.withSuggestedTeam} of {teamTotals.requestsWithoutTeam}{' '}
+        requests, across {countWord(teamTotals.teams)} teams and {countWord(teamTotals.jobPlans)} job plans. The other one is a
+        Public Works drainage request.
+      </p>
+    </div>
+  )
+}
+
+/* 12 */
 const CONTACT_LABELS: Record<string, string> = {
   Resident: 'resident',
   'Entered-by employee': 'took the call',
   'Department supervisor': 'supervisor',
   'Owning group supervisor': 'supervisor',
+  'Contact Center': 'unknown employee',
 }
 
 function AnswerKeySlide() {
@@ -461,7 +522,7 @@ function AnswerKeySlide() {
   )
 }
 
-/* 12 */
+/* 13 */
 function NextSlide() {
   const assumptions = [
     'Most requests come from residents through 311Connect; about one in five through the Contact Center.',
@@ -505,6 +566,7 @@ export const slides: { title: string; Component: () => ReactElement }[] = [
   { title: 'What the AI should do with one request', Component: StepsSlide },
   { title: 'Duplicates', Component: DuplicatesSlide },
   { title: 'Past and planned work', Component: HistorySlide },
+  { title: 'Who does the work', Component: TeamSlide },
   { title: 'The answer key', Component: AnswerKeySlide },
   { title: 'Assumptions and next steps', Component: NextSlide },
 ]

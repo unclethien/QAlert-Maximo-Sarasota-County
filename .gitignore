@@ -15,3 +15,11 @@ plans/
 # Presentation build output
 node_modules/
 dist/
+
+# Maximo loader: credentials and per-instance state. Never commit.
+.env
+.env.*
+!.env.example
+loader-state/
+.venv/
+.pytest_cache/
