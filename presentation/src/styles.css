@@ -980,6 +980,124 @@ ol {
   border-bottom: var(--hairline);
 }
 
+/* ---------- Teams and status values ---------- */
+
+.layout-reference .display-lg {
+  max-width: none;
+}
+
+.reference-grid {
+  display: grid;
+  grid-template-columns: 9fr 5fr 5fr;
+  gap: var(--s-8);
+  align-items: start;
+}
+
+.reference-grid .ledger-title {
+  font-size: var(--t-2);
+}
+
+.ref-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-1);
+}
+
+.ref-table th {
+  padding: var(--s-3) var(--s-4) var(--s-3) 0;
+  border-bottom: var(--hairline);
+  text-align: left;
+  font-weight: 600;
+  color: var(--n-500);
+}
+
+.ref-table td {
+  padding: var(--s-3) var(--s-4) var(--s-3) 0;
+  border-bottom: var(--hairline);
+  vertical-align: top;
+}
+
+.ref-table .ref-count {
+  padding-right: 0;
+  padding-left: var(--s-4);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ref-code {
+  font-weight: 600;
+}
+
+.ref-badge {
+  margin-left: var(--s-3);
+  padding: 2px var(--s-2);
+  background: var(--flag-wash);
+  color: var(--flag-ink);
+  font-size: 16px;
+  font-weight: 600;
+  vertical-align: 2px;
+}
+
+.ref-sub {
+  display: block;
+  color: var(--n-700);
+}
+
+.ref-note {
+  display: block;
+  font-size: 18px;
+}
+
+.layout-reference .footnote {
+  margin-top: var(--s-6);
+  max-width: none;
+}
+
+/* ---------- What changed ---------- */
+
+.layout-changes .lede {
+  margin-top: calc(var(--s-6) * -1);
+  margin-bottom: var(--s-7);
+}
+
+.changes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-7);
+}
+
+.change {
+  padding-top: var(--s-4);
+  border-top: var(--rule);
+}
+
+.change-num {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--t-5);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--flag-ink);
+}
+
+.change-title {
+  margin-top: var(--s-4);
+  font-size: var(--t-3);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.change-body {
+  margin-top: var(--s-3);
+  font-size: var(--t-1);
+  line-height: 1.4;
+  color: var(--n-700);
+}
+
+.layout-changes .footnote {
+  margin-top: var(--s-7);
+}
+
 /* ---------- 11. Close ---------- */
 
 .layout-close {

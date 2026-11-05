@@ -6,6 +6,7 @@ import worklogCsv from '../../data/maximo/worklog.csv?raw'
 import personCsv from '../../data/maximo/person.csv?raw'
 import answerKeyCsv from '../../data/answer-key.csv?raw'
 import addressPointsCsv from '../../data/reference/address-points.csv?raw'
+import requiredInfoCsv from '../../data/reference/required-information.csv?raw'
 import qalertRequests from '../../data/qalert/requests.json'
 import qalertActivity from '../../data/qalert/activity.json'
 import qalertEmployees from '../../data/qalert/employees.json'
@@ -31,6 +32,7 @@ const srRows = parseCsv(srCsv)
 const woRows = parseCsv(woCsv)
 const personRows = parseCsv(personCsv)
 const answerRows = parseCsv(answerKeyCsv)
+const worklogRows = parseCsv(worklogCsv)
 const staffList = qalertEmployees as Employee[]
 
 function indexBy<T>(rows: T[], key: (row: T) => string): Map<string, T> {
@@ -111,7 +113,7 @@ export const totals = {
   followUpWorkOrders: woRows.filter((w) => w.ORIGRECORDCLASS === 'SR').length,
   pastWorkOrders: woRows.filter((w) => !w.ORIGRECORDID && w.WORKTYPE !== 'CP').length,
   plannedWorkOrders: woRows.filter((w) => w.WORKTYPE === 'CP').length,
-  workLogs: parseCsv(worklogCsv).length,
+  workLogs: worklogRows.length,
   people: personRows.length,
   qalertRequests: (qalertRequests as unknown[]).length,
   qalertHistory: (qalertActivity as unknown[]).length,
@@ -290,6 +292,15 @@ const TEAM_LABELS: Record<string, string> = {
   RECLAIM: 'Reclaimed water crew',
 }
 
+// Each team's job plans, as provisioned in Maximo (FORCEMAIN has no work order in the dataset yet).
+const JOB_PLANS_BY_TEAM: Record<string, string[]> = {
+  WTRPIPE: ['LEAK', 'PRESSURE', 'NOWATER'],
+  SANCLINSP: ['SAN INSP', 'FORCEMAIN'],
+  LSCENT: ['LSALARM'],
+  WTRMETER: ['METER'],
+  RECLAIM: ['RECLAIM'],
+}
+
 const personById = indexBy(personRows, (p) => p.PERSONID)
 
 function buildTeamExample(workOrderId: string) {
@@ -314,8 +325,48 @@ export const teamExample = buildTeamExample('WO2900020')
 export const teamTotals = {
   requestsWithoutTeam: srRows.filter((r) => !r.OWNERGROUP).length,
   withSuggestedTeam: answerRows.filter((r) => r.EXPECTED_PERSONGROUP).length,
-  teams: new Set(answerRows.map((r) => r.EXPECTED_PERSONGROUP).filter(Boolean)).size,
-  jobPlans: new Set(woRows.map((w) => w.JPNUM).filter(Boolean)).size,
+}
+
+/* ---------- Teams and status values ---------- */
+
+const COUNTY_TEAMS = new Set(['WTRPIPE', 'SANCLINSP', 'LSCENT'])
+
+export const teamList = Object.entries(TEAM_LABELS).map(([code, label]) => {
+  const orders = woRows.filter((w) => w.PERSONGROUP === code)
+  return {
+    code,
+    label,
+    fromCounty: COUNTY_TEAMS.has(code),
+    jobPlans: JOB_PLANS_BY_TEAM[code] ?? [],
+    workOrders: orders.length,
+    requests: answerRows.filter((r) => r.EXPECTED_PERSONGROUP === code).length,
+  }
+})
+
+// In lifecycle order. `maximo` is the standard internal status a County value is a synonym of.
+const SR_STATUSES = [
+  { code: 'NEW', label: 'New' },
+  { code: 'QUEUED', label: 'Queued' },
+  { code: 'INPRG', label: 'In progress', maximo: 'INPROG' },
+  { code: 'PENDING', label: 'Pending' },
+  { code: 'RESOLVED', label: 'Resolved' },
+  { code: 'CLOSED', label: 'Closed' },
+]
+const WO_STATUSES = [
+  { code: 'WCONT', label: 'Waiting for a contract', maximo: 'WAPPR' },
+  { code: 'SCHED', label: 'Scheduled', maximo: 'WSCH' },
+  { code: 'INPRG', label: 'In progress' },
+  { code: 'COMP', label: 'Completed' },
+  { code: 'CLOSE', label: 'Closed' },
+  { code: 'CAN', label: 'Canceled' },
+]
+
+const withCounts = (statuses: typeof SR_STATUSES, rows: Row[]) =>
+  statuses.map((s) => ({ ...s, count: rows.filter((r) => r.STATUS === s.code).length }))
+
+export const statusLists = {
+  requests: withCounts(SR_STATUSES, srRows),
+  workOrders: withCounts(WO_STATUSES, woRows),
 }
 
 /* ---------- Answer key ---------- */
@@ -334,3 +385,18 @@ export const answerSamples = [requestExample.id, staffExample.id, 'SR800054', 'S
       related: relatedIds(r).join(', '),
     }
   })
+
+/* ---------- What changed after IBM's data review ---------- */
+
+const notCountyRows = answerRows.filter((r) => r.EXPECTED_ALERT === 'Possibly not County responsibility')
+
+export const reviewChanges = {
+  notCounty: notCountyRows.length,
+  cityUtility: notCountyRows.filter((r) => /refer the customer to City of /.test(r.EXPECTED_RECOMMENDATION)).length,
+  reroutedByNote: worklogRows.filter((w) => w.LOGTYPE === 'RESOLUTION').length,
+  requiredInfoRules: parseCsv(requiredInfoCsv).length,
+  requestsWithGaps: answerRows.filter((r) => r.REQUIRED_INFO_GAP).length,
+  sameAddressLookAlikes: answerRows.filter(
+    (r) => r.SCENARIO.startsWith('Look-alike') && relatedIds(r).some((id) => id.startsWith('WO')),
+  ).length,
+}

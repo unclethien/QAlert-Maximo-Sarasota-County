@@ -11,9 +11,12 @@ import {
   plannedExample,
   requestExample,
   residentSubmitted,
+  reviewChanges,
   staffEntered,
   staffExample,
+  statusLists,
   teamExample,
+  teamList,
   teamTotals,
   totals,
   useCaseGroups,
@@ -473,15 +476,85 @@ function TeamSlide() {
       </div>
       <p className="lede">
         The answer key gives the right team for {teamTotals.withSuggestedTeam} of {teamTotals.requestsWithoutTeam}{' '}
-        requests, across {countWord(teamTotals.teams)} teams and {countWord(teamTotals.jobPlans)} job plans. The other{' '}
-        {countWord(teamTotals.requestsWithoutTeam - teamTotals.withSuggestedTeam)} aren’t County Utilities work: Public
-        Works drainage, a private backflow device, or an address another city’s utility serves.
+        requests. The other {countWord(teamTotals.requestsWithoutTeam - teamTotals.withSuggestedTeam)} aren’t County
+        Utilities work.
       </p>
     </div>
   )
 }
 
 /* 12 */
+function StatusList({ title, rows }: { title: string; rows: typeof statusLists.requests }) {
+  return (
+    <div className="status-col">
+      <h3 className="ledger-title">{title}</h3>
+      <table className="ref-table">
+        <tbody>
+          {rows.map((s) => (
+            <tr key={s.code}>
+              <td className="tabular ref-code">{s.code}</td>
+              <td>
+                {s.label}
+                {s.maximo && <span className="muted ref-note">Maximo {s.maximo}</span>}
+              </td>
+              <td className="tabular ref-count">{s.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ReferenceSlide() {
+  return (
+    <div className="layout-reference">
+      <h2 className="display-lg">Teams and status values</h2>
+      <div className="reference-grid">
+        <div>
+          <h3 className="ledger-title">Teams</h3>
+          <table className="ref-table">
+            <thead>
+              <tr>
+                <th scope="col">Team</th>
+                <th scope="col">Job plans</th>
+                <th scope="col" className="ref-count">
+                  Work orders
+                </th>
+                <th scope="col" className="ref-count">
+                  Requests
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamList.map((t) => (
+                <tr key={t.code}>
+                  <td>
+                    <span className="tabular ref-code">{t.code}</span>
+                    {t.fromCounty && <span className="ref-badge">County</span>}
+                    <span className="ref-sub">{t.label}</span>
+                  </td>
+                  <td className="tabular">{t.jobPlans.join(', ')}</td>
+                  <td className="tabular ref-count">{t.workOrders}</td>
+                  <td className="tabular ref-count">{t.requests}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <StatusList title="Request statuses" rows={statusLists.requests} />
+        <StatusList title="Work order statuses" rows={statusLists.workOrders} />
+      </div>
+      <p className="footnote">
+        Numbers are records in the dataset. “County” marks team codes from the County’s sample records; the other two
+        are ours. Requests is how many requests the answer key sends to that team. “Maximo” is the standard status a
+        County value stands for.
+      </p>
+    </div>
+  )
+}
+
+/* 13 */
 const CONTACT_LABELS: Record<string, string> = {
   Resident: 'resident',
   'Entered-by employee': 'took the call',
@@ -523,13 +596,63 @@ function AnswerKeySlide() {
   )
 }
 
-/* 13 */
+/* 14 */
+function ChangesSlide() {
+  const c = reviewChanges
+  const changes = [
+    {
+      count: c.notCounty,
+      title: 'May not be the County’s job',
+      body: `Private plumbing, a private backflow device, and ${countWord(c.cityUtility)} addresses that the City of North Port or City of Venice utility serves. The AI should check responsibility, then say who to refer the customer to.`,
+    },
+    {
+      count: c.reroutedByNote,
+      title: 'Rerouted without a crew',
+      body: 'A “sewer issue” that is really clogged storm drains. As in the County’s misrouted examples, a note sends it back to the Contact Center and no work order is opened.',
+    },
+    {
+      count: c.requiredInfoRules,
+      title: 'Required-information rules',
+      body: `What each request type must include before a crew goes out. The ${c.requestsWithGaps} incomplete requests now name the rules they break. These rules are our proposal for you to confirm.`,
+    },
+    {
+      count: c.sameAddressLookAlikes,
+      title: 'Same address, not a duplicate',
+      body: 'Water comes back at an address six days after the repair was finished. That is new work, not another report of an open problem.',
+    },
+  ]
+  return (
+    <div className="layout-changes">
+      <h2 className="display-lg">What changed after IBM’s data review</h2>
+      <p className="lede narrow">
+        IBM’s updated review of the County’s examples showed four gaps. Each one now has test requests and an expected
+        answer.
+      </p>
+      <ul className="changes">
+        {changes.map((ch) => (
+          <li key={ch.title} className="change">
+            <span className="change-num">{ch.count}</span>
+            <h3 className="change-title">{ch.title}</h3>
+            <p className="change-body">{ch.body}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="footnote">
+        Our scenarios now match the County’s five example groups: duplicates, similar but not duplicate, incomplete,
+        misrouted, and not the County’s job.
+      </p>
+    </div>
+  )
+}
+
+/* 15 */
 function NextSlide() {
   const assumptions = [
     'Most requests come from residents through 311Connect; about one in five through the Contact Center.',
     'QAlert records where each request came from, and who entered phone and email requests.',
     'QAlert and Maximo share the employee ID, and it can come across as an “Entered by” line.',
     'The QAlert origin labels in the data are placeholders until we see real ones.',
+    'The city utility areas and the required-information rules are our placeholders.',
   ]
   return (
     <div className="layout-close">
@@ -568,6 +691,8 @@ export const slides: { title: string; Component: () => ReactElement }[] = [
   { title: 'Duplicates', Component: DuplicatesSlide },
   { title: 'Past and planned work', Component: HistorySlide },
   { title: 'Who does the work', Component: TeamSlide },
+  { title: 'Teams and status values', Component: ReferenceSlide },
   { title: 'The answer key', Component: AnswerKeySlide },
+  { title: 'What changed after IBM’s data review', Component: ChangesSlide },
   { title: 'Assumptions and next steps', Component: NextSlide },
 ]
