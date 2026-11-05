@@ -1,5 +1,7 @@
 # Loading the dataset into Maximo
 
+For a step-by-step walkthrough, see [maximo-import-guide.md](maximo-import-guide.md). This page is the reference.
+
 The `loader/` package puts the sample dataset into a Maximo Manage instance over the REST API: 65 service requests, 41 work orders, their work logs, and the setup records they point to. It writes everything to its own organization `SRQ` and site `SRQSITE`, so it can share an instance with other data.
 
 **Safety rules built into the loader:**

@@ -67,6 +67,6 @@ npm install
 npm run dev     # http://localhost:5180, press F for full screen
 ```
 
-To load the dataset into a Maximo Manage test instance over REST (dry run unless `--apply`, never deletes), see [`docs/maximo-load.md`](docs/maximo-load.md).
+To load the dataset into a Maximo Manage test instance, follow the step-by-step [`docs/maximo-import-guide.md`](docs/maximo-import-guide.md). Every command is a dry run unless you pass `--apply`, and nothing is ever deleted. How the loader maps each column is in [`docs/maximo-load.md`](docs/maximo-load.md).
 
 Every push to `main` that changes `presentation/` or `data/` republishes the deck to https://unclethien.github.io/QAlert-Maximo-Sarasota-County/. See [`docs/deployment.md`](docs/deployment.md).
