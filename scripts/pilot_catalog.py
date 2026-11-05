@@ -95,22 +95,93 @@ DEPARTMENTS = [
     (5, "Contact Center"),
 ]
 
-# QAlert request types mapped to Maximo classification. Drainage / Flooding is a Public
-# Works type and is used only as the true type of a misclassified request.
-# name: (type id, dept id, priority, discipline, COMMODITYGROUP, COMMODITY, OWNERGROUP, QAlert route)
+# Maximo configuration values. In Sarasota, the team that does the work (PERSONGROUP, with
+# SUPERVISOR and LEAD) is set on the work order, by applying a job plan. Service requests carry no
+# team. The boolean marks a code seen in the County's sample records; everything else is our own
+# illustrative value. Code meanings marked "inferred" are read from the code name, not confirmed.
+# person group: (description, real)
+PERSON_GROUPS = {
+    "WTRPIPE": ("Water distribution pipe crew", True),
+    "SANCLINSP": ("Sanitary collection and inspection crew (meaning inferred)", True),
+    "LSCENT": ("Lift station crew (meaning inferred)", True),
+    "WTRMETER": ("Meter services crew", False),
+    "RECLAIM": ("Reclaimed water crew", False),
+}
+# job plan: (description, person group, real)
+JOB_PLANS = {
+    "LEAK": ("Water leak investigation and repair", "WTRPIPE", True),
+    "PRESSURE": ("Low pressure investigation", "WTRPIPE", True),
+    "NOWATER": ("No water investigation", "WTRPIPE", False),
+    "METER": ("Meter repair or change-out", "WTRMETER", False),
+    "SAN INSP": ("Sanitary sewer inspection", "SANCLINSP", True),
+    "FORCEMAIN": ("Force main break response", "SANCLINSP", False),
+    "LSALARM": ("Lift station alarm response", "LSCENT", False),
+    "RECLAIM": ("Reclaimed water repair", "RECLAIM", False),
+}
+# failure code: (description, real)
+FAILURE_CODES = {
+    "SERVLINE": ("Water service line", True),
+    "WTRMAIN": ("Water main", False),
+    "METER": ("Water meter and box", False),
+    "SERVICELATERAL": ("Sewer service lateral", True),
+    "FORCEMAIN": ("Wastewater force main", False),
+    "LIFTSTN": ("Lift station", False),
+    "RECLAIM": ("Reclaimed water line", False),
+}
+# problem code: (description, real)
+PROBLEM_CODES = {
+    "LEAKBROKEN": ("Leak or broken pipe", True),
+    "LOWPRESSURE": ("Low pressure", True),
+    "CURBSTOP": ("Curb stop problem", True),
+    "CUSTCOMPLAINT": ("Customer complaint", True),
+    "NOWATER": ("No water", False),
+    "METERFAIL": ("Meter damaged or not registering", False),
+    "ODOR": ("Odor", False),
+    "ALARM": ("Station alarm", False),
+}
+# Classification IDs are synthetic: the County's numeric IDs only mean something on their
+# own instance. CLASSSTRUCTUREID: (classification, description)
+CLASSIFICATIONS = {
+    "9101": ("WATER-LEAK", "Utilities \\ Water \\ Line leak"),
+    "9102": ("WATER-MAIN", "Utilities \\ Water \\ Main break"),
+    "9103": ("WATER-PRESS", "Utilities \\ Water \\ Low pressure"),
+    "9104": ("WATER-NOWTR", "Utilities \\ Water \\ No water"),
+    "9105": ("WATER-METER", "Utilities \\ Water \\ Meter"),
+    "9106": ("WATER-CURB", "Utilities \\ Water \\ Curb stop"),
+    "9201": ("WW-SEWER", "Utilities \\ Wastewater \\ Sewer issue"),
+    "9202": ("WW-ODOR", "Utilities \\ Wastewater \\ Sewer odor"),
+    "9203": ("WW-LIFT", "Utilities \\ Wastewater \\ Lift station"),
+    "9204": ("WW-FMAIN", "Utilities \\ Wastewater \\ Force main"),
+    "9301": ("RECL-LINE", "Utilities \\ Reclaimed \\ Reclaimed water"),
+    "9401": ("STORM-FLOOD", "Public Works \\ Stormwater \\ Drainage and flooding"),
+}
+SR_STATUSES = ("NEW", "QUEUED", "INPRG", "PENDING", "RESOLVED", "CLOSED")
+WO_STATUSES = ("WCONT", "SCHED", "INPRG", "COMP", "CLOSE", "CAN")
+WORK_TYPES = ("CM", "CS", "IN", "CP")  # CP (planned capital work) is our assumption
+
+
+def _request_type(type_id, dept, priority, discipline, cgroup, commodity, jpnum, failure, problem, classid, route):
+    return dict(type_id=type_id, dept=dept, priority=priority, discipline=discipline, cgroup=cgroup,
+                commodity=commodity, jpnum=jpnum, persongroup=JOB_PLANS[jpnum][1] if jpnum else "",
+                failure=failure, problem=problem, classid=classid, route=route)
+
+
+# QAlert request types mapped to Maximo classification and the job plan a planner would apply.
+# Drainage / Flooding is a Public Works type and is used only as the true type of a
+# misclassified request, so it has no Utilities job plan or team.
 REQUEST_TYPES = {
-    "Water Line Leak": (101, 1, 2, "water", "POTABLE", "WATER_PIPE", "WTRPIPE", "PUWater"),
-    "Water Main Break": (102, 1, 1, "water", "POTABLE", "WATER_PIPE", "WTRPIPE", "PUWater"),
-    "Low Water Pressure": (103, 1, 3, "water", "POTABLE", "WATER_SERV", "WTRSERV", "PUWater"),
-    "No Water": (104, 1, 1, "water", "POTABLE", "WATER_SERV", "WTRSERV", "PUWater"),
-    "Water Meter Issue": (105, 1, 3, "meter", "POTABLE", "WATER_SERV", "WTRMETER", "PUWater"),
-    "Curb Stop": (106, 1, 3, "water", "POTABLE", "WATER_SERV", "WTRSERV", "PUWater"),
-    "Sewer Issue": (201, 2, 2, "wastewater", "WASTEWATER", "COLLECTION", "WWCOLL", "PUWastewater"),
-    "Sewer Odor": (202, 2, 3, "wastewater", "WASTEWATER", "COLLECTION", "WWCOLL", "PUWastewater"),
-    "Lift Station Alarm": (203, 2, 1, "wastewater", "WASTEWATER", "LIFTSTATION", "WWLIFT", "PUWastewater"),
-    "Force Main Break": (204, 2, 1, "wastewater", "WASTEWATER", "FORCEMAIN", "WWCOLL", "PUWastewater"),
-    "Reclaimed Water Issue": (301, 3, 3, "water", "RECLAIMED", "RECLAIM_PIPE", "RECLAIM", "PUReclaimed"),
-    "Drainage / Flooding": (401, 4, 2, "stormwater", "", "", "", "PWStormwater"),
+    "Water Line Leak": _request_type(101, 1, 2, "water", "POTABLE", "WATER_PIPE", "LEAK", "SERVLINE", "LEAKBROKEN", "9101", "PUWater"),
+    "Water Main Break": _request_type(102, 1, 1, "water", "POTABLE", "WATER_PIPE", "LEAK", "WTRMAIN", "LEAKBROKEN", "9102", "PUWater"),
+    "Low Water Pressure": _request_type(103, 1, 3, "water", "POTABLE", "WATER_PIPE", "PRESSURE", "SERVLINE", "LOWPRESSURE", "9103", "PUWater"),
+    "No Water": _request_type(104, 1, 1, "water", "POTABLE", "WATER_SERV", "NOWATER", "SERVLINE", "NOWATER", "9104", "PUWater"),
+    "Water Meter Issue": _request_type(105, 1, 3, "meter", "POTABLE", "WATER_SERV", "METER", "METER", "METERFAIL", "9105", "PUWater"),
+    "Curb Stop": _request_type(106, 1, 3, "water", "POTABLE", "WATER_PIPE", "LEAK", "SERVLINE", "CURBSTOP", "9106", "PUWater"),
+    "Sewer Issue": _request_type(201, 2, 2, "wastewater", "WASTEWATER", "COLLECTION", "SAN INSP", "SERVICELATERAL", "CUSTCOMPLAINT", "9201", "PUWastewater"),
+    "Sewer Odor": _request_type(202, 2, 3, "wastewater", "WASTEWATER", "COLLECTION", "SAN INSP", "SERVICELATERAL", "ODOR", "9202", "PUWastewater"),
+    "Lift Station Alarm": _request_type(203, 2, 1, "wastewater", "WASTEWATER", "LIFTSTATION", "LSALARM", "LIFTSTN", "ALARM", "9203", "PUWastewater"),
+    "Force Main Break": _request_type(204, 2, 1, "wastewater", "WASTEWATER", "FORCEMAIN", "FORCEMAIN", "FORCEMAIN", "LEAKBROKEN", "9204", "PUWastewater"),
+    "Reclaimed Water Issue": _request_type(301, 3, 3, "water", "RECLAIMED", "RECLAIM_PIPE", "RECLAIM", "RECLAIM", "LEAKBROKEN", "9301", "PUReclaimed"),
+    "Drainage / Flooding": _request_type(401, 4, 2, "stormwater", "", "", "", "", "", "9401", "PWStormwater"),
 }
 
 # Streets used only by background work orders, plus the correctly spelled street behind the
@@ -144,7 +215,11 @@ USE_CASE_CONTROL = "Control (no issue)"
 #   ("out_of_county", street, city, number, lat, lon)
 # Timing: ("after", other_key, hours) or ("at", "YYYY-MM-DD HH:MM"); default is random in window.
 # channel: a CHANNELS key. Staff channels name the employee in entered_by. anonymous=True is a
-# web request submitted with no phone or email.
+# web request submitted with no phone or email. unattributed=True is a staff-entered request
+# that records no employee anywhere (no "Entered by" line, no QAlert employeeId), like the
+# County's staff-written samples.
+# SR status: a scenario with a WO follows the WO (INPRG, RESOLVED, CLOSED); otherwise QUEUED,
+# unless sr_status sets PENDING (held for the requester) or NEW (not reviewed yet).
 SCENARIOS = [
     # ---- Missing-Information Detection -------------------------------------------------
     dict(key="M01", group="missing", scenario="Missing location", type="Water Main Break",
@@ -215,14 +290,14 @@ SCENARIOS = [
          issue="No description of the meter problem.",
          missing="What the meter question or problem is (high bill, leak, damage, reading).",
          question="What is the customer's question about the meter: high bill, leak, damage, or something else?",
-         channel="phone", entered_by="0816630"),
+         channel="phone", unattributed=True),
     dict(key="M10", group="missing", scenario="Insufficient problem detail", type="Sewer Issue",
          addr=("valid", "Orchidmere Dr", "Osprey", 0),
          text="Sewer problem at the house.",
          issue="No symptoms described (backup, odor, overflow).",
          missing="Symptoms: backup, odor, or overflow; inside or outside the house.",
          question="Is the sewer problem a backup inside the house, an overflow outside, or an odor?",
-         channel="web"),
+         channel="web", sr_status="PENDING"),
     dict(key="M11", group="missing", scenario="Insufficient problem detail", type="Reclaimed Water Issue",
          addr=("valid", "Calloway Marsh Ln", "Englewood", 0),
          text="Reclaimed water issue, please call.",
@@ -236,7 +311,7 @@ SCENARIOS = [
          issue="Unclear whether the green box is a County sewer asset; it may belong to another utility.",
          missing="What the green box is, and who dug the hole.",
          question="Does the green box have any label or company name on it, and do you know who dug the hole?",
-         wo=dict(worktype="CM", short="GREEN BOX HOLE", status="COMP",
+         wo=dict(worktype="IN", short="GREEN BOX HOLE", status="COMP",
                  logs=["Inspected area. Green box is an electric pedestal, not ours. Referred customer to the power company."]),
          channel="app"),
     dict(key="M13", group="missing", scenario="Unclear request", type="Water Line Leak",
@@ -254,7 +329,7 @@ SCENARIOS = [
          issue="'It' is never described; the request depends on an earlier call that is not referenced.",
          missing="What the problem is and the earlier request number if known.",
          question="What would you like us to look at, and do you have the request number from last year?",
-         channel="web"),
+         channel="web", sr_status="PENDING"),
     dict(key="M15", group="missing", scenario="Incorrect classification", type="Water Line Leak",
          true_type="Drainage / Flooding",
          addr=("valid", "Marlowe Cove Ave", "Sarasota", 0),
@@ -321,7 +396,7 @@ SCENARIOS = [
          missing="Whether other fixtures or neighbors are affected.",
          question="Are any other drains in your house, or any of your neighbors, having problems?",
          notes=["Advised resident this looks like a private plumbing issue. Waiting on callback."],
-         channel="web"),
+         channel="web", sr_status="PENDING"),
     dict(key="M23", group="missing", scenario="County responsibility review", type="Water Line Leak",
          addr=("valid", "Tamberly Creek Rd", "North Port", 0),
          text="Leak under the kitchen sink, water everywhere.",
@@ -413,13 +488,13 @@ SCENARIOS = [
          text="Small leak at the meter box, slow drip, no water in the road.",
          issue="Same street as the September main break, but a separate small meter leak six weeks later.",
          related="DA1", reason="different issue (small meter leak) six weeks after the main break was repaired",
-         when=("at", "2026-10-26 11:30"), channel="web"),
+         when=("at", "2026-10-26 11:30"), channel="web", sr_status="NEW"),
     dict(key="L02", group="lookalike", scenario="Look-alike (not a duplicate)", type="No Water",
          addr=("valid", "Bramblewick Ln", "Sarasota", 2),
          text="No water. I found a lock on the meter and a door hanger about my account.",
          issue="Same street as the outage, but caused by an account lock on the meter, not the main break.",
          related="DC1", reason="no water caused by an account lock on the meter, not the main break",
-         when=("at", "2026-10-27 08:15"), channel="app"),
+         when=("at", "2026-10-27 08:15"), channel="app", sr_status="NEW"),
     dict(key="L03", group="lookalike", scenario="Look-alike (not a duplicate)", type="Lift Station Alarm",
          addr=("valid", "Foxmere Rd", "North Port", 0),
          text="Lift station alarm sounding, light on the panel is flashing.",
@@ -505,8 +580,8 @@ SCENARIOS = [
     dict(key="C04", group="control", scenario="Complete request", type="Water Main Break",
          addr=("valid", "Glimmerton Ave", "Sarasota", 2),
          text="Water flowing out of a crack in the street at the storm drain, about 20 ft from the hydrant. Started an hour ago.",
-         wo=dict(worktype="CM", short="MAIN BREAK", status="COMP",
-                 logs=["Repaired 8 in. main break with repair clamp. Restored service in 3 hrs."]),
+         wo=dict(worktype="CM", short="MAIN BREAK", status="INPRG",
+                 logs=["Isolated the main and started excavation. 8 in. repair clamp on order, crew staying on site."]),
          channel="phone", entered_by="0823690"),
     dict(key="C05", group="control", scenario="Complete request", type="Low Water Pressure",
          addr=("valid", "Harrowgate Blvd", "North Port", 1),
@@ -582,15 +657,15 @@ HISTORICAL_WOS = [
 
 # Planned or in-progress projects. (street, city, request type, status, start, finish, description, scope, logs)
 PLANNED_WOS = [
-    ("Starling Cove Dr", "Sarasota", "Water Main Break", "WSCH", "2026-11-16", "2026-12-18",
+    ("Starling Cove Dr", "Sarasota", "Water Main Break", "SCHED", "2026-11-16", "2026-12-18",
      "Starling Cove Dr water main replacement",
      "Replace about 1,400 LF of 8 in. asbestos-cement water main on Starling Cove Dr with PVC. Expect intermittent low pressure and discolored water during tie-ins and flushing.",
      ["Contractor notice to proceed issued. Door hangers to go out the week before start."]),
-    ("Willowmarsh Rd", "Venice", "Sewer Issue", "APPR", "2026-12-07", "2026-12-23",
+    ("Willowmarsh Rd", "Venice", "Sewer Issue", "WCONT", "2026-12-07", "2026-12-23",
      "Willowmarsh Rd sanitary sewer main lining",
      "Cured-in-place lining of 1,100 LF of 8 in. gravity sewer and manhole rehab on Willowmarsh Rd. Temporary odor possible during bypass pumping.",
      ["Pre-lining CCTV completed. Odor complaints on this segment expected to resolve after lining."]),
-    ("Yarrowfield Ln", "North Port", "Water Meter Issue", "WSCH", "2026-11-02", "2026-11-20",
+    ("Yarrowfield Ln", "North Port", "Water Meter Issue", "SCHED", "2026-11-02", "2026-11-20",
      "Yarrowfield Ln area automated meter change-out",
      "Replace all residential meters in the Yarrowfield Ln area with automated (AMI) meters. Includes failed and blank-display meters.",
      ["Meter crew assigned. Customers on this route will be notified 48 hours before change-out."]),
@@ -598,19 +673,19 @@ PLANNED_WOS = [
      "Quayside Ct valve and hydrant replacement",
      "Replace two 6 in. gate valves and one fire hydrant on Quayside Ct. Pavement restoration follows each excavation.",
      ["Valve 1 replaced and road patched on 10/20.", "Valve 2 scheduled next week. Watch for settlement at the 10/20 patch."]),
-    ("Ironwood Shoals Dr", "Venice", "Water Main Break", "APPR", "2027-01-11", "2027-02-26",
+    ("Ironwood Shoals Dr", "Venice", "Water Main Break", "WCONT", "2027-01-11", "2027-02-26",
      "Ironwood Shoals Dr water main upsizing",
      "Upsize 6 in. main to 8 in. on Ironwood Shoals Dr to improve fire flow.",
      ["Design approved. Awaiting contract award."]),
-    ("Jessamine Bay Rd", "Sarasota", "Sewer Issue", "WSCH", "2026-11-30", "2026-12-11",
+    ("Jessamine Bay Rd", "Sarasota", "Sewer Issue", "SCHED", "2026-11-30", "2026-12-11",
      "Jessamine Bay Rd manhole rehabilitation",
      "Rehabilitate 6 manholes on Jessamine Bay Rd with cementitious liner.",
      ["Traffic control plan approved."]),
-    ("Kingfisher Lantern Ln", "North Port", "Lift Station Alarm", "APPR", "2027-01-18", "2027-03-05",
+    ("Kingfisher Lantern Ln", "North Port", "Lift Station Alarm", "WCONT", "2027-01-18", "2027-03-05",
      "Lift station LS-207 pump and panel upgrade",
      "Replace pumps and control panel at lift station LS-207 off Kingfisher Lantern Ln.",
      ["Equipment on order. Bypass pumping needed during cutover."]),
-    ("Lindenhurst Ave", "Nokomis", "Reclaimed Water Issue", "WSCH", "2026-11-09", "2026-11-25",
+    ("Lindenhurst Ave", "Nokomis", "Reclaimed Water Issue", "SCHED", "2026-11-09", "2026-11-25",
      "Lindenhurst Ave reclaimed main extension",
      "Extend 6 in. reclaimed main 900 LF along Lindenhurst Ave.",
      ["Locates requested."]),

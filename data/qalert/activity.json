@@ -885,7 +885,7 @@
     "displayDate": "10/9/2026 12:48 PM",
     "code": 1,
     "codeDesc": "Created",
-    "routeId": "ckim"
+    "routeId": ""
   },
   {
     "id": 112,
@@ -1089,14 +1089,6 @@
   },
   {
     "id": 137,
-    "requestId": 700058,
-    "displayDate": "10/27/2026 4:10 AM",
-    "code": 15,
-    "codeDesc": "Closed",
-    "routeId": "PUWater"
-  },
-  {
-    "id": 138,
     "requestId": 700060,
     "displayDate": "10/27/2026 8:11 AM",
     "code": 1,
@@ -1104,7 +1096,7 @@
     "routeId": ""
   },
   {
-    "id": 139,
+    "id": 138,
     "requestId": 700060,
     "displayDate": "10/27/2026 8:12 AM",
     "code": 4,
