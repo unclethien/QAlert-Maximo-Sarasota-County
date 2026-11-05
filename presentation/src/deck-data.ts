@@ -292,6 +292,15 @@ const TEAM_LABELS: Record<string, string> = {
   RECLAIM: 'Reclaimed water crew',
 }
 
+// Each team's job plans, as provisioned in Maximo (FORCEMAIN has no work order in the dataset yet).
+const JOB_PLANS_BY_TEAM: Record<string, string[]> = {
+  WTRPIPE: ['LEAK', 'PRESSURE', 'NOWATER'],
+  SANCLINSP: ['SAN INSP', 'FORCEMAIN'],
+  LSCENT: ['LSALARM'],
+  WTRMETER: ['METER'],
+  RECLAIM: ['RECLAIM'],
+}
+
 const personById = indexBy(personRows, (p) => p.PERSONID)
 
 function buildTeamExample(workOrderId: string) {
@@ -316,8 +325,48 @@ export const teamExample = buildTeamExample('WO2900020')
 export const teamTotals = {
   requestsWithoutTeam: srRows.filter((r) => !r.OWNERGROUP).length,
   withSuggestedTeam: answerRows.filter((r) => r.EXPECTED_PERSONGROUP).length,
-  teams: new Set(answerRows.map((r) => r.EXPECTED_PERSONGROUP).filter(Boolean)).size,
-  jobPlans: new Set(woRows.map((w) => w.JPNUM).filter(Boolean)).size,
+}
+
+/* ---------- Teams and status values ---------- */
+
+const COUNTY_TEAMS = new Set(['WTRPIPE', 'SANCLINSP', 'LSCENT'])
+
+export const teamList = Object.entries(TEAM_LABELS).map(([code, label]) => {
+  const orders = woRows.filter((w) => w.PERSONGROUP === code)
+  return {
+    code,
+    label,
+    fromCounty: COUNTY_TEAMS.has(code),
+    jobPlans: JOB_PLANS_BY_TEAM[code] ?? [],
+    workOrders: orders.length,
+    requests: answerRows.filter((r) => r.EXPECTED_PERSONGROUP === code).length,
+  }
+})
+
+// In lifecycle order. `maximo` is the standard internal status a County value is a synonym of.
+const SR_STATUSES = [
+  { code: 'NEW', label: 'New' },
+  { code: 'QUEUED', label: 'Queued' },
+  { code: 'INPRG', label: 'In progress', maximo: 'INPROG' },
+  { code: 'PENDING', label: 'Pending' },
+  { code: 'RESOLVED', label: 'Resolved' },
+  { code: 'CLOSED', label: 'Closed' },
+]
+const WO_STATUSES = [
+  { code: 'WCONT', label: 'Waiting for a contract', maximo: 'WAPPR' },
+  { code: 'SCHED', label: 'Scheduled', maximo: 'WSCH' },
+  { code: 'INPRG', label: 'In progress' },
+  { code: 'COMP', label: 'Completed' },
+  { code: 'CLOSE', label: 'Closed' },
+  { code: 'CAN', label: 'Canceled' },
+]
+
+const withCounts = (statuses: typeof SR_STATUSES, rows: Row[]) =>
+  statuses.map((s) => ({ ...s, count: rows.filter((r) => r.STATUS === s.code).length }))
+
+export const statusLists = {
+  requests: withCounts(SR_STATUSES, srRows),
+  workOrders: withCounts(WO_STATUSES, woRows),
 }
 
 /* ---------- Answer key ---------- */

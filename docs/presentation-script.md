@@ -1,6 +1,6 @@
 # Presentation script: Sprint 2 sample dataset
 
-A speaker script for the 14-slide deck in [`presentation/`](../presentation). It runs about 12 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
+A speaker script for the 15-slide deck in [`presentation/`](../presentation). It runs about 13 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
 
 ## Before you present
 
@@ -180,7 +180,21 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > The answer key records the right team for 60 of the 65 requests. The other five aren't County Utilities work: two drainage requests for Public Works, a private backflow device, and two addresses that a city utility serves.
 
-## 12. An answer key for every request (about 40 seconds)
+## 12. Teams and status values (about 50 seconds)
+
+**On screen:** the five teams with their job plans, and the status values for requests and for work orders, each with how many records use it.
+
+**Say:**
+
+> Here is the full list behind that slide.
+>
+> Five teams. WTRPIPE, SANCLINSP and LSCENT come from your sample records. WTRMETER and RECLAIM are our own examples. Each team has its job plans: LEAK, PRESSURE and NOWATER for the water pipe crew, SAN INSP and FORCEMAIN for sanitary collection, and one each for lift stations, meters and reclaimed water. The water pipe crew gets most of the work.
+>
+> In the middle are the request statuses, from New to Closed. On the right are the work order statuses, including Waiting for a contract and Scheduled.
+>
+> Three of these are your own values: In progress on requests, and Waiting for a contract and Scheduled on work orders. In Maximo each one stands for a standard status, shown in grey. Please tell us if any team or status is missing or named differently.
+
+## 13. An answer key for every request (about 40 seconds)
 
 **On screen:** a table of five sample rows from the answer key, including who to contact and why.
 
@@ -192,7 +206,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > When the AI runs on this data, we compare what it says against this file, one request at a time. That gives us a clear, honest score instead of a gut feeling.
 
-## 13. What changed after IBM's data review (about 1 minute)
+## 14. What changed after IBM's data review (about 1 minute)
 
 **On screen:** four numbers: 6 requests that may not be the County's job, 1 request rerouted without a crew, 15 required-information rules, and 1 repeat at the same address that is not a duplicate.
 
@@ -210,7 +224,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > With these, our scenarios match your five example groups: duplicates, similar but not duplicate, incomplete, misrouted, and not the County's job.
 
-## 14. Please check these assumptions (about 1 minute 10 seconds)
+## 15. Please check these assumptions (about 1 minute 10 seconds)
 
 **On screen:** five assumptions with checkboxes, and the next steps.
 
@@ -232,4 +246,4 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ---
 
-**Total:** about 12 minutes, plus questions.
+**Total:** about 13 minutes, plus questions.

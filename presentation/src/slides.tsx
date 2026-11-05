@@ -14,7 +14,9 @@ import {
   reviewChanges,
   staffEntered,
   staffExample,
+  statusLists,
   teamExample,
+  teamList,
   teamTotals,
   totals,
   useCaseGroups,
@@ -474,15 +476,85 @@ function TeamSlide() {
       </div>
       <p className="lede">
         The answer key gives the right team for {teamTotals.withSuggestedTeam} of {teamTotals.requestsWithoutTeam}{' '}
-        requests, across {countWord(teamTotals.teams)} teams and {countWord(teamTotals.jobPlans)} job plans. The other{' '}
-        {countWord(teamTotals.requestsWithoutTeam - teamTotals.withSuggestedTeam)} aren’t County Utilities work: Public
-        Works drainage, a private backflow device, or an address another city’s utility serves.
+        requests. The other {countWord(teamTotals.requestsWithoutTeam - teamTotals.withSuggestedTeam)} aren’t County
+        Utilities work.
       </p>
     </div>
   )
 }
 
 /* 12 */
+function StatusList({ title, rows }: { title: string; rows: typeof statusLists.requests }) {
+  return (
+    <div className="status-col">
+      <h3 className="ledger-title">{title}</h3>
+      <table className="ref-table">
+        <tbody>
+          {rows.map((s) => (
+            <tr key={s.code}>
+              <td className="tabular ref-code">{s.code}</td>
+              <td>
+                {s.label}
+                {s.maximo && <span className="muted ref-note">Maximo {s.maximo}</span>}
+              </td>
+              <td className="tabular ref-count">{s.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ReferenceSlide() {
+  return (
+    <div className="layout-reference">
+      <h2 className="display-lg">Teams and status values</h2>
+      <div className="reference-grid">
+        <div>
+          <h3 className="ledger-title">Teams</h3>
+          <table className="ref-table">
+            <thead>
+              <tr>
+                <th scope="col">Team</th>
+                <th scope="col">Job plans</th>
+                <th scope="col" className="ref-count">
+                  Work orders
+                </th>
+                <th scope="col" className="ref-count">
+                  Requests
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamList.map((t) => (
+                <tr key={t.code}>
+                  <td>
+                    <span className="tabular ref-code">{t.code}</span>
+                    {t.fromCounty && <span className="ref-badge">County</span>}
+                    <span className="ref-sub">{t.label}</span>
+                  </td>
+                  <td className="tabular">{t.jobPlans.join(', ')}</td>
+                  <td className="tabular ref-count">{t.workOrders}</td>
+                  <td className="tabular ref-count">{t.requests}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <StatusList title="Request statuses" rows={statusLists.requests} />
+        <StatusList title="Work order statuses" rows={statusLists.workOrders} />
+      </div>
+      <p className="footnote">
+        Numbers are records in the dataset. “County” marks team codes from the County’s sample records; the other two
+        are ours. Requests is how many requests the answer key sends to that team. “Maximo” is the standard status a
+        County value stands for.
+      </p>
+    </div>
+  )
+}
+
+/* 13 */
 const CONTACT_LABELS: Record<string, string> = {
   Resident: 'resident',
   'Entered-by employee': 'took the call',
@@ -524,7 +596,7 @@ function AnswerKeySlide() {
   )
 }
 
-/* 13 */
+/* 14 */
 function ChangesSlide() {
   const c = reviewChanges
   const changes = [
@@ -573,7 +645,7 @@ function ChangesSlide() {
   )
 }
 
-/* 14 */
+/* 15 */
 function NextSlide() {
   const assumptions = [
     'Most requests come from residents through 311Connect; about one in five through the Contact Center.',
@@ -619,6 +691,7 @@ export const slides: { title: string; Component: () => ReactElement }[] = [
   { title: 'Duplicates', Component: DuplicatesSlide },
   { title: 'Past and planned work', Component: HistorySlide },
   { title: 'Who does the work', Component: TeamSlide },
+  { title: 'Teams and status values', Component: ReferenceSlide },
   { title: 'The answer key', Component: AnswerKeySlide },
   { title: 'What changed after IBM’s data review', Component: ChangesSlide },
   { title: 'Assumptions and next steps', Component: NextSlide },
