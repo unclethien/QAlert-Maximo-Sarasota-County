@@ -20,9 +20,9 @@ Residents submit app and web requests themselves. Contact Center staff type phon
 
 | Channel | SRs | Who entered it | QAlert `origin` (assumed) |
 |---|---|---|---|
-| 311Connect mobile app | 30 | The resident | `QAlert Mobile iOS` or `QAlert Mobile Android` |
-| 311 web portal | 18 | The resident | `Web Portal` |
-| Phone call to 311 | 9 | Contact Center staff | `Control Panel`, with `intakeMethod` `Phone` |
+| 311Connect mobile app | 32 | The resident | `QAlert Mobile iOS` or `QAlert Mobile Android` |
+| 311 web portal | 19 | The resident | `Web Portal` |
+| Phone call to 311 | 11 | Contact Center staff | `Control Panel`, with `intakeMethod` `Phone` |
 | Email to the Contact Center | 3 | Contact Center staff | `Control Panel`, with `intakeMethod` `Email` |
 
 When a request needs clarification, who to ask depends on the channel:
@@ -58,22 +58,27 @@ The validator checks the following:
   - every non-capital WO has a job plan, its team, and failure and problem codes;
   - statuses and work types come from the Sarasota sets below.
 - The Maximo person-record gap, an inactive employee, and an anonymous request are all represented.
+- Requests that may not be the County's job are flagged and say who to refer the customer to. An address another utility serves, according to the GIS stand-in's `UTILITY` column, has no County team.
+- A `RESOLUTION` work log only closes an SR that has no work order, and at least one misclassified SR is closed that way.
+- Every County request type has one required-information rule. Each missing-information SR names the rules it breaks, and each of those rules applies to its request type.
+- At least one look-alike sits at the same address as earlier work that was finished before it came in.
 - Every phone number and email stays in the fictional ranges.
 
 ## Files
 
 | File | Rows | What it represents |
 |---|---|---|
-| `data/maximo/sr.csv` | 60 | Maximo SRs as the current QAlert feed creates them |
+| `data/maximo/sr.csv` | 65 | Maximo SRs as the current QAlert feed creates them |
 | `data/maximo/wo.csv` | 41 | 19 follow-up WOs created from SRs, 14 past WOs, and 8 planned or in-progress project WOs |
-| `data/maximo/worklog.csv` | 125 | Field notes on WOs and planner notes on SRs |
+| `data/maximo/worklog.csv` | 127 | Field notes on WOs and planner notes on SRs. `LOGTYPE` is `CLIENTNOTE`, except one `RESOLUTION` note that closes a misrouted SR |
 | `data/maximo/person.csv` | 18 | Maximo PERSON records: the integration account, field staff, and 9 of the 15 QAlert staff |
-| `data/qalert/requests.json` | 60 | The QAlert requests behind each SR, including the channel each one came from (`origin`) |
-| `data/qalert/activity.json` | 138 | QAlert request history (Created, Assigned, Closed) |
+| `data/qalert/requests.json` | 65 | The QAlert requests behind each SR, including the channel each one came from (`origin`) |
+| `data/qalert/activity.json` | 150 | QAlert request history (Created, Assigned, Closed) |
 | `data/qalert/employees.json` | 15 | QAlert staff who enter phone and email requests; this is the contact lookup target for those requests |
-| `data/qalert/types.json` / `departments.json` | 12 / 5 | QAlert request types and departments |
-| `data/reference/address-points.csv` | 236 | A stand-in for the County GIS address layer, used to validate locations |
-| `data/answer-key.csv` | 60 | The expected scenario, alert, channel, follow-up contact, clarification question, expected team, related records, and recommendation for every SR |
+| `data/qalert/types.json` / `departments.json` | 13 / 5 | QAlert request types and departments |
+| `data/reference/address-points.csv` | 244 | A stand-in for the County GIS address layer, used to validate locations. `UTILITY` says who supplies water at each address |
+| `data/reference/required-information.csv` | 15 | The information a request needs before a crew is sent: three rules for every request type, and one rule per type |
+| `data/answer-key.csv` | 65 | The expected scenario, alert, broken required-information rules, channel, follow-up contact, clarification question, expected team, related records, and recommendation for every SR |
 
 ## How the files link
 
@@ -84,6 +89,7 @@ wo.csv  ORIGRECORDID ──► sr.csv TICKETID          (follow-up WOs only)
 worklog.csv  RECORDKEY ──► sr.csv TICKETID or wo.csv WONUM  (by CLASS)
 qalert/activity.json  requestId ──► qalert/requests.json id
 answer-key.csv  TICKETID ──► sr.csv;  RELATED_RECORDS ──► sr.csv / wo.csv
+answer-key.csv  REQUIRED_INFO_GAP ──► reference/required-information.csv  RULE_ID
 ```
 
 ID ranges are distinct from real Sarasota ranges:
@@ -125,12 +131,12 @@ SR statuses use Sarasota's values:
 
 | Status | SRs | Meaning |
 |---|---|---|
-| `NEW` | 2 | Just arrived, not reviewed yet (no work log) |
-| `QUEUED` | 36 | Waiting for review or for a crew |
+| `NEW` | 3 | Just arrived, not reviewed yet (no work log) |
+| `QUEUED` | 38 | Waiting for review or for a crew |
 | `PENDING` | 3 | Held while staff wait for the requester |
 | `INPRG` | 1 | Its follow-up WO is in progress |
-| `RESOLVED` | 15 | Its follow-up WO is complete |
-| `CLOSED` | 3 | Its follow-up WO is closed or cancelled |
+| `RESOLVED` | 16 | Its follow-up WO is complete, or a planner settled it by phone |
+| `CLOSED` | 4 | Its follow-up WO is closed or cancelled, or a planner sent it to another department |
 
 `CLASSSTRUCTUREID` holds a synthetic classification for the request type as submitted. A misclassified SR keeps the wrong one, which is what the AI should catch.
 
@@ -141,7 +147,7 @@ In Sarasota, the team that does the work is set on the work order, not the servi
 What the dataset holds:
 - **New requests** have no team. Suggesting one is part of what MAS AI is tested on.
 - **Work orders** that were assigned, including closed ones, keep their team. That history is what the AI learns from.
-- **The answer key** holds the correct team for each SR (`EXPECTED_PERSONGROUP`). A misclassified request's expected team is the team for its correct type.
+- **The answer key** holds the correct team for each SR (`EXPECTED_PERSONGROUP`). A misclassified request's expected team is the team for its correct type. It is blank for requests that are not County Utilities work: the two stormwater requests, the private backflow device, and the two addresses served by city utilities.
 
 ## Maximo WOs
 
@@ -164,6 +170,8 @@ The job plan decides the team:
 | `FORCEMAIN` | `SANCLINSP` | Force Main Break |
 | `LSALARM` | `LSCENT` | Lift Station Alarm |
 | `RECLAIM` | `RECLAIM` | Reclaimed Water Issue |
+
+Backflow Device Issue, a County request type, has no job plan or team: backflow devices belong to the property owner.
 
 `scripts/pilot_catalog.py` holds these tables, the failure and problem codes, and the classifications. Each entry is marked as a real County code or our own illustrative value.
 
@@ -194,7 +202,7 @@ Other conventions:
 - The `id` uses the same 7-digit format as Maximo PERSONID. This reflects the pilot assumption that employee IDs are shared across QAlert and Maximo.
 - Six of the 15 employees have no Maximo PERSON record. This reproduces the "requester does not map to a Maximo person" gap.
 - Two employees are inactive.
-- Twelve SRs are staff-entered. Eleven name their employee; one records no employee anywhere. The other 48 have no employee.
+- Fourteen SRs are staff-entered. Thirteen name their employee; one records no employee anywhere. The other 51 have no employee.
 
 ## Scenarios
 
@@ -204,27 +212,53 @@ Other conventions:
 | | Invalid location | 3 | A house number that is not in the GIS file, a misspelled street, or an address outside the County |
 | | Insufficient problem detail | 4 | For example "Customer has a question about the meter." |
 | | Unclear request | 3 | The device or problem is never identified |
-| | Incorrect classification | 4 | For example stormwater flooding filed as a water leak, or a force main filed as a water main |
+| | Incorrect classification | 5 | For example stormwater flooding filed as a water leak or as a sewer issue, or a force main filed as a water main |
 | | Multiple issues in one request | 3 | Two problems combined in one SR |
-| | County responsibility review | 3 | A single-fixture or inside-the-home problem that is likely private plumbing |
+| | County responsibility review | 6 | The request may not be the County's job: private plumbing inside the home (3), a private backflow device (1), or an address that the City of North Port or City of Venice utility serves (2) |
 | Duplicate Identification | Duplicate clusters A–E | 12 | 5 clusters of 2–3 SRs: same problem, same or neighboring address, within hours to days, sometimes under a different request type. In one cluster, the resident who used the app calls 311 about the same problem. |
-| | Look-alike (not a duplicate) | 3 | The same street or the same night as a cluster, but a different problem |
+| | Look-alike (not a duplicate) | 4 | The same street or the same night as a cluster, but a different problem; or the same address and problem after the earlier repair was finished |
 | Historical / Planned Work Context | Related past work | 5 | Earlier WOs at the same address or on the same street |
 | | Related planned work | 4 | A scheduled or in-progress project on the same street |
 | Control | Complete request | 12 | Nothing to flag |
 
 Several missing-information SRs also have a follow-up WO in which the crew found nothing, or could not find the address. These illustrate the unnecessary dispatches the pilot aims to avoid.
 
+Two misrouted requests show the two ways the County handles them. One had a crew sent before anyone noticed, and that WO was cancelled. The other, like the County's "Misrouted" examples, never got a WO: a planner closed it with a `RESOLUTION` work log that sends routing instructions to the Contact Center.
+
+### How our scenarios match the County's example tabs
+
+The County's workbook, *MAS AI Pilot Data Examples Sarasota County*, groups its real examples into five tabs. IBM's updated review of that workbook, the tab "Pilot Data Review - Updated", asks the County to confirm each label. Our scenarios map onto those tabs like this:
+
+| County tab | Our scenarios | Notes |
+|---|---|---|
+| Duplicates | Duplicate clusters A–E | The County's examples include the same address years apart. We keep duplicates to the same open problem, as agreed, and put repeats after a repair under look-alikes or related past work. IBM asks the County to confirm where that line falls. |
+| Similar but not duplicate | Look-alikes; Related past work | The County's examples are the same address a week or two apart, after the first repair was done. Our same-address look-alike follows that pattern. |
+| Incomplete requests | Missing location, Invalid location, Insufficient problem detail, Unclear request, Multiple issues | The County's "Incomplete SR Data" tab holds work log columns instead of SR rows, as IBM's review points out. Our cases follow the County's *Incomplete and Missing Data Examples* workbook instead. |
+| Misrouted | Incorrect classification | Includes the no-WO, `RESOLUTION`-note pattern above. |
+| Non County | County responsibility review | Covers private plumbing, a private backflow device, and city utility service areas. |
+
+IBM's review also asks the County which outside sources are part of triage: UMAX, Outlook crew schedules, GIS, Badger Beacon, and the restoration Smartsheet. The dataset models none of them, apart from the GIS stand-in.
+
+## Required information by request type
+
+IBM's review rates missing-information detection as only partly covered until the County says what each request type must contain. `data/reference/required-information.csv` is our proposal for that list, for the County to confirm.
+
+- Three rules apply to every type: a findable address (`ADDR`), an address that exists in the County (`ADDR-VALID`), and one problem per request (`ONE-ISSUE`).
+- Each Utilities request type has one rule of its own. For example, `SEWER-SYMPTOM` says a Sewer Issue must give the symptom (backup, overflow or odor) and whether it is inside or outside the house.
+
+The answer key's `REQUIRED_INFO_GAP` lists the rules each missing-information SR breaks. For example, the lift station alarm with no address breaks both `ADDR` and `LS-ID`. It is blank for misclassified and non-County requests, which are about the wrong type or the wrong owner, not missing details.
+
 ## Answer key
 
 `answer-key.csv` has one row per SR with these columns:
-- `USE_CASE`, `SCENARIO`, and `EXPECTED_ALERT`. The alert is `Missing or incorrect information`, `Possible duplicate`, `Related past work`, `Related planned work`, or `None`.
+- `USE_CASE`, `SCENARIO`, and `EXPECTED_ALERT`. The alert is `Missing or incorrect information`, `Possibly not County responsibility`, `Possible duplicate`, `Related past work`, `Related planned work`, or `None`.
 - `ISSUE_SUMMARY` and `MISSING_INFORMATION`.
+- `REQUIRED_INFO_GAP`: the required-information rules the request breaks, separated by `;`.
 - `QALERT_ORIGIN` and `SUBMITTED_VIA`: the channel the request came in through.
 - For staff-entered requests, the QAlert employee who entered the request: ID, name, department, phone, email, active flag, and whether that employee has a Maximo PERSON record. These columns are empty for app and web requests.
 - `FOLLOW_UP_CONTACT_TYPE`, `FOLLOW_UP_CONTACT_NAME`, `FOLLOW_UP_CONTACT_PHONE`, and `FOLLOW_UP_CONTACT_EMAIL`: who to ask if the request needs clarification. The type is `Resident`, `Entered-by employee`, `Department supervisor`, `Contact Center`, or `Owning group supervisor`.
 - `SUGGESTED_CLARIFICATION_QUESTION`.
-- `EXPECTED_PERSONGROUP`: the team that should handle the request. It is blank only for the stormwater request, which belongs to Public Works.
+- `EXPECTED_PERSONGROUP`: the team that should handle the request. It is blank for the two stormwater requests, which belong to Public Works, and for the three requests that are another party's job.
 - `RELATED_RECORDS` and `EXPECTED_RECOMMENDATION`.
 
 Here is an example of the expected output for a missing-location SR submitted through the app:
@@ -241,9 +275,11 @@ Special cases:
 - When a resident gave no phone or email, the question goes to the supervisor of the group that owns the work.
 - When a staff-entered request records no employee, the question goes to the Contact Center.
 
-Of the 24 missing-information SRs:
-- 17 go to the resident;
-- 3 go to the staff member who entered the request;
+A request that may not be the County's job gets the same follow-up contact. Its recommendation starts "Check responsibility before dispatch" and ends with who to refer the customer to once that's confirmed: a plumber, or the City of North Port or City of Venice utility.
+
+Of the 28 flagged SRs (22 missing or incorrect information, 6 possibly not County responsibility):
+- 19 go to the resident;
+- 5 go to the staff member who entered the request;
 - 1 goes to the Contact Center, because nobody recorded who took the call;
 - 2 go to a department supervisor, because that staff member is inactive;
 - 1 goes to the owning group's supervisor, because the request was anonymous.
@@ -252,7 +288,10 @@ The recommendations encode the team's assumptions. Stakeholders should review th
 
 ## Assumptions to revisit
 
-- The channel mix (48 resident-submitted, 12 staff-entered) reflects the County's statement that only a small share of requests comes through the Contact Center. The real proportions are unknown.
+- The channel mix (51 resident-submitted, 14 staff-entered) reflects the County's statement that only a small share of requests comes through the Contact Center. The real proportions are unknown.
+- The City of North Port and the City of Venice run their own water utilities. Which streets they serve is illustrative: two invented streets are marked in the GIS stand-in's `UTILITY` column, and every other address is County-served, whatever its mailing city. The real boundaries come from County GIS.
+- The required-information rules are our proposal. The County has not yet said what each request type must contain.
+- The `RESOLUTION` work log type is used in the County's samples. The TechZone instance may not have it; `python -m loader inventory` reports whether it does.
 - The QAlert API returns each request's `origin` and, for staff-entered requests, the employee ID. The `origin` labels other than `Control Panel` and `QAlert Mobile iOS` are assumed.
 - App users always have an email on file; web, phone, and email requests may lack one.
 - QAlert employee IDs equal Maximo PERSONIDs.
@@ -263,7 +302,7 @@ The recommendations encode the team's assumptions. Stakeholders should review th
   - the teams `WTRMETER` and `RECLAIM`, and the job plans `NOWATER`, `METER`, `FORCEMAIN`, `LSALARM` and `RECLAIM`;
   - the other failure and problem codes;
   - the `CP` work type for planned capital projects (we assume the County tracks this work as its own type);
-  - all classification IDs (`9101`–`9401`); the County's numeric IDs only mean something on its own instance;
-  - `COMMODITY` values other than `WATER_PIPE`, `WATER_SERV`, and `COLLECTION`.
+  - all classification IDs (`9101`–`9401`, including `9107` for backflow devices); the County's numeric IDs only mean something on its own instance;
+  - `COMMODITY` values other than `WATER_PIPE`, `WATER_SERV`, `COLLECTION`, and `BACKFLOW`.
 - Street names were invented and checked only by eye. Rename any that match a real Sarasota County street.
 - The CSVs use Maximo attribute names. Loading them into the TechZone environment may require column mapping for MXLoader or the REST API.

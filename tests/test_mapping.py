@@ -67,7 +67,7 @@ def test_status_steps_resume_from_where_a_run_stopped():
 
 def test_chains_cover_every_record_once():
     chains = DATA.chains()
-    assert sum(len(c.srs) for c in chains) == 60 and sum(len(c.wos) for c in chains) == 41
+    assert sum(len(c.srs) for c in chains) == 65 and sum(len(c.wos) for c in chains) == 41
     one = DATA.select(only=["SR800008"])
     assert [r["TICKETID"] for r in one.srs] == ["SR800008"] and [w["WONUM"] for w in one.wos] == ["WO2900014"]
     assert len(DATA.select(limit=3).srs) == 3

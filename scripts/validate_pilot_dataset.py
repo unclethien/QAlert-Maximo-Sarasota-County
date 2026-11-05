@@ -22,25 +22,28 @@ ENTERED_BY = re.compile(r"<div>Entered by: (\w+)</div>")
 LD_PHONES = re.compile(r"\b\d{3}-\d{3}-\d{4}\b")
 LD_EMAILS = re.compile(r"[\w.+-]+@[\w.-]+")
 
+NOT_COUNTY = "Possibly not County responsibility"
+EXPECTED_SRS = 65
 EXPECTED_ALERTS = {
-    "Missing or incorrect information": 24,
+    "Missing or incorrect information": 22,
+    NOT_COUNTY: 6,
     "Possible duplicate": 7,
     "Related past work": 5,
     "Related planned work": 4,
-    "None": 20,
+    "None": 21,
 }
 # Provisional channel mix: most requests come from residents through 311Connect (app or web),
 # about one in five from Contact Center staff (phone or email). Values are QAlert origin labels.
 STAFF_ORIGIN = "Control Panel"
 EXPECTED_CHANNELS = {
-    "311Connect mobile app": 30,
-    "311 web portal": 18,
-    "phone call to 311": 9,
+    "311Connect mobile app": 32,
+    "311 web portal": 19,
+    "phone call to 311": 11,
     "email to the Contact Center": 3,
 }
 EXPECTED_USE_CASES = {
-    "Missing-Information Detection": 24,
-    "Duplicate Identification": 15,
+    "Missing-Information Detection": 28,
+    "Duplicate Identification": 16,
     "Historical / Planned Work Context": 9,
     "Control (no issue)": 12,
 }
@@ -68,6 +71,7 @@ def main():
     logs = read_csv("maximo/worklog.csv")
     persons = read_csv("maximo/person.csv")
     points = read_csv("reference/address-points.csv")
+    rules = read_csv("reference/required-information.csv")
     answers = read_csv("answer-key.csv")
     requests = read_json("qalert/requests.json")
     activity = read_json("qalert/activity.json")
@@ -84,7 +88,7 @@ def main():
 
     # Links between files.
     unattributed = []
-    check(len(sr_ids) == len(srs) == 60, f"expected 60 unique SRs, found {len(srs)}")
+    check(len(sr_ids) == len(srs) == EXPECTED_SRS, f"expected {EXPECTED_SRS} unique SRs, found {len(srs)}")
     for sr in srs:
         rid = int(sr["EXTERNALSYSTEM_TICKETID"])
         check(rid in request_by_id, f"{sr['TICKETID']}: QAlert request {rid} missing")
@@ -160,8 +164,11 @@ def main():
             check((a["ENTERED_BY_IN_MAXIMO"] == "Y") == (emp["id"] in person_ids),
                   f"{a['TICKETID']}: ENTERED_BY_IN_MAXIMO disagrees with person.csv")
             check((a["ENTERED_BY_ACTIVE"] == "Y") == emp["active"], f"{a['TICKETID']}: ENTERED_BY_ACTIVE disagrees")
-        if a["EXPECTED_ALERT"] == "Missing or incorrect information":
+        if a["EXPECTED_ALERT"] in ("Missing or incorrect information", NOT_COUNTY):
             check(bool(a["SUGGESTED_CLARIFICATION_QUESTION"]), f"{a['TICKETID']}: flagged SR needs a clarification question")
+        if a["EXPECTED_ALERT"] == NOT_COUNTY:
+            check("refer the customer to" in a["EXPECTED_RECOMMENDATION"],
+                  f"{a['TICKETID']}: a possibly non-County request must say who to refer the customer to")
     channels = Counter(a["SUBMITTED_VIA"] for a in answers)
     check(channels == Counter(EXPECTED_CHANNELS), f"channel counts {dict(channels)} differ from {EXPECTED_CHANNELS}")
     alerts = Counter(a["EXPECTED_ALERT"] for a in answers)
@@ -213,19 +220,87 @@ def main():
         group = a["EXPECTED_PERSONGROUP"]
         check(group == "" or group in cat.PERSON_GROUPS, f"{a['TICKETID']}: unknown expected team {group!r}")
         if not group:
-            check("Drainage / Flooding" in a["EXPECTED_RECOMMENDATION"],
-                  f"{a['TICKETID']}: only non-Utilities requests have no expected team")
+            check("Drainage / Flooding" in a["EXPECTED_RECOMMENDATION"] or a["EXPECTED_ALERT"] == NOT_COUNTY,
+                  f"{a['TICKETID']}: only non-Utilities or non-County requests have no expected team")
 
-    # Location scenarios agree with the GIS stand-in.
-    scenario_by_ticket = {a["TICKETID"]: a["SCENARIO"] for a in answers}
+    # Work log types, and requests closed by a note instead of a work order (the County's
+    # misrouted pattern: a RESOLUTION note on the SR, no WO).
+    log_types = Counter(log["LOGTYPE"] for log in logs)
+    check(set(log_types) <= set(cat.LOG_TYPES), f"unexpected work log types {sorted(set(log_types) - set(cat.LOG_TYPES))}")
+    with_wo = {wo["ORIGRECORDID"] for wo in wos if wo["ORIGRECORDID"]}
+    resolution_srs = {log["RECORDKEY"] for log in logs if log["LOGTYPE"] == "RESOLUTION"}
+    for log in logs:
+        if log["LOGTYPE"] == "RESOLUTION":
+            check(log["CLASS"] == "SR" and log["RECORDKEY"] not in with_wo
+                  and sr_status_by_id.get(log["RECORDKEY"]) in ("RESOLVED", "CLOSED"),
+                  f"work log {log['WORKLOGID']}: a RESOLUTION note closes an SR that has no work order")
+    check(any(a["SCENARIO"] == "Incorrect classification" and a["TICKETID"] in resolution_srs for a in answers),
+          "at least one misclassified SR must be closed by a RESOLUTION note, with no work order")
+    check(any(a["EXPECTED_ALERT"] == NOT_COUNTY and a["TICKETID"] not in with_wo
+              and sr_status_by_id[a["TICKETID"]] in ("RESOLVED", "CLOSED") for a in answers),
+          "at least one non-County SR must be resolved by a note, with no work order")
+
+    # Required information: one rule per County request type, and every missing-information SR
+    # names the rules it breaks.
+    rule_by_id = {r["RULE_ID"]: r for r in rules}
+    check(len(rule_by_id) == len(rules), "required-information rule ids must be unique")
+    for rtype in cat.REQUEST_TYPES:
+        if rtype != "Drainage / Flooding":
+            count = sum(r["REQUEST_TYPE"] == rtype for r in rules)
+            check(count == 1, f"request type {rtype!r} needs exactly one required-information rule, has {count}")
+    submitted_type = {sr["TICKETID"]: sr["DESCRIPTION"].split(",")[0] for sr in srs}
+    for a in answers:
+        gaps = [g for g in a["REQUIRED_INFO_GAP"].split(";") if g]
+        check(bool(gaps) == (a["SCENARIO"] in cat.REQUIRED_INFO_SCENARIOS),
+              f"{a['TICKETID']}: REQUIRED_INFO_GAP is set exactly for missing-information scenarios")
+        for g in gaps:
+            rule = rule_by_id.get(g)
+            check(rule is not None and rule["REQUEST_TYPE"] in ("ALL", submitted_type[a["TICKETID"]]),
+                  f"{a['TICKETID']}: rule {g!r} does not exist or does not apply to its request type")
+
+    # Location scenarios agree with the GIS stand-in, and so does who supplies the water.
+    answer_by_ticket = {a["TICKETID"]: a for a in answers}
+    utility_by_address = {(p["STREETNO"], p["STREETNAME"].upper(), p["CITY"]): p["UTILITY"] for p in points}
+    city_utility_srs = []
     for sr in srs:
         req = request_by_id[int(sr["EXTERNALSYSTEM_TICKETID"])]
-        in_gis = (req["streetNum"], req["streetName"], req["cityName"]) in known_addresses
-        scenario = scenario_by_ticket[sr["TICKETID"]]
+        address = (req["streetNum"], req["streetName"], req["cityName"])
+        in_gis = address in known_addresses
+        a = answer_by_ticket[sr["TICKETID"]]
+        scenario = a["SCENARIO"]
         if scenario in ("Missing location", "Invalid location"):
             check(not in_gis, f"{sr['TICKETID']}: {scenario} SR unexpectedly matches an address point")
         else:
             check(in_gis, f"{sr['TICKETID']}: address {req['streetNum']} {req['streetName']} is not in address-points.csv")
+        utility = utility_by_address.get(address, cat.COUNTY_UTILITY)
+        for city_utility in set(cat.CITY_UTILITY_STREETS.values()):
+            if f"refer the customer to {city_utility}" in a["EXPECTED_RECOMMENDATION"]:
+                check(utility == city_utility, f"{sr['TICKETID']}: referred to {city_utility}, but GIS says {utility}")
+        if utility != cat.COUNTY_UTILITY:
+            city_utility_srs.append(sr["TICKETID"])
+            check(a["EXPECTED_ALERT"] == NOT_COUNTY and utility in a["EXPECTED_RECOMMENDATION"]
+                  and a["EXPECTED_PERSONGROUP"] == "",
+                  f"{sr['TICKETID']}: an address {utility} serves must be flagged and referred, with no County team")
+    check(len(city_utility_srs) >= 1, "at least one SR must be at an address another utility serves")
+
+    # A look-alike at the same address as an earlier request whose work order was finished
+    # before it came in: separate work, not a duplicate.
+    sr_by_id = {sr["TICKETID"]: sr for sr in srs}
+    wo_by_id = {wo["WONUM"]: wo for wo in wos}
+    same_address = 0
+    for a in answers:
+        refs = [r for r in a["RELATED_RECORDS"].split(";") if r]
+        if not a["SCENARIO"].startswith("Look-alike") or not any(r in wo_by_id for r in refs):
+            continue
+        earlier = next(sr_by_id[r] for r in refs if r in sr_by_id)
+        wo = next(wo_by_id[r] for r in refs if r in wo_by_id)
+        here = sr_by_id[a["TICKETID"]]
+        same_address += 1
+        check(here["DESCRIPTION"].split(", ", 1)[1:] == earlier["DESCRIPTION"].split(", ", 1)[1:],
+              f"{a['TICKETID']}: a look-alike with a related work order must be at the earlier SR's address")
+        check(wo["ORIGRECORDID"] == earlier["TICKETID"] and wo["ACTFINISH"] and wo["ACTFINISH"] < here["REPORTDATE"],
+              f"{a['TICKETID']}: the earlier work order must be finished before the look-alike was reported")
+    check(same_address >= 1, "at least one look-alike must be at the same address as finished work")
 
     # The mapping gap and inactive staff are both represented.
     unmapped = [e for e in employees if e["id"] not in person_ids]

@@ -271,7 +271,7 @@ function MissingSlide() {
   return (
     <div className="layout-bars">
       <div>
-        <h2 className="display-lg">{missingTotal} requests are missing something</h2>
+        <h2 className="display-lg">{missingTotal} requests are missing something or may not be ours</h2>
         <p className="aside-stat">
           <span className="aside-num">{missingWithCrewSent}</span> of these already had a crew sent out. Asking first
           could have saved the trip.
@@ -473,8 +473,9 @@ function TeamSlide() {
       </div>
       <p className="lede">
         The answer key gives the right team for {teamTotals.withSuggestedTeam} of {teamTotals.requestsWithoutTeam}{' '}
-        requests, across {countWord(teamTotals.teams)} teams and {countWord(teamTotals.jobPlans)} job plans. The other one is a
-        Public Works drainage request.
+        requests, across {countWord(teamTotals.teams)} teams and {countWord(teamTotals.jobPlans)} job plans. The other{' '}
+        {countWord(teamTotals.requestsWithoutTeam - teamTotals.withSuggestedTeam)} aren’t County Utilities work: Public
+        Works drainage, a private backflow device, or an address another city’s utility serves.
       </p>
     </div>
   )

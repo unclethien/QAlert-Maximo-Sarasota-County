@@ -49,10 +49,12 @@ MAXIMO_PERSON_COLUMNS = [
     "PERSONID", "DISPLAYNAME", "FIRSTNAME", "LASTNAME", "PRIMARYEMAIL", "PRIMARYPHONE",
     "DEPARTMENT", "TITLE", "STATUS",
 ]
-ADDRESS_COLUMNS = ["ADDRESS_ID", "STREETNO", "STREETNAME", "CITY", "STATE", "ZIP", "LATITUDE", "LONGITUDE", "PARCEL_ID"]
+ADDRESS_COLUMNS = ["ADDRESS_ID", "STREETNO", "STREETNAME", "CITY", "STATE", "ZIP", "LATITUDE", "LONGITUDE",
+                   "PARCEL_ID", "UTILITY"]
+REQUIRED_INFO_COLUMNS = ["RULE_ID", "REQUEST_TYPE", "REQUIRED_INFORMATION"]
 ANSWER_KEY_COLUMNS = [
     "TICKETID", "QALERT_REQUEST_ID", "USE_CASE", "SCENARIO", "EXPECTED_ALERT", "ISSUE_SUMMARY",
-    "MISSING_INFORMATION", "QALERT_ORIGIN", "SUBMITTED_VIA", "ENTERED_BY_EMPLOYEE_ID", "ENTERED_BY_NAME",
+    "MISSING_INFORMATION", "REQUIRED_INFO_GAP", "QALERT_ORIGIN", "SUBMITTED_VIA", "ENTERED_BY_EMPLOYEE_ID", "ENTERED_BY_NAME",
     "ENTERED_BY_DEPARTMENT", "ENTERED_BY_PHONE", "ENTERED_BY_EMAIL", "ENTERED_BY_ACTIVE", "ENTERED_BY_IN_MAXIMO",
     "FOLLOW_UP_CONTACT_TYPE", "FOLLOW_UP_CONTACT_NAME", "FOLLOW_UP_CONTACT_PHONE", "FOLLOW_UP_CONTACT_EMAIL",
     "SUGGESTED_CLARIFICATION_QUESTION", "EXPECTED_PERSONGROUP", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION",
@@ -145,7 +147,8 @@ def build_address_points(streets):
             point = dict(ADDRESS_ID=f"AP{len(rows) + 1:05d}", STREETNO=str(first_number + 6 * i),
                          STREETNAME=street, CITY=city, STATE="FL", ZIP=zip_code,
                          LATITUDE=round(lat0 + 0.0003 * i, 6), LONGITUDE=round(lon0 + 0.0002 * i, 6),
-                         PARCEL_ID=str(r.randrange(10 ** 9, 10 ** 10)))
+                         PARCEL_ID=str(r.randrange(10 ** 9, 10 ** 10)),
+                         UTILITY=cat.CITY_UTILITY_STREETS.get((street, city), cat.COUNTY_UTILITY))
             points[(street, i)] = point
             rows.append(point)
     return points, centroids, rows
@@ -258,7 +261,7 @@ def build():
 
     srs, requests, activity, wos, logs, answers = [], [], [], [], [], []
     sr_by_key, wo_by_key, residents = {}, {}, {}
-    pending_logs = []  # (datetime, record key, class, author, description, text)
+    pending_logs = []  # (datetime, (class, record key), author, description, text[, log type; CLIENTNOTE if absent])
 
     # Historical and planned work orders, kept for ID assignment after sorting.
     work_orders = []
@@ -308,7 +311,7 @@ def build():
         ld = long_description(resident, loc, s["text"], employee and employee["id"])
         sup, lead, planner = crew_for(discipline, field)
 
-        wo_spec = s.get("wo")
+        wo_spec, resolved = s.get("wo"), s.get("resolved")
         if wo_spec:
             dispatched = reported + timedelta(hours=rng.randint(1, 20), minutes=rng.randrange(60))
             finished = dispatched + timedelta(hours=rng.randint(1, 4), minutes=rng.randrange(60))
@@ -317,6 +320,10 @@ def build():
             else:
                 sr_status = "CLOSED" if wo_spec["status"] in ("CLOSE", "CAN") else "RESOLVED"
                 sr_status_date = finished + timedelta(hours=1)
+        elif resolved:  # closed by a planner's note, with no work order
+            sr_status, sr_status_date = resolved["status"], reported + timedelta(hours=resolved["hours"])
+            pending_logs.append((sr_status_date - timedelta(minutes=5), ("SR", key), planner["id"], "",
+                                 resolved["note"], resolved["logtype"]))
         else:
             sr_status, sr_status_date = s.get("sr_status", "QUEUED"), reported
         if sr_status in ("CLOSED", "RESOLVED"):
@@ -370,18 +377,22 @@ def build():
                                     sup=sup, lead=wo_lead, actstart=dispatched, actfinish=finished,
                                     statusdate=sr_status_date, notes=wo_spec["logs"]))
         for note in s.get("notes", []):
-            pending_logs.append((reported + timedelta(hours=3), ("SR", key), planner["id"], "", note))
+            pending_logs.append((reported + timedelta(hours=3), ("SR", key), planner["id"], "", note, "CLIENTNOTE"))
 
-        if s["group"] == "missing" and "notes" not in s:
+        # A request from another utility's area is still waiting for its first review.
+        if s["group"] in ("missing", "responsibility") and "notes" not in s and not resolved and not s.get("other_utility"):
             notes = SR_REVIEW_NOTES["staff" if staff_entered else "resident"]
             note = notes[ord(key[-1]) % len(notes)]
             if wo_spec:
                 note = "Reviewed SR and dispatched to field crew."
-            pending_logs.append((reported + timedelta(hours=1, minutes=rng.randrange(50)), ("SR", key), planner["id"], "", note))
+            pending_logs.append((reported + timedelta(hours=1, minutes=rng.randrange(50)), ("SR", key), planner["id"], "",
+                                 note, "CLIENTNOTE"))
         elif s["group"] == "control" and not wo_spec:
-            pending_logs.append((reported + timedelta(hours=2), ("SR", key), planner["id"], "", "Reviewed. Complete request, assigned to crew queue."))
+            pending_logs.append((reported + timedelta(hours=2), ("SR", key), planner["id"], "",
+                                 "Reviewed. Complete request, assigned to crew queue.", "CLIENTNOTE"))
         elif s.get("cluster") and key.endswith("1"):
-            pending_logs.append((reported + timedelta(minutes=40), ("SR", key), planner["id"], "", "Priority call. Assigned to on-call crew."))
+            pending_logs.append((reported + timedelta(minutes=40), ("SR", key), planner["id"], "",
+                                 "Priority call. Assigned to on-call crew.", "CLIENTNOTE"))
 
         s.update(_employee=employee, _loc=loc, _origin=origin, _resident=resident, _supervisor=sup)
 
@@ -438,10 +449,11 @@ def build():
             pending_logs.append((wo["actfinish"], ("WORKORDER", wo["id"]), author["id"], wo["desc"], wo["closing"]))
 
     pending_logs.sort(key=lambda p: (p[0], p[1][1]))
-    for i, (at, (cls, record), author, desc, text) in enumerate(pending_logs):
+    for i, (at, (cls, record), author, desc, text, *logtype) in enumerate(pending_logs):
         record_id = sr_by_key[record]["id"] if cls == "SR" else record
         logs.append({
-            "WORKLOGID": str(3000001 + i), "RECORDKEY": record_id, "CLASS": cls, "LOGTYPE": "CLIENTNOTE",
+            "WORKLOGID": str(3000001 + i), "RECORDKEY": record_id, "CLASS": cls,
+            "LOGTYPE": logtype[0] if logtype else "CLIENTNOTE",
             "CREATEBY": author, "CREATEDATE": maximo_date(at), "CLIENTVIEWABLE": "1",
             "DESCRIPTION": desc, "DESCRIPTION_LONGDESCRIPTION": text, "SITEID": cat.SITEID, "ORGID": cat.ORGID,
         })
@@ -502,16 +514,28 @@ def follow_up(s):
             f"question to {name} ({sup['title']}, {sup['phone']}, {sup['email']}).")
 
 
+def required_info_gaps(s):
+    """The required-information rules a request breaks: its own `gaps`, or its scenario's default."""
+    defaults = s.get("gaps") or cat.REQUIRED_INFO_SCENARIOS.get(s["scenario"], ())
+    type_rule = next((rid for rid, rtype, _ in cat.REQUIRED_INFORMATION if rtype == s["type"]), None)
+    return [type_rule if rule == "TYPE" else rule for rule in defaults]
+
+
 def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
     key, emp, group = s["key"], s["_employee"], s["group"]
     contact_type, contact_name, contact_phone, contact_email, contact_sentence = follow_up(s)
     sr_id = sr_by_key[key]["id"]
     related, alert, recommendation = [], "None", ""
-    use_case = {"missing": cat.USE_CASE_MISSING, "duplicate": cat.USE_CASE_DUPLICATE,
-                "lookalike": cat.USE_CASE_DUPLICATE, "historical": cat.USE_CASE_CONTEXT,
-                "planned": cat.USE_CASE_CONTEXT, "control": cat.USE_CASE_CONTROL}[group]
+    use_case = {"missing": cat.USE_CASE_MISSING, "responsibility": cat.USE_CASE_MISSING,
+                "duplicate": cat.USE_CASE_DUPLICATE, "lookalike": cat.USE_CASE_DUPLICATE,
+                "historical": cat.USE_CASE_CONTEXT, "planned": cat.USE_CASE_CONTEXT,
+                "control": cat.USE_CASE_CONTROL}[group]
 
-    if group == "missing":
+    if group == "responsibility":
+        alert = "Possibly not County responsibility"
+        recommendation = (f"Check responsibility before dispatch: {s['issue']} {contact_sentence} "
+                          f"Ask: \"{s['question']}\" If confirmed, refer the customer to {s['refer_to']}.")
+    elif group == "missing":
         alert = "Missing or incorrect information"
         recommendation = f"Flag before dispatch: {s['issue']} {contact_sentence} Ask: \"{s['question']}\""
         if s.get("true_type"):
@@ -540,6 +564,11 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
         other = sr_by_key[s["related"]]["id"]
         related.append(other)
         recommendation = f"Similar to {other} but not a duplicate: {s['reason']}. Treat as a new request."
+        if s.get("same_address"):
+            earlier = wo_by_key[s["related"]]
+            related.append(earlier["id"])
+            recommendation += (f" Give the crew work order {earlier['id']} (completed "
+                               f"{earlier['actfinish'].date().isoformat()}) as context.")
     elif group in ("historical", "planned"):
         street = s["_loc"]["street"]
         kind = "historical" if group == "historical" else "planned"
@@ -558,7 +587,8 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
     return {
         "TICKETID": sr_id, "QALERT_REQUEST_ID": str(request_id_by_key[key]), "USE_CASE": use_case,
         "SCENARIO": s["scenario"], "EXPECTED_ALERT": alert, "ISSUE_SUMMARY": s.get("issue", "Complete request."),
-        "MISSING_INFORMATION": s.get("missing", ""), "QALERT_ORIGIN": s["_origin"],
+        "MISSING_INFORMATION": s.get("missing", ""), "REQUIRED_INFO_GAP": ";".join(required_info_gaps(s)),
+        "QALERT_ORIGIN": s["_origin"],
         "SUBMITTED_VIA": cat.CHANNELS[s["channel"]][3],
         "ENTERED_BY_EMPLOYEE_ID": emp["id"] if emp else "",
         "ENTERED_BY_NAME": f"{emp['firstName']} {emp['lastName']}" if emp else "",
@@ -569,7 +599,8 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
         "FOLLOW_UP_CONTACT_TYPE": contact_type, "FOLLOW_UP_CONTACT_NAME": contact_name,
         "FOLLOW_UP_CONTACT_PHONE": contact_phone, "FOLLOW_UP_CONTACT_EMAIL": contact_email,
         "SUGGESTED_CLARIFICATION_QUESTION": s.get("question", ""),
-        "EXPECTED_PERSONGROUP": cat.REQUEST_TYPES[s.get("true_type") or s["type"]]["persongroup"],
+        # Another utility's customer gets no County team.
+        "EXPECTED_PERSONGROUP": "" if s.get("other_utility") else cat.REQUEST_TYPES[s.get("true_type") or s["type"]]["persongroup"],
         "RELATED_RECORDS": ";".join(related),
         "EXPECTED_RECOMMENDATION": recommendation,
     }
@@ -614,6 +645,8 @@ def main():
     write_csv(DATA / "maximo" / "worklog.csv", MAXIMO_WORKLOG_COLUMNS, d["logs"])
     write_csv(DATA / "maximo" / "person.csv", MAXIMO_PERSON_COLUMNS, persons)
     write_csv(DATA / "reference" / "address-points.csv", ADDRESS_COLUMNS, d["address_rows"])
+    write_csv(DATA / "reference" / "required-information.csv", REQUIRED_INFO_COLUMNS,
+              [dict(zip(REQUIRED_INFO_COLUMNS, rule)) for rule in cat.REQUIRED_INFORMATION])
     write_csv(DATA / "answer-key.csv", ANSWER_KEY_COLUMNS, d["answers"])
 
     write_json(DATA / "qalert" / "requests.json", d["requests"])

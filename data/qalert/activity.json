@@ -1102,5 +1102,101 @@
     "code": 4,
     "codeDesc": "Assigned",
     "routeId": "PUWater"
+  },
+  {
+    "id": 139,
+    "requestId": 700061,
+    "displayDate": "10/27/2026 8:31 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "rmorales"
+  },
+  {
+    "id": 140,
+    "requestId": 700061,
+    "displayDate": "10/27/2026 8:32 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 141,
+    "requestId": 700062,
+    "displayDate": "10/27/2026 9:08 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": ""
+  },
+  {
+    "id": 142,
+    "requestId": 700062,
+    "displayDate": "10/27/2026 9:09 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 143,
+    "requestId": 700063,
+    "displayDate": "10/27/2026 10:18 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": ""
+  },
+  {
+    "id": 144,
+    "requestId": 700063,
+    "displayDate": "10/27/2026 10:19 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 145,
+    "requestId": 700061,
+    "displayDate": "10/27/2026 10:40 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWastewater"
+  },
+  {
+    "id": 146,
+    "requestId": 700062,
+    "displayDate": "10/27/2026 11:10 AM",
+    "code": 15,
+    "codeDesc": "Closed",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 147,
+    "requestId": 700064,
+    "displayDate": "10/27/2026 11:33 AM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": "lchen"
+  },
+  {
+    "id": 148,
+    "requestId": 700064,
+    "displayDate": "10/27/2026 11:34 AM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
+  },
+  {
+    "id": 149,
+    "requestId": 700065,
+    "displayDate": "10/27/2026 12:09 PM",
+    "code": 1,
+    "codeDesc": "Created",
+    "routeId": ""
+  },
+  {
+    "id": 150,
+    "requestId": 700065,
+    "displayDate": "10/27/2026 12:10 PM",
+    "code": 4,
+    "codeDesc": "Assigned",
+    "routeId": "PUWater"
   }
 ]

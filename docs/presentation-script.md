@@ -54,27 +54,27 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ## 3. Most requests come from residents (about 1 minute)
 
-**On screen:** one bar split into four channels: 30 from the 311Connect app, 18 from the 311 web portal, 9 phone calls to 311, and 3 emails.
+**On screen:** one bar split into four channels: 32 from the 311Connect app, 19 from the 311 web portal, 11 phone calls to 311, and 3 emails.
 
 **Say:**
 
 > Sarasota's 311 has four ways in. Residents can use the 311Connect app or the 311 web portal themselves. Or they can call 311, or 941-861-5000 from outside the County, or email the Contact Center, and a staff member enters the request for them.
 >
-> We've heard that most requests now come in through the app and the website, and only a small share through the Contact Center. So in the dataset, 48 of the 60 requests come straight from residents and 12 were entered by Contact Center staff. That's about one in five.
+> We've heard that most requests now come in through the app and the website, and only a small share through the Contact Center. So in the dataset, 51 of the 65 requests come straight from residents and 14 were entered by Contact Center staff. That's about one in five.
 >
 > That split is our assumption, not a measured number. If you have the real figures, we'll adjust.
 >
 > It matters because it changes who the AI should ask. If the resident sent it, ask the resident. If staff entered it, ask the staff member who took the call or the email.
 
-## 4. 60 requests, four kinds of test (about 40 seconds)
+## 4. 65 requests, four kinds of test (about 40 seconds)
 
-**On screen:** one bar split into four groups: 24, 15, 9, and 12.
+**On screen:** one bar split into four groups: 28, 16, 9, and 12.
 
 **Say:**
 
-> Each of the 60 requests was written on purpose to test one thing.
+> Each of the 65 requests was written on purpose to test one thing.
 >
-> 24 are missing information: no address, too little detail, or the wrong request type. 15 are about duplicates, where several people report the same problem. 9 have related past or planned work at the same place.
+> 28 are missing information or may not be the County's job: no address, too little detail, the wrong request type, or a problem that belongs to a plumber or another utility. 16 are about duplicates, where several people report the same problem. 9 have related past or planned work at the same place.
 >
 > And 12 are complete requests with nothing wrong. Those check that the AI doesn't raise false alarms.
 
@@ -84,11 +84,11 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 **Say:**
 
-> On the Maximo side: 60 service requests, 41 work orders, 125 work log notes, and 18 person records.
+> On the Maximo side: 65 service requests, 41 work orders, 127 work log notes, and 18 person records.
 >
-> On the QAlert side, which is our mock: the 60 matching requests, 138 history entries, and 15 Contact Center staff who enter phone and email requests.
+> On the QAlert side, which is our mock: the 65 matching requests, 150 history entries, and 15 Contact Center staff who enter phone and email requests.
 >
-> We also added a stand-in for the County's address list, with 236 points, so we can test whether an address is real. And an answer key, which I'll show you in a minute.
+> We also added a stand-in for the County's address list, with 244 points, so we can test whether an address is real and who supplies its water. And an answer key, which I'll show you in a minute.
 >
 > Everything is made up: names, phone numbers, emails, and street names. Only the city names and ZIP codes are real, so the addresses look local.
 
@@ -108,13 +108,13 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > The "Entered by" line is our assumption about how the ID could come across. We need your help to confirm it.
 
-## 7. 24 requests are missing something (about 50 seconds)
+## 7. 28 requests are missing something or may not be ours (about 50 seconds)
 
 **On screen:** seven bars, one for each kind of missing information, and the number 8 in orange.
 
 **Say:**
 
-> The 24 missing-information requests fall into seven patterns: no usable address, too little detail, the wrong request type, an address that doesn't exist, unclear what's wrong, two problems in one request, and likely private plumbing.
+> These 28 requests fall into seven patterns: no usable address, too little detail, the wrong request type, an address that doesn't exist, unclear what's wrong, two problems in one request, and a problem that may not be the County's job. That last group covers private plumbing, a private backflow device, and two addresses that the City of North Port or City of Venice utility serves.
 >
 > The example under each bar is the kind of thing the AI should notice.
 >
@@ -150,7 +150,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > The AI should suggest linking the second and third requests to the first, instead of sending three crews.
 >
-> Overall there are five groups like this, plus three look-alikes: requests on the same street or the same night that are actually different problems. The AI should not link those.
+> Overall there are five groups like this, plus four look-alikes the AI should not link. Three are on the same street or the same night but are different problems. The fourth is at the first Bramblewick address itself: water came up again six days after the main was repaired. Because that repair was finished, it's new work, not a duplicate.
 
 ## 10. Some places already have history (about 50 seconds)
 
@@ -178,7 +178,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > At the bottom is what happens next. The planner applies a job plan, here LEAK, and the job plan fills in the team, the supervisor, and the crew lead on the work order.
 >
-> The answer key records the right team for 59 of the 60 requests. The last one is a drainage request, which belongs to Public Works.
+> The answer key records the right team for 60 of the 65 requests. The other five aren't County Utilities work: two drainage requests for Public Works, a private backflow device, and two addresses that a city utility serves.
 
 ## 12. An answer key for every request (about 40 seconds)
 
@@ -186,7 +186,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 **Say:**
 
-> To check the AI, we wrote down the right answer for every one of the 60 requests: what it should flag, who to contact, and which other records are related.
+> To check the AI, we wrote down the right answer for every one of the 65 requests: what it should flag, who to contact, and which other records are related.
 >
 > Notice the contact column. For app and web requests it's the resident. For phone and email requests it's the staff member who took it.
 >

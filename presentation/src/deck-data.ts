@@ -144,7 +144,7 @@ export const staffEntered = channelGroups.filter((c) => c.staff).reduce((sum, c)
 /* ---------- Use cases ---------- */
 
 const USE_CASES = [
-  { key: 'Missing-Information Detection', label: 'Missing information', note: 'No address, too little detail, wrong type' },
+  { key: 'Missing-Information Detection', label: 'Missing information', note: 'No address, too little detail, wrong type, not ours' },
   { key: 'Duplicate Identification', label: 'Duplicates', note: 'Several calls about one problem' },
   { key: 'Historical / Planned Work Context', label: 'Past or planned work', note: 'Earlier repairs or a project nearby' },
   { key: 'Control (no issue)', label: 'Nothing to flag', note: 'Complete requests, as a baseline' },
@@ -164,7 +164,7 @@ const PATTERN_LABELS: Record<string, string> = {
   'Unclear request': 'Unclear what is wrong',
   'Incorrect classification': 'Wrong request type',
   'Multiple issues in one request': 'Two problems in one request',
-  'County responsibility review': 'Likely private plumbing',
+  'County responsibility review': 'May not be the County’s job',
 }
 
 const missingRows = answerRows.filter((r) => r.USE_CASE === USE_CASES[0].key)
