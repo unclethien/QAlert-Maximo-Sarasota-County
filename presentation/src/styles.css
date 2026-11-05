@@ -980,6 +980,51 @@ ol {
   border-bottom: var(--hairline);
 }
 
+/* ---------- What changed ---------- */
+
+.layout-changes .lede {
+  margin-top: calc(var(--s-6) * -1);
+  margin-bottom: var(--s-7);
+}
+
+.changes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-7);
+}
+
+.change {
+  padding-top: var(--s-4);
+  border-top: var(--rule);
+}
+
+.change-num {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--t-5);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--flag-ink);
+}
+
+.change-title {
+  margin-top: var(--s-4);
+  font-size: var(--t-3);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.change-body {
+  margin-top: var(--s-3);
+  font-size: var(--t-1);
+  line-height: 1.4;
+  color: var(--n-700);
+}
+
+.layout-changes .footnote {
+  margin-top: var(--s-7);
+}
+
 /* ---------- 11. Close ---------- */
 
 .layout-close {

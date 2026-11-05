@@ -11,6 +11,7 @@ import {
   plannedExample,
   requestExample,
   residentSubmitted,
+  reviewChanges,
   staffEntered,
   staffExample,
   teamExample,
@@ -524,12 +525,62 @@ function AnswerKeySlide() {
 }
 
 /* 13 */
+function ChangesSlide() {
+  const c = reviewChanges
+  const changes = [
+    {
+      count: c.notCounty,
+      title: 'May not be the County’s job',
+      body: `Private plumbing, a private backflow device, and ${countWord(c.cityUtility)} addresses that the City of North Port or City of Venice utility serves. The AI should check responsibility, then say who to refer the customer to.`,
+    },
+    {
+      count: c.reroutedByNote,
+      title: 'Rerouted without a crew',
+      body: 'A “sewer issue” that is really clogged storm drains. As in the County’s misrouted examples, a note sends it back to the Contact Center and no work order is opened.',
+    },
+    {
+      count: c.requiredInfoRules,
+      title: 'Required-information rules',
+      body: `What each request type must include before a crew goes out. The ${c.requestsWithGaps} incomplete requests now name the rules they break. These rules are our proposal for you to confirm.`,
+    },
+    {
+      count: c.sameAddressLookAlikes,
+      title: 'Same address, not a duplicate',
+      body: 'Water comes back at an address six days after the repair was finished. That is new work, not another report of an open problem.',
+    },
+  ]
+  return (
+    <div className="layout-changes">
+      <h2 className="display-lg">What changed after IBM’s data review</h2>
+      <p className="lede narrow">
+        IBM’s updated review of the County’s examples showed four gaps. Each one now has test requests and an expected
+        answer.
+      </p>
+      <ul className="changes">
+        {changes.map((ch) => (
+          <li key={ch.title} className="change">
+            <span className="change-num">{ch.count}</span>
+            <h3 className="change-title">{ch.title}</h3>
+            <p className="change-body">{ch.body}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="footnote">
+        Our scenarios now match the County’s five example groups: duplicates, similar but not duplicate, incomplete,
+        misrouted, and not the County’s job.
+      </p>
+    </div>
+  )
+}
+
+/* 14 */
 function NextSlide() {
   const assumptions = [
     'Most requests come from residents through 311Connect; about one in five through the Contact Center.',
     'QAlert records where each request came from, and who entered phone and email requests.',
     'QAlert and Maximo share the employee ID, and it can come across as an “Entered by” line.',
     'The QAlert origin labels in the data are placeholders until we see real ones.',
+    'The city utility areas and the required-information rules are our placeholders.',
   ]
   return (
     <div className="layout-close">
@@ -569,5 +620,6 @@ export const slides: { title: string; Component: () => ReactElement }[] = [
   { title: 'Past and planned work', Component: HistorySlide },
   { title: 'Who does the work', Component: TeamSlide },
   { title: 'The answer key', Component: AnswerKeySlide },
+  { title: 'What changed after IBM’s data review', Component: ChangesSlide },
   { title: 'Assumptions and next steps', Component: NextSlide },
 ]

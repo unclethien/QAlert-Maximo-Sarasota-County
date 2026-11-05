@@ -1,6 +1,6 @@
 # Presentation script: Sprint 2 sample dataset
 
-A speaker script for the 13-slide deck in [`presentation/`](../presentation). It runs about 11 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
+A speaker script for the 14-slide deck in [`presentation/`](../presentation). It runs about 12 minutes for a mixed audience of the IBM team and Sarasota County staff. Read it as written, or use it as talking points.
 
 ## Before you present
 
@@ -192,9 +192,27 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > When the AI runs on this data, we compare what it says against this file, one request at a time. That gives us a clear, honest score instead of a gut feeling.
 
-## 13. Please check these assumptions (about 1 minute 10 seconds)
+## 13. What changed after IBM's data review (about 1 minute)
 
-**On screen:** four assumptions with checkboxes, and the next steps.
+**On screen:** four numbers: 6 requests that may not be the County's job, 1 request rerouted without a crew, 15 required-information rules, and 1 repeat at the same address that is not a duplicate.
+
+**Say:**
+
+> IBM's updated review of the County's examples showed four gaps in our test data, so we closed them. Every request from before keeps its number and details.
+>
+> First, 6 requests that may not be the County's job: private plumbing inside the home, a private backflow device, and two addresses served by the City of North Port or City of Venice utility. The AI should check whose job it is and say who to refer the customer to.
+>
+> Second, a request filed as a sewer issue that is really clogged storm drains. As in your misrouted examples, it's closed with a note to the Contact Center, and no crew goes out.
+>
+> Third, 15 rules for what each request type must include before a crew goes out, such as a findable address, or the symptom for a sewer problem. The incomplete requests now say which rules they break. These rules are our proposal, so please correct them.
+>
+> And fourth, water comes back at an address six days after the repair was finished. That's new work, not a duplicate of an open request.
+>
+> With these, our scenarios match your five example groups: duplicates, similar but not duplicate, incomplete, misrouted, and not the County's job.
+
+## 14. Please check these assumptions (about 1 minute 10 seconds)
+
+**On screen:** five assumptions with checkboxes, and the next steps.
 
 **Say:**
 
@@ -204,6 +222,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 > - Does QAlert record where each request came from, and who entered phone and email requests?
 > - Do QAlert and Maximo share the employee ID, and could it come across as an "Entered by" line?
 > - The labels we use for where a request came from are placeholders. What does QAlert actually call them?
+> - Which streets the North Port and Venice utilities serve, and what each request type must include, are our placeholders too. Please correct them.
 >
 > Next, we'll build a mock QAlert service and its API guide, so the AI can look up requests and people the way it would in production.
 >
@@ -213,4 +232,4 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ---
 
-**Total:** about 11 minutes, plus questions.
+**Total:** about 12 minutes, plus questions.

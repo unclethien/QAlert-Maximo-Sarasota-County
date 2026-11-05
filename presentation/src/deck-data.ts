@@ -6,6 +6,7 @@ import worklogCsv from '../../data/maximo/worklog.csv?raw'
 import personCsv from '../../data/maximo/person.csv?raw'
 import answerKeyCsv from '../../data/answer-key.csv?raw'
 import addressPointsCsv from '../../data/reference/address-points.csv?raw'
+import requiredInfoCsv from '../../data/reference/required-information.csv?raw'
 import qalertRequests from '../../data/qalert/requests.json'
 import qalertActivity from '../../data/qalert/activity.json'
 import qalertEmployees from '../../data/qalert/employees.json'
@@ -31,6 +32,7 @@ const srRows = parseCsv(srCsv)
 const woRows = parseCsv(woCsv)
 const personRows = parseCsv(personCsv)
 const answerRows = parseCsv(answerKeyCsv)
+const worklogRows = parseCsv(worklogCsv)
 const staffList = qalertEmployees as Employee[]
 
 function indexBy<T>(rows: T[], key: (row: T) => string): Map<string, T> {
@@ -111,7 +113,7 @@ export const totals = {
   followUpWorkOrders: woRows.filter((w) => w.ORIGRECORDCLASS === 'SR').length,
   pastWorkOrders: woRows.filter((w) => !w.ORIGRECORDID && w.WORKTYPE !== 'CP').length,
   plannedWorkOrders: woRows.filter((w) => w.WORKTYPE === 'CP').length,
-  workLogs: parseCsv(worklogCsv).length,
+  workLogs: worklogRows.length,
   people: personRows.length,
   qalertRequests: (qalertRequests as unknown[]).length,
   qalertHistory: (qalertActivity as unknown[]).length,
@@ -334,3 +336,18 @@ export const answerSamples = [requestExample.id, staffExample.id, 'SR800054', 'S
       related: relatedIds(r).join(', '),
     }
   })
+
+/* ---------- What changed after IBM's data review ---------- */
+
+const notCountyRows = answerRows.filter((r) => r.EXPECTED_ALERT === 'Possibly not County responsibility')
+
+export const reviewChanges = {
+  notCounty: notCountyRows.length,
+  cityUtility: notCountyRows.filter((r) => /refer the customer to City of /.test(r.EXPECTED_RECOMMENDATION)).length,
+  reroutedByNote: worklogRows.filter((w) => w.LOGTYPE === 'RESOLUTION').length,
+  requiredInfoRules: parseCsv(requiredInfoCsv).length,
+  requestsWithGaps: answerRows.filter((r) => r.REQUIRED_INFO_GAP).length,
+  sameAddressLookAlikes: answerRows.filter(
+    (r) => r.SCENARIO.startsWith('Look-alike') && relatedIds(r).some((id) => id.startsWith('WO')),
+  ).length,
+}
