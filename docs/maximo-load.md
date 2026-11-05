@@ -1,6 +1,6 @@
 # Loading the dataset into Maximo
 
-The `loader/` package puts the sample dataset into a Maximo Manage instance over the REST API: 60 service requests, 41 work orders, their work logs, and the setup records they point to. It writes everything to its own organization `SRQ` and site `SRQSITE`, so it can share an instance with other data.
+The `loader/` package puts the sample dataset into a Maximo Manage instance over the REST API: 65 service requests, 41 work orders, their work logs, and the setup records they point to. It writes everything to its own organization `SRQ` and site `SRQSITE`, so it can share an instance with other data.
 
 **Safety rules built into the loader:**
 
@@ -66,7 +66,7 @@ These steps run in order:
 4. 5 person groups, each with its supervisors and leads as members;
 5. the status values our data uses;
 6. work types;
-7. 12 classifications;
+7. 13 classifications;
 8. 8 job plans, which are then set to `ACTIVE`.
 
 `WCONT` is added as a synonym of `WAPPR`, and `SCHED` as a synonym of `WSCH`. On standard SR statuses, `INPRG` becomes a synonym of `INPROG`. If the instance doesn't have the internal value a status needs, the step fails and asks you to choose a mapping. It doesn't guess.
@@ -77,6 +77,7 @@ These steps run in order:
 
 - **Give the API user access to the site.** In Security Groups, give the API key user's group access to `SRQSITE`. Until you do, Maximo refuses every SR and WO for that site.
 - **Activate the organization.** A new organization stays inactive until someone sets its clearing account. In Organizations, open `SRQ`, set the clearing account, activate it, then run `provision --apply` again.
+- **Work log types.** One SR work log uses `LOGTYPE` `RESOLUTION`, as in the County's misrouted samples. `inventory` lists any work log type the instance lacks. If `RESOLUTION` is missing, add it to the `LOGTYPE` domain in Domains before the load.
 - **Work types.** Standard Maximo has no REST object structure for work types. Under Organizations > `SRQ` > Work Order Options > Work Type, make sure `CM`, `CS`, `IN` and `CP` exist.
 - **Job plans that were already there.** `provision` only activates job plans it created itself. A plan that was already there and isn't `ACTIVE` is listed for you to activate by hand.
 - **Teams, status values and work types, when the API is refused.** On the TechZone MAS 9 instance, Maximo refuses REST writes to person groups, domains and work types with `BMXAA0024E` ("The action ADD is not allowed"), even for a `MAXADMIN` user. `provision` then reports them as `FAILED`. Add them in the UI:

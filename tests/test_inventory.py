@@ -19,6 +19,7 @@ def _empty_instance():
                                                        ("NEW", "QUEUED", "INPRG", "PENDING", "RESOLVED", "CLOSED")]},
             {"domainid": "WOSTATUS", "synonymdomain": [{"value": v, "maxvalue": v} for v in
                                                        ("WAPPR", "WSCH", "INPRG", "COMP", "CLOSE", "CAN")]},
+            {"domainid": "LOGTYPE", "alndomain": [{"value": "CLIENTNOTE"}, {"value": "UPDATE"}]},
         ],
         "mxapiclassstructure": [],
         "mxapijobplan": [],
@@ -39,6 +40,7 @@ def test_inventory_on_an_empty_instance(fake_maximo):
     assert report["record_counts"] == {"status": "ok", "sr_at_site": 0, "wo_at_site": 0}
     assert report["domains"]["SRSTATUS"]["status"] == "ok"
     assert report["domains"]["WOSTATUS"]["missing"] == ["WCONT", "SCHED"]
+    assert report["domains"]["LOGTYPE"]["missing"] == ["RESOLUTION"]
     assert report["work_types"]["status"] == "unknown"
     refs = report["reference_data"]
     assert len(refs["persons"]["missing"]) == 18 and "MWQSCINT" in refs["persons"]["missing"]

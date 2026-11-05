@@ -84,14 +84,18 @@ def check_record_counts(client: MaximoClient) -> dict:
 
 
 def check_domains(client: MaximoClient) -> dict:
-    wanted = {"SRSTATUS": cat.SR_STATUSES, "WOSTATUS": cat.WO_STATUSES}
+    """Status values (synonym domains) and work log types (an ALN domain) the dataset uses."""
+    wanted = {"SRSTATUS": cat.SR_STATUSES, "WOSTATUS": cat.WO_STATUSES, "LOGTYPE": cat.LOG_TYPES}
     rows = client.query("mxapidomain", where=f"domainid in {quote_list(wanted)}",
-                        select="domainid,domaintype,synonymdomain{value,maxvalue,defaults}")
+                        select="domainid,domaintype,synonymdomain{value,maxvalue,defaults},alndomain{value}")
     result = {}
     for domainid, values in wanted.items():
         row = next((r for r in rows if r.get("domainid") == domainid), None)
         if row is None:
             result[domainid] = {"status": "missing", "reason": "domain not found"}
+            continue
+        if domainid == "LOGTYPE":
+            result[domainid] = _present([v.get("value") for v in row.get("alndomain") or []], values)
             continue
         synonyms = {s.get("value"): s.get("maxvalue") for s in row.get("synonymdomain") or []}
         entry = _present(list(synonyms), values)
