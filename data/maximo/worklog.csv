@@ -124,3 +124,5 @@ WORKLOGID,RECORDKEY,CLASS,LOGTYPE,CREATEBY,CREATEDATE,CLIENTVIEWABLE,DESCRIPTION
 3000123,SR800057,SR,CLIENTNOTE,0832671,2026-10-24T20:10:00-04:00,1,,Advised resident this looks like a private plumbing issue. Waiting on callback.,SRQSITE,SRQ
 3000124,WO2900041,WORKORDER,CLIENTNOTE,0831027,2026-10-26T23:23:00-04:00,1,6430 Glimmerton Ave:  MAIN BREAK,Arrived on site.,SRQSITE,SRQ
 3000125,WO2900041,WORKORDER,CLIENTNOTE,0831027,2026-10-27T01:16:30-04:00,1,6430 Glimmerton Ave:  MAIN BREAK,"Isolated the main and started excavation. 8 in. repair clamp on order, crew staying on site.",SRQSITE,SRQ
+3000126,SR800061,SR,RESOLUTION,0832671,2026-10-27T10:35:00-04:00,1,,"Spoke with the caller. The clogged drains are the storm drains in the road, so this is stormwater, not sewer. Sent routing instruction to the Contact Center to reassign it to Public Works Stormwater.",SRQSITE,SRQ
+3000127,SR800062,SR,CLIENTNOTE,0832236,2026-10-27T11:05:00-04:00,1,,Called the customer and explained that backflow devices are the property owner's responsibility. Advised them to call a plumber.,SRQSITE,SRQ

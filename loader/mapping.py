@@ -7,23 +7,36 @@ codes when provisioning left them as a manual step); every dropped column is rep
 
 from dataclasses import dataclass, field
 
-# CSV column -> attribute. Attributes are the lowercase column names, so only the lists matter.
+# CSV column -> attribute. Attributes are the lowercase column names, except those in RENAMED.
 SR_COLUMNS = ("TICKETID", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "REPORTEDBY", "REPORTEDNAME",
               "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE", "AFFECTEDPERSON", "AFFECTEDNAME", "AFFECTEDEMAIL",
-              "EXTERNALSYSTEM", "EXTERNALSYSTEM_TICKETID", "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID",
+              "EXTERNALSYSTEM_TICKETID", "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID",
               "OWNERGROUP", "SITEID", "ORGID")
 WO_COLUMNS = ("WONUM", "PARENT", "WORKTYPE", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "ORIGRECORDID",
               "ORIGRECORDCLASS", "REPORTEDBY", "REPORTDATE", "CLASSSTRUCTUREID", "JPNUM", "PERSONGROUP",
               "OWNERGROUP", "SUPERVISOR", "LEAD", "FAILURECODE", "PROBLEMCODE", "SCHEDSTART", "SCHEDFINISH",
               "ACTSTART", "ACTFINISH", "SITEID", "ORGID")
+# Standard Maximo has no EXTERNALSYSTEM_TICKETID on tickets, so the QAlert request id goes into
+# the standard EXTERNALRECID. It is also the SR's natural key for re-runs.
+RENAMED = {"EXTERNALSYSTEM_TICKETID": "externalrecid"}
 WORKLOG_COLUMNS = ("LOGTYPE", "CREATEBY", "CREATEDATE", "CLIENTVIEWABLE", "DESCRIPTION",
                    "DESCRIPTION_LONGDESCRIPTION")
 
-# Set by Maximo, or by the loader through another call. Never sent on create.
+# The County's PERSONGROUP holds more than standard Maximo's 8 characters. A longer team code is
+# written under a shorter one; verify and the Maximo answer key use the same mapping.
+TEAM_CODES = {"SANCLINSP": "SANCLINS"}
+
+
+def maximo_team(code: str) -> str:
+    return TEAM_CODES.get(code, code)
+
+
+# Set by Maximo, set by the loader through another call, or implied. Never sent on create.
 DERIVED = {
     "sr": {"CLASS": "Maximo sets it from the object structure", "STATUS": "applied with changeStatus",
            "STATUSDATE": "set by changeStatus", "CREATEDBY": "the API key's user",
-           "CREATIONDATE": "the time of the load"},
+           "CREATIONDATE": "the time of the load",
+           "EXTERNALSYSTEM": "always QAlert; standard Maximo has no such ticket attribute"},
     "wo": {"STATUS": "applied with changeStatus", "STATUSDATE": "set by changeStatus"},
     "worklog": {"WORKLOGID": "Maximo numbers work logs", "RECORDKEY": "the parent record",
                 "CLASS": "the parent record", "SITEID": "the parent record", "ORGID": "the parent record"},
@@ -46,7 +59,7 @@ def _value(column: str, raw: str):
 
 
 def _payload(row: dict, columns, drop: set[str]) -> dict:
-    return {c.lower(): _value(c, row[c]) for c in columns if c not in drop and row.get(c, "") != ""}
+    return {RENAMED.get(c, c.lower()): _value(c, row[c]) for c in columns if c not in drop and row.get(c, "") != ""}
 
 
 def sr_payload(row: dict, remap: Remap, drop: set[str] = frozenset()) -> dict:
@@ -65,6 +78,9 @@ def wo_payload(row: dict, remap: Remap, drop: set[str] = frozenset()) -> dict:
         payload["parent"] = remap.wonums.get(row["PARENT"], row["PARENT"])
     if "classstructureid" in payload:
         payload["classstructureid"] = remap.classes.get(row["CLASSSTRUCTUREID"], row["CLASSSTRUCTUREID"])
+    for team in ("persongroup", "ownergroup"):
+        if team in payload:
+            payload[team] = maximo_team(payload[team])
     return payload
 
 

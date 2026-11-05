@@ -27,7 +27,7 @@ def test_dry_run_writes_nothing(fake_maximo, tmp_path):
     fake = fake_maximo(_instance())
     loader, code, lines = _load(fake, tmp_path, apply=False)
     assert code == 0 and fake.writes() == []
-    assert loader.counts["sr"]["PLAN"] == 60 and loader.counts["wo"]["PLAN"] == 41
+    assert loader.counts["sr"]["PLAN"] == 65 and loader.counts["wo"]["PLAN"] == 41
     assert loader.counts["worklog"]["PLAN"] == len(DATA.worklogs)
     assert any("FAILURECODE: dropped for this run" in line for line in lines)
     assert not (tmp_path / "manifest.json").exists()
@@ -37,7 +37,7 @@ def test_full_load_then_rerun_creates_nothing(fake_maximo, tmp_path):
     fake = fake_maximo(_instance())
     _, code, _ = _load(fake, tmp_path)
     assert code == 0
-    assert len(fake.records["mxapisr"]) == 60 and len(fake.records["mxapiwodetail"]) == 41
+    assert len(fake.records["mxapisr"]) == 65 and len(fake.records["mxapiwodetail"]) == 41
     assert sum(len(r.get("worklog", [])) for k in ("mxapisr", "mxapiwodetail") for r in fake.records[k]) == len(DATA.worklogs)
     final = {r["TICKETID"]: r["STATUS"] for r in DATA.srs} | {r["WONUM"]: r["STATUS"] for r in DATA.wos}
     assert all(r["status"] == final[r["ticketid"]] for r in fake.records["mxapisr"])
@@ -53,7 +53,7 @@ def test_full_load_then_rerun_creates_nothing(fake_maximo, tmp_path):
     (tmp_path / "manifest.json").unlink()
     third, code3, _ = _load(fake, tmp_path)
     assert code3 == 0 and len(fake.writes()) == writes
-    assert third.counts["sr"]["EXISTS"] == 60 and third.counts["worklog"]["EXISTS"] == len(DATA.worklogs)
+    assert third.counts["sr"]["EXISTS"] == 65 and third.counts["worklog"]["EXISTS"] == len(DATA.worklogs)
 
 
 def test_renumbered_keys_are_remapped(fake_maximo, tmp_path):

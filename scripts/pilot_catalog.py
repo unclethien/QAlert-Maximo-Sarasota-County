@@ -49,10 +49,14 @@ QALERT_STAFF = [
     ("0818023", "gdiaz", "Gabriel", "Diaz", "Public Works Customer Service", True, False),
 ]
 
+# Maximo PERSON.TITLE and PERSON.DEPARTMENT hold 30 characters, so a QAlert department that is
+# longer gets a shorter Maximo name.
+MAXIMO_DEPARTMENT = {"Public Utilities Customer Service": "Utilities Customer Service"}
+
 # Maximo-only field staff. (person id, first, last, title, discipline)
 FIELD_STAFF = [
-    ("0830144", "Raymond", "Castillo", "Supervisor - Water Distribution", "water"),
-    ("0830581", "Denise", "Holloway", "Supervisor - Wastewater Collection", "wastewater"),
+    ("0830144", "Raymond", "Castillo", "Supervisor - Water", "water"),
+    ("0830581", "Denise", "Holloway", "Supervisor - Wastewater", "wastewater"),
     ("0831027", "Marcus", "Bell", "Crew Lead - Water", "water"),
     ("0831460", "Owen", "Price", "Crew Lead - Water", "water"),
     ("0831893", "Felix", "Romero", "Crew Lead - Wastewater", "wastewater"),
@@ -148,6 +152,7 @@ CLASSIFICATIONS = {
     "9104": ("WATER-NOWTR", "Utilities \\ Water \\ No water"),
     "9105": ("WATER-METER", "Utilities \\ Water \\ Meter"),
     "9106": ("WATER-CURB", "Utilities \\ Water \\ Curb stop"),
+    "9107": ("WATER-BACKFLOW", "Utilities \\ Water \\ Backflow device"),
     "9201": ("WW-SEWER", "Utilities \\ Wastewater \\ Sewer issue"),
     "9202": ("WW-ODOR", "Utilities \\ Wastewater \\ Sewer odor"),
     "9203": ("WW-LIFT", "Utilities \\ Wastewater \\ Lift station"),
@@ -158,6 +163,18 @@ CLASSIFICATIONS = {
 SR_STATUSES = ("NEW", "QUEUED", "INPRG", "PENDING", "RESOLVED", "CLOSED")
 WO_STATUSES = ("WCONT", "SCHED", "INPRG", "COMP", "CLOSE", "CAN")
 WORK_TYPES = ("CM", "CS", "IN", "CP")  # CP (planned capital work) is our assumption
+# Work log types. The County's samples use CLIENTNOTE for notes and RESOLUTION for the note that
+# closes a misrouted request without a work order.
+LOG_TYPES = ("CLIENTNOTE", "RESOLUTION")
+
+# Who supplies water at an address. The mailing city does not decide it: Venice and North Port
+# addresses can be served by the County or by the city's own utility. ILLUSTRATIVE: the real
+# service-area boundaries come from County GIS. Streets not listed are County-served.
+COUNTY_UTILITY = "Sarasota County Utilities"
+CITY_UTILITY_STREETS = {
+    ("Zinnia Crest Ln", "North Port"): "City of North Port Utilities",
+    ("Zoysia Meadow Ct", "Venice"): "City of Venice Utilities",
+}
 
 
 def _request_type(type_id, dept, priority, discipline, cgroup, commodity, jpnum, failure, problem, classid, route):
@@ -168,7 +185,9 @@ def _request_type(type_id, dept, priority, discipline, cgroup, commodity, jpnum,
 
 # QAlert request types mapped to Maximo classification and the job plan a planner would apply.
 # Drainage / Flooding is a Public Works type and is used only as the true type of a
-# misclassified request, so it has no Utilities job plan or team.
+# misclassified request, so it has no Utilities job plan or team. Backflow Device Issue is a
+# County request type with the County's BACKFLOW commodity; backflow devices belong to the
+# property owner, so it has no job plan or team either.
 REQUEST_TYPES = {
     "Water Line Leak": _request_type(101, 1, 2, "water", "POTABLE", "WATER_PIPE", "LEAK", "SERVLINE", "LEAKBROKEN", "9101", "PUWater"),
     "Water Main Break": _request_type(102, 1, 1, "water", "POTABLE", "WATER_PIPE", "LEAK", "WTRMAIN", "LEAKBROKEN", "9102", "PUWater"),
@@ -176,6 +195,7 @@ REQUEST_TYPES = {
     "No Water": _request_type(104, 1, 1, "water", "POTABLE", "WATER_SERV", "NOWATER", "SERVLINE", "NOWATER", "9104", "PUWater"),
     "Water Meter Issue": _request_type(105, 1, 3, "meter", "POTABLE", "WATER_SERV", "METER", "METER", "METERFAIL", "9105", "PUWater"),
     "Curb Stop": _request_type(106, 1, 3, "water", "POTABLE", "WATER_PIPE", "LEAK", "SERVLINE", "CURBSTOP", "9106", "PUWater"),
+    "Backflow Device Issue": _request_type(107, 1, 3, "water", "POTABLE", "BACKFLOW", "", "", "", "9107", "PUWater"),
     "Sewer Issue": _request_type(201, 2, 2, "wastewater", "WASTEWATER", "COLLECTION", "SAN INSP", "SERVICELATERAL", "CUSTCOMPLAINT", "9201", "PUWastewater"),
     "Sewer Odor": _request_type(202, 2, 3, "wastewater", "WASTEWATER", "COLLECTION", "SAN INSP", "SERVICELATERAL", "ODOR", "9202", "PUWastewater"),
     "Lift Station Alarm": _request_type(203, 2, 1, "wastewater", "WASTEWATER", "LIFTSTATION", "LSALARM", "LIFTSTN", "ALARM", "9203", "PUWastewater"),
@@ -201,6 +221,36 @@ EXTRA_STREETS = [
     ("Lindenhurst Ave", "Nokomis"),
 ]
 
+# Information a request needs before a crew is sent: rules for every request type, then one rule
+# per type. Our own proposal for the County to confirm; the answer key's REQUIRED_INFO_GAP names
+# the rules each missing-information request breaks. (rule id, request type or "ALL", requirement)
+REQUIRED_INFORMATION = [
+    ("ADDR", "ALL", "A street address with a house number, or a cross street or landmark a crew can find"),
+    ("ADDR-VALID", "ALL", "An address that exists in the County address file and lies in Sarasota County"),
+    ("ONE-ISSUE", "ALL", "One problem per request; a second problem needs its own request"),
+    ("LEAK-WHERE", "Water Line Leak", "Where the water is (yard, road, meter box) and whether it runs continuously"),
+    ("MAIN-WHERE", "Water Main Break", "Where the water comes up in the road and how much is flowing"),
+    ("PRESS-SCOPE", "Low Water Pressure", "Whether the whole house or one fixture is affected, and since when"),
+    ("NOWATER-SCOPE", "No Water", "Whether neighbors are out too, and whether the meter has a lock or notice"),
+    ("METER-PROBLEM", "Water Meter Issue", "What the meter problem is: leak, damage, blank display, reading or bill"),
+    ("CURB-PROBLEM", "Curb Stop", "What is wrong with the curb stop: leaking, stuck or broken"),
+    ("BACKFLOW-WHERE", "Backflow Device Issue", "Where the device is and what it is doing: leaking, spraying or noisy"),
+    ("SEWER-SYMPTOM", "Sewer Issue", "The symptom (backup, overflow, odor) and whether it is inside or outside the house"),
+    ("ODOR-SOURCE", "Sewer Odor", "Where the odor comes from: a manhole, a cleanout or inside the house"),
+    ("LS-ID", "Lift Station Alarm", "The lift station name or number, or the street it is on"),
+    ("FMAIN-WHERE", "Force Main Break", "Where the pipe is broken and whether sewage is flowing"),
+    ("RECL-PROBLEM", "Reclaimed Water Issue", "What the reclaimed water problem is: no pressure, leak or water quality"),
+]
+# Scenarios whose requests break a required-information rule, and the rule each breaks by default.
+# "TYPE" means the rule for the request type as submitted. A scenario can override with `gaps`.
+REQUIRED_INFO_SCENARIOS = {
+    "Missing location": ("ADDR",),
+    "Invalid location": ("ADDR-VALID",),
+    "Insufficient problem detail": ("TYPE",),
+    "Unclear request": ("TYPE",),
+    "Multiple issues in one request": ("ONE-ISSUE",),
+}
+
 USE_CASE_MISSING = "Missing-Information Detection"
 USE_CASE_DUPLICATE = "Duplicate Identification"
 USE_CASE_CONTEXT = "Historical / Planned Work Context"
@@ -219,7 +269,15 @@ USE_CASE_CONTROL = "Control (no issue)"
 # that records no employee anywhere (no "Entered by" line, no QAlert employeeId), like the
 # County's staff-written samples.
 # SR status: a scenario with a WO follows the WO (INPRG, RESOLVED, CLOSED); otherwise QUEUED,
-# unless sr_status sets PENDING (held for the requester) or NEW (not reviewed yet).
+# unless sr_status sets PENDING (held for the requester) or NEW (not reviewed yet). `resolved`
+# closes an SR without a WO, through one SR work log, as in the County's misrouted and
+# non-County samples: dict(status, hours after the report, logtype, note).
+# group "responsibility": the request may not be the County's job. `refer_to` names who to send
+# the customer to once confirmed; `other_utility` marks an address another utility serves.
+# A look-alike with same_address=True is at the address of an earlier SR whose WO was already
+# completed: a new problem, not a duplicate of an open one.
+# New scenarios are reported on 2026-10-27, after every earlier one, so adding them leaves the
+# IDs, names and phone numbers of existing records unchanged.
 SCENARIOS = [
     # ---- Missing-Information Detection -------------------------------------------------
     dict(key="M01", group="missing", scenario="Missing location", type="Water Main Break",
@@ -251,7 +309,7 @@ SCENARIOS = [
          issue="No address and no lift station identified.",
          missing="Lift station name or number, or the nearest street.",
          question="Which neighborhood or street is the pump station behind?",
-         channel="web", anonymous=True),
+         gaps=("ADDR", "LS-ID"), channel="web", anonymous=True),
     dict(key="M05", group="missing", scenario="Invalid location", type="Low Water Pressure",
          addr=("bad_number", "Wrenhaven Pl", "Sarasota", 9870),
          text="Low water pressure at my house for 2 weeks, the shower barely runs.",
@@ -389,28 +447,28 @@ SCENARIOS = [
          missing="Separate the leak from the damage claim; identify the earlier work.",
          question="Do you know when the earlier County work happened? The damage claim will be handled separately by risk management.",
          channel="app"),
-    dict(key="M22", group="missing", scenario="County responsibility review", type="Sewer Issue",
+    dict(key="M22", group="responsibility", scenario="County responsibility review", type="Sewer Issue",
          addr=("valid", "Driftmoor St", "Venice", 0),
          text="The toilet in the guest bathroom backs up when the washer drains. The other toilets are fine.",
          issue="A single-fixture backup suggests private plumbing, not a County sewer problem. This is a planner judgment.",
          missing="Whether other fixtures or neighbors are affected.",
          question="Are any other drains in your house, or any of your neighbors, having problems?",
          notes=["Advised resident this looks like a private plumbing issue. Waiting on callback."],
-         channel="web", sr_status="PENDING"),
-    dict(key="M23", group="missing", scenario="County responsibility review", type="Water Line Leak",
+         refer_to="a licensed plumber", channel="web", sr_status="PENDING"),
+    dict(key="M23", group="responsibility", scenario="County responsibility review", type="Water Line Leak",
          addr=("valid", "Tamberly Creek Rd", "North Port", 0),
          text="Leak under the kitchen sink, water everywhere.",
          issue="The leak is inside the home, which is the property owner's responsibility.",
          missing="Whether there is any leak on the County side of the meter.",
          question="Is the leak only inside your house, or is there water at the meter box too?",
-         channel="app"),
-    dict(key="M24", group="missing", scenario="County responsibility review", type="Low Water Pressure",
+         refer_to="a licensed plumber", channel="app"),
+    dict(key="M24", group="responsibility", scenario="County responsibility review", type="Low Water Pressure",
          addr=("valid", "Silverthorn Bayou Dr", "North Port", 0),
          text="Only the upstairs shower has low pressure, the rest of the house is fine.",
          issue="Low pressure at a single fixture points to private plumbing.",
          missing="Whether pressure is low at the outside hose bib.",
          question="Is the pressure normal at your outside spigot near the meter?",
-         channel="web"),
+         refer_to="a licensed plumber", channel="web"),
 
     # ---- Duplicate Identification ------------------------------------------------------
     dict(key="DA1", group="duplicate", cluster="A", scenario="Duplicate cluster A (primary)", type="Water Main Break",
@@ -621,6 +679,56 @@ SCENARIOS = [
          addr=("valid", "Ashgrove Tern Ct", "Nokomis", 1),
          text="Meter is spinning with all fixtures off and no visible leak in the house. Please check the meter for accuracy.",
          channel="web"),
+
+    # ---- Added after IBM's updated data review: the County's misrouted, non-County and
+    # similar-but-not-duplicate patterns. Reported on the last day, after every earlier SR.
+    dict(key="M25", group="missing", scenario="Incorrect classification", type="Sewer Issue",
+         true_type="Drainage / Flooding",
+         addr=("valid", "Pinnacle Reef Ct", "Englewood", 2),
+         text="Caller says the sewer pipes along the street need to be cleaned out. The drains in the road are clogged with leaves and the street floods every time it rains.",
+         issue="Describes clogged storm drains and street flooding, but it was filed as a Sewer Issue and routed to Wastewater.",
+         missing="Correct classification: Drainage / Flooding (Public Works Stormwater).",
+         question="Are the clogged drains the storm drains in the road, or a sewer manhole or cleanout?",
+         resolved=dict(status="CLOSED", hours=2, logtype="RESOLUTION",
+                       note="Spoke with the caller. The clogged drains are the storm drains in the road, so this is "
+                            "stormwater, not sewer. Sent routing instruction to the Contact Center to reassign it to "
+                            "Public Works Stormwater."),
+         when=("at", "2026-10-27 08:40"), channel="phone", entered_by="0822775"),
+    dict(key="N01", group="responsibility", scenario="County responsibility review", type="Backflow Device Issue",
+         addr=("valid", "Dovetail Pl", "Nokomis", 2),
+         text="The backflow pipes in front of our office are leaking, a lot of water is coming out of the valves. Maybe it is rusted out.",
+         issue="A backflow preventer belongs to the property owner, so the repair is private, not County work.",
+         missing="Whether the water comes from the backflow device or from the County side of the meter.",
+         question="Is the water coming from the backflow device itself, or from the meter box at the street?",
+         refer_to="a licensed plumber or backflow tester",
+         resolved=dict(status="RESOLVED", hours=2, logtype="CLIENTNOTE",
+                       note="Called the customer and explained that backflow devices are the property owner's "
+                            "responsibility. Advised them to call a plumber."),
+         when=("at", "2026-10-27 09:10"), channel="web"),
+    dict(key="N02", group="responsibility", scenario="County responsibility review", type="Water Line Leak",
+         addr=("valid", "Zinnia Crest Ln", "North Port", 1),
+         text="Water is leaking from the meter box in front of my house and running down the street.",
+         issue="The address is in the City of North Port Utilities service area, so the County does not own this meter or line.",
+         missing="Which utility the customer gets a water bill from.",
+         question="Is your water bill from the City of North Port? If so, the city's utility handles this leak.",
+         refer_to="City of North Port Utilities", other_utility=True,
+         when=("at", "2026-10-27 10:25"), channel="app"),
+    dict(key="N03", group="responsibility", scenario="County responsibility review", type="No Water",
+         addr=("valid", "Zoysia Meadow Ct", "Venice", 0),
+         text="Caller has had no water since early this morning. The neighbors are out too.",
+         issue="The address is in the City of Venice Utilities service area; the County does not supply water there.",
+         missing="Which utility the customer gets a water bill from.",
+         question="Does the caller pay a City of Venice water bill? If so, give them the city utility's number.",
+         refer_to="City of Venice Utilities", other_utility=True,
+         when=("at", "2026-10-27 11:40"), channel="phone", entered_by="0821106"),
+    dict(key="L04", group="lookalike", scenario="Look-alike (not a duplicate)", type="Water Main Break",
+         addr=("valid", "Bramblewick Ln", "Sarasota", 0),
+         text="Water is coming up through the road again at the same spot the County dug up last week.",
+         issue="Same address and problem as the October outage, but reported after that repair was completed.",
+         related="DC1", same_address=True,
+         reason="the main break repair at this address was completed before this report, so water coming up again "
+                "is a new leak or a failed repair, not another report of the open problem",
+         when=("at", "2026-10-27 12:15"), channel="app", sr_status="NEW"),
 ]
 
 # Past work orders. (street, city, house_index or None, request type, months ago, short description, logs)

@@ -1,0 +1,16 @@
+RULE_ID,REQUEST_TYPE,REQUIRED_INFORMATION
+ADDR,ALL,"A street address with a house number, or a cross street or landmark a crew can find"
+ADDR-VALID,ALL,An address that exists in the County address file and lies in Sarasota County
+ONE-ISSUE,ALL,One problem per request; a second problem needs its own request
+LEAK-WHERE,Water Line Leak,"Where the water is (yard, road, meter box) and whether it runs continuously"
+MAIN-WHERE,Water Main Break,Where the water comes up in the road and how much is flowing
+PRESS-SCOPE,Low Water Pressure,"Whether the whole house or one fixture is affected, and since when"
+NOWATER-SCOPE,No Water,"Whether neighbors are out too, and whether the meter has a lock or notice"
+METER-PROBLEM,Water Meter Issue,"What the meter problem is: leak, damage, blank display, reading or bill"
+CURB-PROBLEM,Curb Stop,"What is wrong with the curb stop: leaking, stuck or broken"
+BACKFLOW-WHERE,Backflow Device Issue,"Where the device is and what it is doing: leaking, spraying or noisy"
+SEWER-SYMPTOM,Sewer Issue,"The symptom (backup, overflow, odor) and whether it is inside or outside the house"
+ODOR-SOURCE,Sewer Odor,"Where the odor comes from: a manhole, a cleanout or inside the house"
+LS-ID,Lift Station Alarm,"The lift station name or number, or the street it is on"
+FMAIN-WHERE,Force Main Break,Where the pipe is broken and whether sewage is flowing
+RECL-PROBLEM,Reclaimed Water Issue,"What the reclaimed water problem is: no pressure, leak or water quality"

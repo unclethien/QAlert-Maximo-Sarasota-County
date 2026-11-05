@@ -16,7 +16,8 @@ def _followup():
 def test_sr_payload_sends_mapped_columns_and_skips_derived_and_blank():
     row = _sr("SR800001")
     payload = mapping.sr_payload(row, mapping.Remap(classes={"9101": "1234"}))
-    assert payload["ticketid"] == "SR800001" and payload["externalsystem_ticketid"] == "700001"
+    assert payload["ticketid"] == "SR800001" and payload["externalrecid"] == "700001"
+    assert "externalsystem" not in payload and "externalsystem_ticketid" not in payload
     assert payload["classstructureid"] == "1234"
     assert "ownergroup" not in payload  # blank on every SR: the team belongs on the WO
     assert not {"status", "statusdate", "createdby", "creationdate", "class"} & set(payload)
@@ -45,7 +46,7 @@ def test_worklog_payload_is_a_child_row():
 
 def test_dropped_column_report_names_every_unsent_column():
     sr = mapping.dropped_columns("sr", DATA.sr_header, set())
-    assert set(sr) == {"CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE"}
+    assert set(sr) == {"CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE", "EXTERNALSYSTEM"}
     wo = mapping.dropped_columns("wo", DATA.wo_header, {"FAILURECODE", "PROBLEMCODE"})
     assert set(wo) == {"STATUS", "STATUSDATE", "FAILURECODE", "PROBLEMCODE"}
     assert set(mapping.dropped_columns("worklog", DATA.wl_header, set())) == {
@@ -66,7 +67,7 @@ def test_status_steps_resume_from_where_a_run_stopped():
 
 def test_chains_cover_every_record_once():
     chains = DATA.chains()
-    assert sum(len(c.srs) for c in chains) == 60 and sum(len(c.wos) for c in chains) == 41
+    assert sum(len(c.srs) for c in chains) == 65 and sum(len(c.wos) for c in chains) == 41
     one = DATA.select(only=["SR800008"])
     assert [r["TICKETID"] for r in one.srs] == ["SR800008"] and [w["WONUM"] for w in one.wos] == ["WO2900014"]
     assert len(DATA.select(limit=3).srs) == 3
@@ -81,3 +82,10 @@ def test_manifest_writes_atomically_and_reloads(tmp_path):
     assert again.get("sr", "SR800001")["maximo_id"] == "1001"
     assert again.get("sr", "SR800001")["status"] == "QUEUED"
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_long_team_codes_are_written_under_their_maximo_code():
+    row = next(w for w in DATA.wos if w["PERSONGROUP"] == "SANCLINSP")
+    payload = mapping.wo_payload(row, mapping.Remap(), drop={"FAILURECODE", "PROBLEMCODE"})
+    assert payload["persongroup"] == "SANCLINS"
+    assert all(len(mapping.maximo_team(g)) <= 8 for g in {w["PERSONGROUP"] for w in DATA.wos if w["PERSONGROUP"]})

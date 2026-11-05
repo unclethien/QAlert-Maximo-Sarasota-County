@@ -1,6 +1,6 @@
 # Loading the dataset into Maximo
 
-The `loader/` package puts the sample dataset into a Maximo Manage instance over the REST API: 60 service requests, 41 work orders, their work logs, and the setup records they point to. It writes everything to its own organization `SRQ` and site `SRQSITE`, so it can share an instance with other data.
+The `loader/` package puts the sample dataset into a Maximo Manage instance over the REST API: 65 service requests, 41 work orders, their work logs, and the setup records they point to. It writes everything to its own organization `SRQ` and site `SRQSITE`, so it can share an instance with other data.
 
 **Safety rules built into the loader:**
 
@@ -28,7 +28,7 @@ cp .env.example .env                           # then fill in .env
 | `MAXIMO_URL` | The Manage base URL, ending in `/maximo`. Use the public Manage route, not the MAS admin route. |
 | `MAXIMO_API_KEY` | An API key for a Maximo user who can create organizations, people, person groups, domains, classifications, job plans, service requests and work orders. |
 | `MAXIMO_API_PATH` | Optional. Defaults to `api`. |
-| `MAXIMO_ITEMSETID` | The item set for the new `SRQ` organization. The inventory lists the item sets already in use. |
+| `MAXIMO_ITEMSETID` | The item set for the new `SRQ` organization. It must already exist. Either reuse one the inventory lists as in use, or create a new one (for example `SRQSET`, type `ITEM`) in the Sets application first. The company set and currency are copied from an organization that shares the item set, or, for a new item set, from an active USD organization. |
 | `MAXIMO_VERIFY_TLS` | Optional. Set to `false` only for an instance with a self-signed certificate. |
 
 The loader never prints the API key or writes it to a file. Its state goes in `loader-state/`, which is also gitignored. `loader-state/manifest.json` records what was loaded and which instance it went to. If `MAXIMO_URL` later points somewhere else, the loader refuses to use that manifest. Move the file aside, and the loader finds its own records again by their natural keys.
@@ -66,7 +66,7 @@ These steps run in order:
 4. 5 person groups, each with its supervisors and leads as members;
 5. the status values our data uses;
 6. work types;
-7. 12 classifications;
+7. 13 classifications;
 8. 8 job plans, which are then set to `ACTIVE`.
 
 `WCONT` is added as a synonym of `WAPPR`, and `SCHED` as a synonym of `WSCH`. On standard SR statuses, `INPRG` becomes a synonym of `INPROG`. If the instance doesn't have the internal value a status needs, the step fails and asks you to choose a mapping. It doesn't guess.
@@ -77,8 +77,15 @@ These steps run in order:
 
 - **Give the API user access to the site.** In Security Groups, give the API key user's group access to `SRQSITE`. Until you do, Maximo refuses every SR and WO for that site.
 - **Activate the organization.** A new organization stays inactive until someone sets its clearing account. In Organizations, open `SRQ`, set the clearing account, activate it, then run `provision --apply` again.
+- **Work log types.** One SR work log uses `LOGTYPE` `RESOLUTION`, as in the County's misrouted samples. `inventory` lists any work log type the instance lacks. If `RESOLUTION` is missing, add it to the `LOGTYPE` domain in Domains before the load.
 - **Work types.** Standard Maximo has no REST object structure for work types. Under Organizations > `SRQ` > Work Order Options > Work Type, make sure `CM`, `CS`, `IN` and `CP` exist.
 - **Job plans that were already there.** `provision` only activates job plans it created itself. A plan that was already there and isn't `ACTIVE` is listed for you to activate by hand.
+- **Teams, status values and work types, when the API is refused.** On the TechZone MAS 9 instance, Maximo refuses REST writes to person groups, domains and work types with `BMXAA0024E` ("The action ADD is not allowed"), even for a `MAXADMIN` user. `provision` then reports them as `FAILED`. Add them in the UI:
+  - **Person Groups:** create each team and add its supervisors and leads. `provision --only person_groups` lists them.
+  - **Domains:** add `INPRG` (internal `INPROG`) to `SRSTATUS`, and `WCONT` (internal `WAPPR`) and `SCHED` (internal `WSCH`) to `WOSTATUS`, each for organization `SRQ` only.
+  - **Organizations > `SRQ` > Work Order Options > Work Type:** add any missing work type.
+
+  Then run `provision --apply` again. It sees them as existing and creates the job plans, which need the teams.
 - **Failure codes.** The loader doesn't write the failure hierarchy. `provision` prints the failure classes and problem codes to add in Failure Codes. Until they exist, `load` sends work orders without `FAILURECODE` and `PROBLEMCODE`. Once they exist, pass `--keep-failure-codes` to `load` and `verify`.
 
 ## What the load does with each column
@@ -89,6 +96,7 @@ These steps run in order:
   - every `STATUSDATE`.
 - **Status.** Applied after create with `changeStatus`, through the usual steps. For example, a closed WO goes `INPRG`, then `COMP`, then `CLOSE`. The loader passes the dataset's status date. If Maximo refuses a back-dated status, the loader sets the status without the date and lists it under *Known limitations*.
 - **Keys.** The loader sends our own `TICKETID` and `WONUM`. Each WO also gets `EXTERNALREFID` set to our WO number. If Maximo renumbers a record, `loader-state/manifest.json` records its number. `loader-state/answer-key-maximo.csv` then repeats the answer key with Maximo's numbers.
+- **Team codes.** Standard Maximo team codes (`PERSONGROUP`) hold 8 characters. The County's own code `SANCLINSP` has 9, so the loader writes it as `SANCLINS`. The dataset keeps `SANCLINSP`. `verify` uses the same mapping, and `loader-state/answer-key-maximo.csv` shows `SANCLINS`.
 - **Classification.** Maximo numbers classifications itself. The loader finds each classification by name, for example `WATER-LEAK`, and sends Maximo's number.
 
 The run report starts with the full list of columns it didn't send, with the reason for each.
@@ -99,7 +107,8 @@ The run report starts with the full list of columns it didn't send, with the rea
 - If a run stops partway, run it again. The manifest is saved after every record, so the next run picks up where the last one stopped.
   - **Status changes:** before each one, the loader reads the record's live status, so a change whose answer was lost isn't sent twice.
   - **Follow-up WOs:** a follow-up WO is only created once its SR is in Maximo. If the SR failed, the WO waits for the next run.
-- The natural keys are `EXTERNALSYSTEM` with `EXTERNALSYSTEM_TICKETID` for SRs, and `EXTERNALREFID` for WOs. The inventory checks that SRs can be queried by those attributes. The canary shows whether Maximo keeps the work log `CREATEDATE` we send, which the work log check depends on.
+- Standard Maximo has no `EXTERNALSYSTEM` or `EXTERNALSYSTEM_TICKETID` on tickets. The loader puts the QAlert request ID from `EXTERNALSYSTEM_TICKETID` into the standard `EXTERNALRECID`, and doesn't send `EXTERNALSYSTEM`, which is always `QAlert`. To find a request's QAlert record in Maximo, read the SR's `EXTERNALRECID`.
+- The natural keys are `EXTERNALRECID` at site `SRQSITE` for SRs, and `EXTERNALREFID` for WOs. The inventory checks that SRs can be queried by `EXTERNALRECID`. The canary shows whether Maximo keeps the work log `CREATEDATE` we send, which the work log check depends on.
 - To remove loaded records, do it by hand in the Maximo UI. The loader can't delete.
 
 ## Tests
