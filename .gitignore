@@ -1,4 +1,5 @@
 # Real Sarasota pilot exports contain resident PII. Never commit them.
+Documents/
 Incomplete and Missing Data*
 *.xlsx
 *.xls
