@@ -18,7 +18,11 @@ from .client import MaximoClient, MaximoError, oslc_str, quote_list
 from .config import DATA_DIR, SITEID, STATE_DIR, cat
 from .manifest import Manifest
 
-DEFAULT_DROP = ("FAILURECODE", "PROBLEMCODE")  # provisioning leaves failure codes as a manual step
+FAILURE_CODE_COLUMNS = ("FAILURECODE", "PROBLEMCODE")  # provisioning leaves failure codes as a manual step
+# Service groups and services must exist in Maximo, and the County's codes (WATER_PIPE) are longer
+# than standard Maximo's 8-character COMMODITY, so they are not sent until set up.
+COMMODITY_COLUMNS = ("COMMODITYGROUP", "COMMODITY")
+DEFAULT_DROP = FAILURE_CODE_COLUMNS + COMMODITY_COLUMNS
 STATUS_MEMO = "Loaded from the synthetic Sarasota pilot dataset"
 SR_SELECT = "ticketid,status,externalrecid,siteid"
 WO_SELECT = "wonum,status,externalrefid,siteid"
@@ -245,10 +249,10 @@ class Loader:
             self._line("worklog", "CREATED", f"work log {r['WORKLOGID']} on {parent_id}")
 
     # -- statuses -------------------------------------------------------------------
-    def _live_status(self, href: str) -> str | None:
-        return self.client.get(href, "status").get("status")
+    def _live_status(self, kind: str, href: str) -> str | None:
+        return mapping.dataset_status(kind, self.client.get(href, "status").get("status"))
 
-    def _apply_status(self, kind: str, row: dict) -> None:
+    def _apply_status(self, kind: str, row: dict, stop_at: str | None = None) -> None:
         our_id = row["TICKETID"] if kind == "sr" else row["WONUM"]
         entry = self.manifest.get(kind, our_id)
         what = f"{kind.upper()} {our_id} status"
@@ -259,7 +263,7 @@ class Loader:
             return
         try:
             # The live status, not the manifest's: a change whose response was lost still happened.
-            current = self._live_status(entry["href"]) if self.apply else entry.get("status")
+            current = self._live_status(kind, entry["href"]) if self.apply else entry.get("status")
         except MaximoError as e:
             self._line("status", "FAILED", what, str(e))
             return
@@ -269,6 +273,10 @@ class Loader:
             self._line("status", "EXISTS", what, f"is {current}, ours is {final} (left unchanged)")
             return
         steps = mapping.status_steps(kind, final, current)
+        if stop_at in mapping.status_steps(kind, final):  # this pass only goes as far as stop_at
+            steps = steps[:steps.index(stop_at) + 1] if stop_at in steps else []
+            if not steps:
+                return
         if not steps:
             if self.apply and entry.get("status") != final:
                 self.manifest.set_status(kind, our_id, final)
@@ -276,13 +284,26 @@ class Loader:
         if not self.apply:
             self._line("status", "PLAN", what, " -> ".join(steps))
             return
+        history = next((i for i, step in enumerate(steps) if step in mapping.HISTORY_STATUSES[kind]), None)
+        unloaded = self._unloaded_logs(kind, our_id) if history is not None else []
+        if unloaded:
+            self._line("status", "FAILED", f"{what} {steps[history]}",
+                       f"held back: work log {', '.join(unloaded)} is not loaded, and {steps[history]} would lock "
+                       f"the record; re-run after it loads")
+            steps = steps[:history]
         for step in steps:
             if not self._change_status(kind, our_id, what, entry["href"], step, row["STATUSDATE"]):
                 return
-        self._line("status", "CREATED", what, " -> ".join(steps))
+        if steps:
+            self._line("status", "CREATED", what, " -> ".join(steps))
+
+    def _unloaded_logs(self, kind: str, our_id: str) -> list[str]:
+        cls = "SR" if kind == "sr" else "WORKORDER"
+        return [w["WORKLOGID"] for w in self.data.worklogs if (w["CLASS"], w["RECORDKEY"]) == (cls, our_id)
+                and self.manifest.get("worklog", w["WORKLOGID"]) is None]
 
     def _change_status(self, kind: str, our_id: str, what: str, href: str, step: str, date: str) -> bool:
-        body = {"status": step, "date": date, "memo": STATUS_MEMO}
+        body = {"status": mapping.maximo_status(kind, step), "date": date, "memo": STATUS_MEMO}
         try:
             try:
                 self.client.action(href, "changeStatus", body)
@@ -294,7 +315,7 @@ class Loader:
                 self.limitations.append(f"{what} {step}: historical date refused ({e}); Maximo used the load time")
         except MaximoError as e:
             try:  # the change may have gone through even though the answer did not come back
-                applied = self._live_status(href) == step
+                applied = self._live_status(kind, href) == step
             except MaximoError:
                 applied = False
             if not applied:
@@ -327,10 +348,16 @@ class Loader:
         self.log("Work logs:")
         self._load_worklogs(logs)
         self.log("Statuses:")
-        for row in selection.srs:
-            self._apply_status("sr", row)
+        # The order work happens in: Maximo moves a follow-up WO's SR when the WO starts, and
+        # refuses that while the SR is still queued, so SRs go in progress first, then the WOs
+        # run, then the SRs are resolved or closed.
+        if self.apply:
+            for row in selection.srs:
+                self._apply_status("sr", row, stop_at=mapping.SR_IN_PROGRESS)
         for row in selection.wos:
             self._apply_status("wo", row)
+        for row in selection.srs:
+            self._apply_status("sr", row)
         if self.apply:
             self.log(f"Answer key with Maximo ids: "
                      f"{write_answer_key(self.data, remap, self.state_dir / 'answer-key-maximo.csv')}")

@@ -52,7 +52,7 @@ class Verifier:
         if row.get("CLASSSTRUCTUREID") and row["CLASSSTRUCTUREID"] not in remap.classes:
             drop.add("CLASSSTRUCTUREID")
         expected = (mapping.sr_payload if kind == "sr" else mapping.wo_payload)(row, remap, drop)
-        expected["status"] = row["STATUS"]
+        expected["status"] = mapping.maximo_status(kind, row["STATUS"])
         expected["ticketid" if kind == "sr" else "wonum"] = entry["maximo_id"]  # Maximo may renumber
         select = ",".join(sorted(set(expected) | {"statusdate"})) + ",worklog{createdate,description,logtype,createby}"
         try:

@@ -21,6 +21,7 @@ from .client import JsonDict, MaximoClient, MaximoError, quote_list
 from .mapping import maximo_team
 from .config import DATA_DIR, ORGID, SITEID, Settings, cat
 
+DOMAIN_WRITE_STRUCTURE = "mxdomain"
 STEPS = ("org", "site", "persons", "person_groups", "statuses", "work_types", "classifications",
          "job_plans", "failure_codes")
 
@@ -267,6 +268,15 @@ class Provisioner:
                 self._create("mxapipersongroup", what, person_group_payload(group, members[group]),
                              f"{len(members[group])} members")
 
+    def _domain_write_href(self, domainid: str, fallback: str) -> str:
+        """Some instances (TechZone MAS 9) refuse domain writes through MXAPIDOMAIN with BMXAA0024E
+        but accept them through the MXDOMAIN integration structure, so write there when it exists."""
+        try:
+            found = self.client.query(DOMAIN_WRITE_STRUCTURE, where=f'domainid="{domainid}"', select="domainid")
+        except MaximoError:
+            return fallback
+        return found[0]["href"] if found else fallback
+
     def statuses(self) -> None:
         for domainid, values in STATUS_VALUES.items():
             found = self._find("mxapidomain", f'domainid="{domainid}"',
@@ -300,7 +310,8 @@ class Provisioner:
                     self._line("PLAN", what, f"synonym of {a['maxvalue']}, for org {ORGID} only")
                 continue
             try:
-                self.client.merge(domain["href"], {"synonymdomain": [a for _, a in additions]})
+                self.client.merge(self._domain_write_href(domainid, domain["href"]),
+                                  {"synonymdomain": [a for _, a in additions]})
                 for what, a in additions:
                     self._line("CREATED", what, f"synonym of {a['maxvalue']}, for org {ORGID} only")
             except MaximoError as e:

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .client import MaximoClient, MaximoError, quote_list
 from .config import DATA_DIR, ORGID, SITEID, STATE_DIR, cat
-from .mapping import maximo_team
+from .mapping import maximo_logtype, maximo_team
 
 # Object structures the loader uses. Failure codes have no standard API structure, so a few
 # candidate names are probed and whichever answers is recorded.
@@ -84,8 +84,8 @@ def check_record_counts(client: MaximoClient) -> dict:
 
 
 def check_domains(client: MaximoClient) -> dict:
-    """Status values (synonym domains) and work log types (an ALN domain) the dataset uses."""
-    wanted = {"SRSTATUS": cat.SR_STATUSES, "WOSTATUS": cat.WO_STATUSES, "LOGTYPE": cat.LOG_TYPES}
+    """Status values (synonym domains) and work log types the dataset uses."""
+    wanted = {"SRSTATUS": cat.SR_STATUSES, "WOSTATUS": cat.WO_STATUSES, "LOGTYPE": tuple(dict.fromkeys(maximo_logtype(t) for t in cat.LOG_TYPES))}
     rows = client.query("mxapidomain", where=f"domainid in {quote_list(wanted)}",
                         select="domainid,domaintype,synonymdomain{value,maxvalue,defaults},alndomain{value}")
     result = {}
@@ -94,8 +94,9 @@ def check_domains(client: MaximoClient) -> dict:
         if row is None:
             result[domainid] = {"status": "missing", "reason": "domain not found"}
             continue
-        if domainid == "LOGTYPE":
-            result[domainid] = _present([v.get("value") for v in row.get("alndomain") or []], values)
+        if domainid == "LOGTYPE":  # an ALN domain on some instances, a synonym domain on others
+            found = [v.get("value") for v in (row.get("alndomain") or []) + (row.get("synonymdomain") or [])]
+            result[domainid] = _present(found, values)
             continue
         synonyms = {s.get("value"): s.get("maxvalue") for s in row.get("synonymdomain") or []}
         entry = _present(list(synonyms), values)

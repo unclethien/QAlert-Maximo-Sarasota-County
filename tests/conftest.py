@@ -75,7 +75,7 @@ class FakeMaximo:
     """
 
     def __init__(self, records=None, missing=(), whoami=None, page_size=None, refuse=(), renumber=False,
-                 refuse_dated_status=False, lose_status_answers=0):
+                 refuse_dated_status=False, lose_status_answers=0, refuse_status=None):
         self.records = {s: [self._with_href(s, i, r) for i, r in enumerate(rows)]
                         for s, rows in (records or {}).items()}
         self.missing = set(missing)
@@ -83,6 +83,7 @@ class FakeMaximo:
         self.renumber = renumber              # Maximo assigns its own TICKETID / WONUM
         self.refuse_dated_status = refuse_dated_status
         self.lose_status_answers = lose_status_answers  # apply the change, then answer 504 (n times)
+        self.refuse_status = refuse_status or {}  # structure -> status values changeStatus rejects
         self.whoami = whoami or {"userName": "loader", "personid": "LOADER"}
         self.page_size = page_size
         self.session = FakeSession(self.handle)
@@ -149,6 +150,10 @@ class FakeMaximo:
         assert headers.get("x-method-override") == "PATCH", "updates must be PATCH overrides"
         record = next(r for r in rows if r["href"] == url.split("?")[0])
         if params.get("action") == "wsmethod:changeStatus":
+            if payload["status"] in self.refuse_status.get(structure, ()):
+                return FakeResponse(400, {"Error": {"reasonCode": "BMXAA4295E",
+                                                    "message": f"Status {payload['status']} is not in the value list."}},
+                                    url=url)
             if self.refuse_dated_status and "date" in payload:
                 return FakeResponse(400, {"Error": {"reasonCode": "BMXAA4590E",
                                                     "message": "The status date cannot be in the past."}}, url=url)

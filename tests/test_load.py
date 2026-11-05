@@ -1,7 +1,8 @@
 import csv
 
+from loader import mapping
 from loader.config import cat
-from loader.load import Dataset, Loader, write_answer_key
+from loader.load import DEFAULT_DROP, Dataset, Loader, write_answer_key
 from loader.manifest import Manifest
 from loader.verify import Verifier
 
@@ -40,7 +41,7 @@ def test_full_load_then_rerun_creates_nothing(fake_maximo, tmp_path):
     assert len(fake.records["mxapisr"]) == 65 and len(fake.records["mxapiwodetail"]) == 41
     assert sum(len(r.get("worklog", [])) for k in ("mxapisr", "mxapiwodetail") for r in fake.records[k]) == len(DATA.worklogs)
     final = {r["TICKETID"]: r["STATUS"] for r in DATA.srs} | {r["WONUM"]: r["STATUS"] for r in DATA.wos}
-    assert all(r["status"] == final[r["ticketid"]] for r in fake.records["mxapisr"])
+    assert all(r["status"] == mapping.maximo_status("sr", final[r["ticketid"]]) for r in fake.records["mxapisr"])
     assert all(r["status"] == final[r["wonum"]] for r in fake.records["mxapiwodetail"])
     assert all(r["classstructureid"].startswith("70") for r in fake.records["mxapisr"])
 
@@ -111,13 +112,13 @@ def test_verify_matches_after_load_and_flags_a_changed_field(fake_maximo, tmp_pa
     _load(fake, tmp_path, only=["SR800008", "SR800001"])
     lines = []
     manifest = Manifest(tmp_path / "manifest.json")
-    verifier = Verifier(fake.client(), manifest, DATA, drop=("FAILURECODE", "PROBLEMCODE"), log=lines.append)
+    verifier = Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append)
     assert verifier.run(only=["SR800008", "SR800001"]) == 0, "\n".join(lines)
     assert verifier.ok == 3
 
     fake.records["mxapisr"][0]["description"] = "changed by hand"
     lines.clear()
-    verifier = Verifier(fake.client(), manifest, DATA, drop=("FAILURECODE", "PROBLEMCODE"), log=lines.append)
+    verifier = Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append)
     assert verifier.run(only=["SR800008", "SR800001"]) == 1
     assert any("description: expected" in line for line in lines)
 
@@ -186,5 +187,47 @@ def test_verify_accepts_renumbered_records(fake_maximo, tmp_path):
     _load(fake, tmp_path, only=["SR800008"])
     lines = []
     verifier = Verifier(fake.client(), Manifest(tmp_path / "manifest.json"), DATA,
-                        drop=("FAILURECODE", "PROBLEMCODE"), log=lines.append)
+                        drop=DEFAULT_DROP, log=lines.append)
     assert verifier.run(only=["SR800008"]) == 0, "\n".join(lines)
+
+
+def test_sr_in_progress_is_sent_as_maximo_inprog(fake_maximo, tmp_path):
+    # The real instance rejects the SRSTATUS synonym INPRG in changeStatus.
+    fake = fake_maximo(_instance(), refuse_status={"mxapisr": {"INPRG"}})
+    chains = ["SR800008", "SR800058"]  # one goes through in-progress to RESOLVED, one stops there
+    _, code, lines = _load(fake, tmp_path, only=chains)
+    assert code == 0, "\n".join(lines)
+    status = {r["ticketid"]: r["status"] for r in fake.records["mxapisr"]}
+    assert status == {"SR800008": "RESOLVED", "SR800058": "INPROG"}
+
+    writes = len(fake.writes())
+    again, code2, _ = _load(fake, tmp_path, only=chains)
+    assert code2 == 0 and len(fake.writes()) == writes and again.counts["status"]["EXISTS"] == 0
+
+    lines = []
+    verifier = Verifier(fake.client(), Manifest(tmp_path / "manifest.json"), DATA, drop=DEFAULT_DROP, log=lines.append)
+    assert verifier.run(only=chains) == 0, "\n".join(lines)
+
+
+def test_srs_go_in_progress_before_their_work_orders_start_and_resolve_after(fake_maximo, tmp_path):
+    fake = fake_maximo(_instance())
+    _load(fake, tmp_path, only=["SR800008"])
+    sr = fake.records["mxapisr"][0]["href"]
+    order = [(url.split("?")[0] == sr, body["status"]) for _, url, params, _, body in fake.session.calls
+             if params and params.get("action") == "wsmethod:changeStatus"]
+    assert order.index((True, "INPROG")) < order.index((False, "INPRG")) < order.index((True, "RESOLVED"))
+
+
+def test_a_record_is_not_closed_while_one_of_its_work_logs_is_missing(fake_maximo, tmp_path):
+    # SR800061 ends CLOSED, and its RESOLUTION work log fails on an instance without that log type.
+    fake = fake_maximo(_instance())
+    manifest = Manifest(tmp_path / "manifest.json")
+    loader = Loader(fake.client(), manifest, DATA, apply=True, log=[].append, state_dir=tmp_path)
+    loader._load_worklogs = lambda logs: None  # every work log fails to load
+    assert loader.run(only=["SR800061"]) == 1
+    sr = fake.records["mxapisr"][0]
+    assert sr["status"] == "RESOLVED"
+    assert loader.counts["status"]["FAILED"] == 1
+
+    _, code, _ = _load(fake, tmp_path, only=["SR800061"])  # the log loads now, so the SR closes
+    assert code == 0 and sr["status"] == "CLOSED"
