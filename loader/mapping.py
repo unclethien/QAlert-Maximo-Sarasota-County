@@ -123,7 +123,7 @@ INITIAL_STATUS = {"sr": "NEW", "wo": "WAPPR"}
 SR_IN_PROGRESS = "INPRG"
 # Statuses that put a record in history: Maximo refuses every later change, work logs included.
 HISTORY_STATUSES = {"sr": {"CLOSED"}, "wo": {"CLOSE", "CAN"}}
-WO_STEPS = {"WCONT": ["WCONT"], "SCHED": ["SCHED"], "INPRG": ["INPRG"], "COMP": ["INPRG", "COMP"],
+WO_STEPS = {"WAPPR": [], "WCONT": ["WCONT"], "SCHED": ["SCHED"], "INPRG": ["INPRG"], "COMP": ["INPRG", "COMP"],
             "CLOSE": ["INPRG", "COMP", "CLOSE"], "CAN": ["CAN"]}
 
 

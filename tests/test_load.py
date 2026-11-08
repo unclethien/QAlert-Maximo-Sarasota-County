@@ -231,3 +231,85 @@ def test_a_record_is_not_closed_while_one_of_its_work_logs_is_missing(fake_maxim
 
     _, code, _ = _load(fake, tmp_path, only=["SR800061"])  # the log loads now, so the SR closes
     assert code == 0 and sr["status"] == "CLOSED"
+
+
+HISTORY = Dataset(name="history")
+
+
+def test_history_is_its_own_dataset_without_an_answer_key():
+    assert len(HISTORY.srs) == 390 and len(HISTORY.wos) == 330 and HISTORY.answers == []
+    assert HISTORY.sr_header == DATA.sr_header and HISTORY.wo_header == DATA.wo_header
+    assert len(HISTORY.chains()) == 390  # every history WO follows one history SR
+    assert not {r["TICKETID"] for r in HISTORY.srs} & {r["TICKETID"] for r in DATA.srs}
+
+
+def test_history_loads_beside_the_pilot_and_a_rerun_creates_nothing(fake_maximo, tmp_path):
+    fake = fake_maximo(_instance())
+    _load(fake, tmp_path)
+    lines = []
+    manifest = tmp_path / "manifest.json"
+    loader = Loader(fake.client(), Manifest(manifest), HISTORY, apply=True, log=lines.append, state_dir=tmp_path)
+    assert loader.run(limit=40) == 0
+    assert len(fake.records["mxapisr"]) == 65 + 40
+    assert all(r["status"] == "CLOSE" for r in fake.records["mxapiwodetail"] if r["externalrefid"].startswith("WO27"))
+    assert not any("Answer key" in line for line in lines)  # the history is not scored
+    writes = len(fake.writes())
+    again = Loader(fake.client(), Manifest(manifest), HISTORY, apply=True, log=lambda _: None, state_dir=tmp_path)
+    assert again.run(limit=40) == 0 and len(fake.writes()) == writes
+    assert Verifier(fake.client(), Manifest(manifest, persist=False), HISTORY, drop=DEFAULT_DROP,
+                    log=lambda _: None).run(limit=40) == 0
+
+
+DRAFTS = Dataset(name="drafts")
+
+
+def test_drafts_are_work_orders_for_pilot_srs_only():
+    assert DRAFTS.srs == [] and DRAFTS.worklogs == [] and DRAFTS.answers == [] and len(DRAFTS.wos) == 35
+    assert DRAFTS.wo_header == DATA.wo_header
+    pilot_srs = {r["TICKETID"] for r in DATA.srs}
+    assert {w["ORIGRECORDID"] for w in DRAFTS.wos} <= pilot_srs
+    assert not {w["WONUM"] for w in DRAFTS.wos} & {w["WONUM"] for w in DATA.wos + HISTORY.wos}
+
+
+def test_drafts_load_after_the_pilot_link_to_its_srs_and_stay_wappr(fake_maximo, tmp_path):
+    fake = fake_maximo(_instance())
+    _load(fake, tmp_path)
+    manifest = tmp_path / "manifest.json"
+    loader = Loader(fake.client(), Manifest(manifest), DRAFTS, apply=True, log=lambda _: None, state_dir=tmp_path)
+    assert loader.run() == 0
+    drafts = [r for r in fake.records["mxapiwodetail"] if r["externalrefid"].startswith("WO295")]
+    assert len(drafts) == 35 and all(r["status"] == "WAPPR" for r in drafts)
+    loaded = {r["ticketid"] for r in fake.records["mxapisr"]}
+    origin = {w["WONUM"]: w["ORIGRECORDID"] for w in DRAFTS.wos}
+    assert all(r["origrecordid"] == origin[r["externalrefid"]] and r["origrecordid"] in loaded for r in drafts)
+    writes = len(fake.writes())
+    again = Loader(fake.client(), Manifest(manifest), DRAFTS, apply=True, log=lambda _: None, state_dir=tmp_path)
+    assert again.run() == 0 and len(fake.writes()) == writes
+    assert Verifier(fake.client(), Manifest(manifest, persist=False), DRAFTS, drop=DEFAULT_DROP,
+                    log=lambda _: None).run() == 0
+
+
+def test_drafts_before_the_pilot_are_refused_until_their_sr_is_loaded(fake_maximo, tmp_path):
+    fake = fake_maximo(_instance())
+    lines = []
+    loader = Loader(fake.client(), Manifest(tmp_path / "m.json"), DRAFTS, apply=True, log=lines.append,
+                    state_dir=tmp_path)
+    assert loader.run(limit=3) == 1
+    assert not fake.records["mxapiwodetail"]
+    assert sum("is not loaded yet" in line for line in lines) == 3
+
+
+def test_maximo_answer_key_keeps_our_classification_ids_for_scoring_by_name(tmp_path):
+    from loader.mapping import Remap
+    classes = {ours: str(7000 + i) for i, ours in enumerate(cat.CLASSIFICATIONS)}
+    rows = list(csv.DictReader(write_answer_key(DATA, Remap(classes=classes), tmp_path / "key.csv").open()))
+    assert [r["EXPECTED_CLASSSTRUCTUREID"] for r in rows] == [a["EXPECTED_CLASSSTRUCTUREID"] for a in DATA.answers]
+
+
+def test_load_and_verify_take_a_dataset_option():
+    import subprocess
+    import sys
+    for command in ("load", "verify"):
+        out = subprocess.run([sys.executable, "-m", "loader", command, "--help"], capture_output=True, text=True,
+                             check=True).stdout
+        assert "--dataset {pilot,history,drafts}" in out
