@@ -57,7 +57,7 @@ ANSWER_KEY_COLUMNS = [
     "MISSING_INFORMATION", "REQUIRED_INFO_GAP", "QALERT_ORIGIN", "SUBMITTED_VIA", "ENTERED_BY_EMPLOYEE_ID", "ENTERED_BY_NAME",
     "ENTERED_BY_DEPARTMENT", "ENTERED_BY_PHONE", "ENTERED_BY_EMAIL", "ENTERED_BY_ACTIVE", "ENTERED_BY_IN_MAXIMO",
     "FOLLOW_UP_CONTACT_TYPE", "FOLLOW_UP_CONTACT_NAME", "FOLLOW_UP_CONTACT_PHONE", "FOLLOW_UP_CONTACT_EMAIL",
-    "SUGGESTED_CLARIFICATION_QUESTION", "EXPECTED_PERSONGROUP", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION",
+    "SUGGESTED_CLARIFICATION_QUESTION", "EXPECTED_CLASSSTRUCTUREID", "EXPECTED_PERSONGROUP", "RELATED_RECORDS", "EXPECTED_RECOMMENDATION",
 ]
 
 # Planner notes on held SRs, by who entered the request.
@@ -599,6 +599,8 @@ def answer_row(s, sr_by_key, wo_by_key, request_id_by_key, work_orders, times):
         "FOLLOW_UP_CONTACT_TYPE": contact_type, "FOLLOW_UP_CONTACT_NAME": contact_name,
         "FOLLOW_UP_CONTACT_PHONE": contact_phone, "FOLLOW_UP_CONTACT_EMAIL": contact_email,
         "SUGGESTED_CLARIFICATION_QUESTION": s.get("question", ""),
+        # The classification of what the request really is, so a misclassified SR expects its corrected class.
+        "EXPECTED_CLASSSTRUCTUREID": cat.REQUEST_TYPES[s.get("true_type") or s["type"]]["classid"],
         # Another utility's customer gets no County team.
         "EXPECTED_PERSONGROUP": "" if s.get("other_utility") else cat.REQUEST_TYPES[s.get("true_type") or s["type"]]["persongroup"],
         "RELATED_RECORDS": ";".join(related),
