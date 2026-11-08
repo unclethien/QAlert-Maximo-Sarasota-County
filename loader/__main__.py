@@ -3,7 +3,9 @@
   inventory   read-only report of what the instance already holds (never writes)
   provision   create the org, site, persons, teams, statuses, classifications and job plans
               the load needs (dry run unless --apply)
-  load        load SRs, WOs and work logs, then set statuses (dry run unless --apply)
+  load        load SRs, WOs and work logs, then set statuses (dry run unless --apply);
+              --dataset history loads the AI training history instead of the pilot;
+              --dataset drafts loads draft work orders for pilot SRs (after the pilot)
   verify      read the loaded records back and compare them with the dataset (never writes)
 """
 
@@ -12,7 +14,7 @@ import sys
 
 from .client import MaximoClient, MaximoError
 from .config import Settings, load_settings
-from .load import COMMODITY_COLUMNS, FAILURE_CODE_COLUMNS
+from .load import COMMODITY_COLUMNS, DATASETS, FAILURE_CODE_COLUMNS
 from .provision import STEPS
 
 
@@ -59,21 +61,22 @@ def _drop(args: argparse.Namespace) -> list[str]:
 
 
 def cmd_load(args: argparse.Namespace) -> int:
-    from .load import Loader
+    from .load import Dataset, Loader
     from .manifest import Manifest
 
     settings = load_settings()
-    return Loader(make_client(settings), Manifest(instance=settings.url), apply=args.apply,
-                  drop=_drop(args)).run(args.only, args.limit)
+    return Loader(make_client(settings), Manifest(instance=settings.url), Dataset(name=args.dataset),
+                  apply=args.apply, drop=_drop(args)).run(args.only, args.limit)
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
     from .manifest import Manifest
+    from .load import Dataset
     from .verify import Verifier
 
     settings = load_settings()
     return Verifier(make_client(settings), Manifest(instance=settings.url, persist=False),
-                    drop=_drop(args)).run(args.only, args.limit)
+                    Dataset(name=args.dataset), drop=_drop(args)).run(args.only, args.limit)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -91,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=text)
         if name == "load":
             p.add_argument("--apply", action="store_true", help="write to Maximo; without it nothing is written")
+        p.add_argument("--dataset", choices=list(DATASETS), default="pilot",
+                       help="pilot: the 65 test SRs (default); history: the closed records the AI learns from; "
+                            "drafts: WAPPR work orders for pilot SRs that have none, loaded after the pilot")
         p.add_argument("--only", type=_ids, help="comma-separated TICKETIDs or WONUMs; each brings its whole chain")
         p.add_argument("--limit", type=int, help="only the first N chains (an SR with its WOs, or a lone WO)")
         p.add_argument("--keep-failure-codes", action="store_true",

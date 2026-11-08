@@ -216,6 +216,13 @@ def main():
     for sr in srs:
         if sr["DESCRIPTION"].split(",")[0] in ("Low Water Pressure", "Curb Stop"):
             check(sr["COMMODITY"] == "WATER_PIPE", f"{sr['TICKETID']}: Low Water Pressure and Curb Stop use WATER_PIPE")
+    # The expected classification differs from the SR's own only where the request was misclassified.
+    sr_class = {sr["TICKETID"]: sr["CLASSSTRUCTUREID"] for sr in srs}
+    for a in answers:
+        expected, misclassified = a["EXPECTED_CLASSSTRUCTUREID"], "Suggested reclassification:" in a["EXPECTED_RECOMMENDATION"]
+        check(expected in cat.CLASSIFICATIONS, f"{a['TICKETID']}: unknown expected classification {expected!r}")
+        check((expected != sr_class.get(a["TICKETID"])) == misclassified,
+              f"{a['TICKETID']}: expected classification must differ from the SR's exactly when it is misclassified")
     for a in answers:
         group = a["EXPECTED_PERSONGROUP"]
         check(group == "" or group in cat.PERSON_GROUPS, f"{a['TICKETID']}: unknown expected team {group!r}")

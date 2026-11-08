@@ -54,6 +54,8 @@ The canary, `SR800008`, is a water leak that has an SR work log and a follow-up 
 
 Options:
 
+- `--dataset history`: load or verify the AI training history (`data/maximo/history/`) instead of the pilot. It uses the same manifest, because the IDs do not overlap. It writes no answer key.
+- `--dataset drafts`: load or verify the draft work orders (`data/maximo/drafts/`), one WAPPR work order for each open pilot SR that names a team and has none. Each links to its pilot SR, so load the pilot first. Same manifest, no answer key.
 - `--only ID,ID`: load or verify only these SRs or WOs. Each SR brings its follow-up WOs and all their work logs.
 - `--limit N`: only the first N chains. A chain is an SR with its WOs, or a WO with no SR.
 - `provision --only org,site,...`: only some setup steps.
@@ -102,7 +104,7 @@ These steps run in order:
   - **SR "in progress".** The dataset uses `INPRG` for SRs, but Maximo's `changeStatus` refuses the `SRSTATUS` synonym `INPRG` ("not in the value list") even when the domain lists it. The loader therefore sends Maximo's standard `INPROG`, which is the same internal status. `verify` expects `INPROG`. WOs keep `INPRG`, which is standard on `WOSTATUS`.
   - **Order.** When a follow-up WO starts, Maximo also moves its SR to in progress, and it refuses the WO's change while the SR is still queued. So the loader applies statuses in the order work happens: SRs go to in progress first, then the WOs run, then the SRs are resolved or closed. Maximo resolves some SRs itself when their WO completes.
   - **Closing.** `CLOSED`, `CLOSE` and `CAN` put a record in history, and Maximo then refuses every change, new work logs included. If any of a record's work logs failed to load, the loader stops it one step short, reports the status as `FAILED`, and closes it on the run after the work log loads.
-- **Keys.** The loader sends our own `TICKETID` and `WONUM`. Each WO also gets `EXTERNALREFID` set to our WO number. If Maximo renumbers a record, `loader-state/manifest.json` records its number. `loader-state/answer-key-maximo.csv` then repeats the answer key with Maximo's numbers.
+- **Keys.** The loader sends our own `TICKETID` and `WONUM`. Each WO also gets `EXTERNALREFID` set to our WO number. If Maximo renumbers a record, `loader-state/manifest.json` records its number. `loader-state/answer-key-maximo.csv` then repeats the answer key with Maximo's numbers. Expected classifications keep our IDs (9101 and so on), because results are scored by classification name.
 - **Team codes.** Standard Maximo team codes (`PERSONGROUP`) hold 8 characters. The County's own code `SANCLINSP` has 9, so the loader writes it as `SANCLINS`. The dataset keeps `SANCLINSP`. `verify` uses the same mapping, and `loader-state/answer-key-maximo.csv` shows `SANCLINS`.
 - **Classification.** Maximo numbers classifications itself. The loader finds each classification by name, for example `WATER-LEAK`, and sends Maximo's number.
 

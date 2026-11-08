@@ -51,13 +51,20 @@ class Chain:
     wos: list[dict]
 
 
+# The pilot SRs are what the AI is tested on; the history is what it learns from. The drafts are
+# work orders for pilot SRs that have none yet, so they load after the pilot. Same columns.
+DATASETS = {"pilot": "maximo", "history": "maximo/history", "drafts": "maximo/drafts"}
+
+
 class Dataset:
-    def __init__(self, data_dir=DATA_DIR) -> None:
-        base = data_dir / "maximo"
+    def __init__(self, data_dir=DATA_DIR, name: str = "pilot") -> None:
+        base = data_dir / DATASETS[name]
+        self.name = name
         self.sr_header, self.srs = read_csv(base / "sr.csv")
         self.wo_header, self.wos = read_csv(base / "wo.csv")
         self.wl_header, self.worklogs = read_csv(base / "worklog.csv")
-        self.answer_header, self.answers = read_csv(data_dir / "answer-key.csv")
+        # Only the pilot is scored, so only the pilot has an answer key.
+        self.answer_header, self.answers = read_csv(data_dir / "answer-key.csv") if name == "pilot" else ([], [])
 
     def chains(self) -> list[Chain]:
         followups = defaultdict(list)
@@ -358,7 +365,7 @@ class Loader:
             self._apply_status("wo", row)
         for row in selection.srs:
             self._apply_status("sr", row)
-        if self.apply:
+        if self.apply and self.data.answers:
             self.log(f"Answer key with Maximo ids: "
                      f"{write_answer_key(self.data, remap, self.state_dir / 'answer-key-maximo.csv')}")
         return self.summary()

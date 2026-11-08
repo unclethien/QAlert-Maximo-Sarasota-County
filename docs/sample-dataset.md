@@ -63,6 +63,7 @@ The validator checks the following:
 - Every County request type has one required-information rule. Each missing-information SR names the rules it breaks, and each of those rules applies to its request type.
 - At least one look-alike sits at the same address as earlier work that was finished before it came in.
 - Every phone number and email stays in the fictional ranges.
+- Every SR has an expected classification. It differs from the SR's own classification exactly on the misclassified requests.
 
 ## Files
 
@@ -258,6 +259,7 @@ The answer key's `REQUIRED_INFO_GAP` lists the rules each missing-information SR
 - For staff-entered requests, the QAlert employee who entered the request: ID, name, department, phone, email, active flag, and whether that employee has a Maximo PERSON record. These columns are empty for app and web requests.
 - `FOLLOW_UP_CONTACT_TYPE`, `FOLLOW_UP_CONTACT_NAME`, `FOLLOW_UP_CONTACT_PHONE`, and `FOLLOW_UP_CONTACT_EMAIL`: who to ask if the request needs clarification. The type is `Resident`, `Entered-by employee`, `Department supervisor`, `Contact Center`, or `Owning group supervisor`.
 - `SUGGESTED_CLARIFICATION_QUESTION`.
+- `EXPECTED_CLASSSTRUCTUREID`: the classification the request should have. It differs from the SR's own classification only for the five misclassified requests, where it is the class of the correct type, for example 9401 (stormwater) for a flooding report filed as a water leak.
 - `EXPECTED_PERSONGROUP`: the team that should handle the request. It is blank for the two stormwater requests, which belong to Public Works, and for the three requests that are another party's job.
 - `RELATED_RECORDS` and `EXPECTED_RECOMMENDATION`.
 
@@ -285,6 +287,57 @@ Of the 28 flagged SRs (22 missing or incorrect information, 6 possibly not Count
 - 1 goes to the owning group's supervisor, because the request was anonymous.
 
 The recommendations encode the team's assumptions. Stakeholders should review them; this is the Sprint 2 "refine based on feedback" step.
+
+## Training history for MAS AI
+
+MAS AI's field value recommendations learn from past records before they can recommend a classification or a team. The 65 pilot SRs are the test set, so the model learns from a separate history instead.
+
+```bash
+python3 scripts/generate_training_history.py   # writes data/maximo/history/
+python3 scripts/validate_training_history.py   # exits 1 if any check fails
+```
+
+| File | Rows | What it represents |
+|---|---|---|
+| `data/maximo/history/sr.csv` | 390 | Past requests, 30 for each of the 13 classifications, all closed or resolved |
+| `data/maximo/history/wo.csv` | 330 | One closed follow-up WO for each request that needed a crew, with the right job plan and team |
+| `data/maximo/history/worklog.csv` | 720 | Crew notes on the WOs, and the note that closed each request with no crew |
+
+- **Same columns as the pilot files**, so the loader handles them with `--dataset history`.
+- **Dates:** everything happens between 2024-08-01 and 2026-07-31, and every pilot SR is reported on or after 2026-08-03.
+  - A `reportdate` filter can therefore separate history SRs from pilot SRs.
+  - It cannot separate WOs, because the pilot's past work goes back to 2025. The AI configuration filters on external IDs instead.
+- **IDs:** SR600001 onward, QAlert request 500001 onward, WO2700001 onward, and work log 3500001 onward. None of them overlaps the pilot.
+  - Records are numbered round by round, and each one is built from its own seed.
+  - Raising the size only adds records at the end. Records already loaded into Maximo never change.
+- **Kept apart from the pilot:** the history uses its own streets, resident names and wording. The validator checks that no history request repeats a pilot request's text. Residents give only an email, because the pilot uses up the fictional phone range.
+- **Labels are what the planner settled on:** `CLASSSTRUCTUREID` is the correct classification.
+  - 12% of the Utilities requests were filed under a nearby QAlert type. Their `DESCRIPTION` still starts with the type the resident picked, so the model has to read the request, not copy the type name.
+  - Every stormwater request was filed under a Utilities type, as they are in real life. Each was closed with a `RESOLUTION` note that refers it to Public Works.
+  - Backflow requests are resolved with a note that the device belongs to the property owner. Neither stormwater nor backflow requests get a work order.
+- **Size:** `PER_CLASS` in `scripts/history_catalog.py` sets the count per classification. Raise it if Maximo's **Check data requirement** asks for more data, then load the history again; only the new records are created.
+- **Coverage:** the misfiled pairs are general confusions (leak and main break, sewer issue and odor, and so on). They do not include every confusion in the pilot. For example, no history leak is filed as Sewer Issue, as SR800018 is. Read that SR's result with this in mind.
+
+See [mas-ai-configuration.md](mas-ai-configuration.md) for how the AI uses it.
+
+## Draft work orders for MAS AI
+
+Team recommendations and similar work orders show on a work order, but most pilot SRs are still waiting for review and have none. The drafts are the work orders a planner opens before deciding who goes:
+
+```bash
+python3 scripts/generate_draft_work_orders.py   # writes data/maximo/drafts/, after the pilot files
+python3 scripts/validate_draft_work_orders.py   # exits 1 if any check fails
+```
+
+| File | Rows | What it holds |
+|---|---|---|
+| `data/maximo/drafts/wo.csv` | 35 | One WAPPR work order for each open pilot SR that names a team and has no work order |
+| `data/maximo/drafts/sr.csv`, `worklog.csv` | 0 | Header only, so the loader reads every dataset the same way |
+
+- **Duplicate reports get no draft.** Several residents reporting one problem should end up on one work order: the one their cluster's first report already has, or that report's draft (WO2950024 for SR800044). Grouping them is what similar service requests suggest.
+- **Nothing is decided yet.** A draft has the SR's text and classification, and no team, job plan, crew, codes or field dates. The validator checks this.
+- **Created by the planner.** `REPORTEDBY` is the planner for the request type. The draft is dated within the hour after the SR, and never after the as-of time.
+- **The pilot files are not changed**, so its 65 SRs and 41 WOs stay as reviewed. The drafts are WO2950001 onward and load with `--dataset drafts`, after the pilot.
 
 ## Assumptions to revisit
 

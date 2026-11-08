@@ -180,6 +180,35 @@ uv run --no-project python -m loader load --apply    # should create 0
 - It also lists status dates under *Known limitation*. That is the limitation from step 6, not a failure.
 - The second `load --apply` should report `created 0` on every line. That shows a re-run is safe.
 
+## Step 7b: Load the training history (for MAS AI)
+
+MAS AI learns classification and team from past records. These are in a separate set of 390 closed or resolved SRs and 330 closed WOs: see [sample-dataset.md](sample-dataset.md#training-history-for-mas-ai). Load them the same way, with `--dataset history`:
+
+```bash
+uv run --no-project python -m loader load --dataset history --limit 3            # preview
+uv run --no-project python -m loader load --dataset history --limit 3 --apply    # load a few
+uv run --no-project python -m loader load --dataset history --apply              # load the rest
+uv run --no-project python -m loader verify --dataset history
+```
+
+- This is about 6,000 calls, 3,600 of them writes, so expect it to take a while. If it stops partway, run the same command again; it resumes.
+- History records are SR600001 to SR600390 and WO2700001 to WO2700330.
+- No answer key is written for the history, because only the pilot is scored.
+
+## Step 7c: Load the draft work orders (for MAS AI)
+
+Team recommendations and similar work orders show on a work order. Most pilot SRs are still waiting for review and have none, so `data/maximo/drafts/` holds 35 draft work orders, one for each open pilot SR that names a team. Duplicate reports get none, because they join their cluster's work order. Load the drafts **after the pilot**, because each one links to a pilot SR:
+
+```bash
+uv run --no-project python -m loader load --dataset drafts --limit 3            # preview
+uv run --no-project python -m loader load --dataset drafts --apply              # load all 35
+uv run --no-project python -m loader verify --dataset drafts
+```
+
+- The drafts are WO2950001 to WO2950035. They stay in status WAPPR, with no team, job plan or crew.
+- If a draft's SR is not loaded yet, the loader reports "is not loaded yet; re-run after it is" and creates nothing for it.
+- See [mas-ai-configuration.md](mas-ai-configuration.md#draft-work-orders).
+
 ## Step 8: Find the data in Maximo
 
 - **Service requests:** open **Service Requests** and filter Site = `SRQSITE`. You'll see SR800001 to SR800065.
@@ -195,6 +224,7 @@ Maximo may give a record a different number from ours. If it does, `loader-state
 | What you see | What it means | What to do |
 |---|---|---|
 | `BMXAA0024E` "The action ADD is not allowed" on person groups, domains or work types | The instance refuses REST writes to that application. | Add them in the UI (step 4), then run `provision --apply` again. |
+| `BMXAA7385E` "The person … is not a member of the … Person Group" on a work order | The work order's lead is not on its team. Teams set up before the training history was added may lack a lead it uses. | Run `provision --only person_groups`. It lists any missing member as a manual step. Add them in **Person Groups**, then run the same `load` again. |
 | `BMXAA0029E` "You are not authorized" when activating job plans | The API user can't change job plan status. | Activate them in **Job Plans** (step 4). |
 | Every SR or WO fails, mentioning the site | The API user's group has no access to `SRQSITE`. | Give the group access to the site in **Security Groups**. |
 | `SRQ` doesn't appear in **Organizations** | It's inactive, and the list shows only active organizations. | Clear the **Active** filter. Then set the clearing account and activate it. |
@@ -214,6 +244,8 @@ Maximo may give a record a different number from ours. If it does, `loader-state
 
 Options for `load` and `verify`:
 
+- `--dataset history`: the AI training history instead of the 65 pilot SRs (the default is `pilot`).
+- `--dataset drafts`: the 35 draft work orders for open pilot SRs. Load them after the pilot.
 - `--only SR800008,WO2900001`: only these records. Each brings its linked records.
 - `--limit 5`: only the first 5 chains.
 - `--keep-failure-codes`: send failure codes, once they exist in Maximo.
