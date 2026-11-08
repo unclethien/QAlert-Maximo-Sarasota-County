@@ -56,6 +56,23 @@ def test_dataset_teams_and_job_plans_are_complete():
     assert {p for ps in tree.values() for p in ps} <= set(cat.PROBLEM_CODES)
 
 
+def test_every_work_order_lead_is_a_member_of_its_team():
+    rows = [r for name in prov.TEAM_WO_FILES for r in prov.read_csv(name)]
+    members = prov.team_members(rows)
+    assert all(r[k] in members[r["PERSONGROUP"]] for r in rows if r["PERSONGROUP"]
+               for k in ("SUPERVISOR", "LEAD") if r[k])
+    assert "0831460" in members["RECLAIM"]  # a water lead on some training-history reclaim jobs
+
+
+def test_an_existing_team_missing_a_member_is_a_manual_step(fake_maximo):
+    fake = fake_maximo(_instance(mxapipersongroup=[
+        {"persongroup": "RECLAIM", "persongroupteam": [{"respparty": "0830144"}]}]))
+    p, _, _ = _run(fake, apply=True, only=["person_groups"])
+    step = next(m for m in p.manual if "person group RECLAIM" in m)
+    assert "0831460" in step and "0830144" not in step
+    assert fake.records["mxapipersongroup"][0]["persongroupteam"] == [{"respparty": "0830144"}]
+
+
 def test_payloads():
     assert prov.org_payload("SET1", "COMPSET1", "USD")["itemsetid"] == "SET1"
     assert prov.site_payload() == {"site": [{"siteid": "SRQSITE", "description": "Sarasota County pilot site",

@@ -42,6 +42,9 @@ FAILURE_STRUCTURES = ("mxapifailurelist", "mxfailurelist", "mxapifailurecode", "
 
 
 # -- data from the generated dataset --------------------------------------------------
+TEAM_WO_FILES = ("wo.csv", "history/wo.csv", "drafts/wo.csv")  # the pilot first, so its member order holds
+
+
 def read_csv(name: str) -> list[dict]:
     with (DATA_DIR / "maximo" / name).open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
@@ -145,6 +148,8 @@ class Provisioner:
         self.counts = Counter()
         self.manual: list[str] = []
         self.wo_rows = read_csv("wo.csv")
+        # Every WO dataset is loaded onto these teams, and Maximo refuses a WO whose lead is not a member.
+        self.team_rows = [row for name in TEAM_WO_FILES for row in read_csv(name)]
         self.org_href: str | None = None
 
     # -- reporting -----------------------------------------------------------------
@@ -255,18 +260,34 @@ class Provisioner:
                 self._create("mxapiperson", what, payload, row["DISPLAYNAME"])
 
     def person_groups(self) -> None:
-        members = team_members(self.wo_rows)
+        members = team_members(self.team_rows)
         groups = list(cat.PERSON_GROUPS)
-        existing = {g.get("persongroup") for g in self._find(
+        existing = {g.get("persongroup"): g for g in self._find(
             "mxapipersongroup", f"persongroup in {quote_list([maximo_team(g) for g in groups])}", "persongroup")}
         for group in groups:
             ours = maximo_team(group)
             what = f"person group {ours}" + (f" (dataset {group})" if ours != group else "")
             if ours in existing:
                 self._exists(what)
+                on_instance = self._team_of(existing[ours])
+                missing = [p for p in members[group] if on_instance is not None and p not in on_instance]
+                if missing:
+                    self._manual(what, f"add {', '.join(missing)} in People Groups; "
+                                       f"Maximo refuses a work order whose lead is not a member")
             else:
                 self._create("mxapipersongroup", what, person_group_payload(group, members[group]),
                              f"{len(members[group])} members")
+
+    def _team_of(self, group: JsonDict) -> set[str] | None:
+        """The group's members, or None when they cannot be read (then nothing is reported missing).
+        Manage lists them under ALLPERSONGROUPTEAM, a collection it links to rather than embeds."""
+        rows = group.get("allpersongroupteam", group.get("persongroupteam"))
+        if not isinstance(rows, list):
+            try:
+                rows = self.client.get(f"{group['href']}/allpersongroupteam", "respparty").get("member")
+            except (MaximoError, KeyError):
+                return None
+        return {r.get("respparty") for r in rows or []}
 
     def _domain_write_href(self, domainid: str, fallback: str) -> str:
         """Some instances (TechZone MAS 9) refuse domain writes through MXAPIDOMAIN with BMXAA0024E
