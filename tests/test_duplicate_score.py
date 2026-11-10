@@ -15,6 +15,7 @@ SCRIPT = ROOT / "scripts" / "autoscript" / "srqdupscore.py"
 ns: dict = {}
 exec(compile(SCRIPT.read_text(), str(SCRIPT), "exec"), ns)
 coordinates, distance_m, duplicate_score = ns["coordinates"], ns["distance_m"], ns["duplicate_score"]
+deductions = ns["deductions"]
 
 SHOW_AT = 85  # a duplicate score at or above this marks a likely duplicate in the AISIMSR dialog
 # The AI scored every pilot pair between 83 and 97 on TechZone (2026-11-08), so a true duplicate is
@@ -88,6 +89,23 @@ def test_same_type_reports_over_a_kilometre_apart_score_50_or_less():
                           coordinates(SRS[b]["DESCRIPTION_LONGDESCRIPTION"])) > 1000]
     assert far
     assert max(_score(a, b, AI_HIGH) for a, b in far) <= 50
+
+
+@pytest.mark.parametrize("ai", range(80, 101))
+@pytest.mark.parametrize("meters", [None, 0, 150, 400, 575, 999, 6107])
+@pytest.mark.parametrize("days", [None, 0, 3, 6, 14, 25])
+def test_deductions_add_up_to_the_ai_score(ai, meters, days):
+    score, distance_pts, time_pts = deductions(ai, meters, days)
+    assert score == duplicate_score(ai, meters, days)
+    assert score + distance_pts + time_pts == ai
+    assert distance_pts >= 0 and time_pts >= 0
+
+
+def test_deductions_for_the_willowmarsh_match_and_the_true_duplicate():
+    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR800044", "SR800025"))
+    assert deductions(93, distance_m(a, b), 25) == (33, 46, 14)
+    assert deductions(97, 12, 2) == (97, 0, 0)
+    assert deductions(92, 30, 42) == (64, 0, 28)
 
 
 def test_an_sr_without_a_map_link_ranks_below_located_matches():

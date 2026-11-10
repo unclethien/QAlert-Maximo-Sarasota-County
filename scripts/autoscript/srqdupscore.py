@@ -8,14 +8,16 @@
 #     AI score x location factor x time factor
 #
 # so a same-type report at another address lands near 46, and a same-address report a few hours
-# later keeps its AI score. The AISIMSR dialog sorts on it (relationship AISIMSRPAIR).
+# later keeps its AI score. The AISIMSR dialog sorts on it (relationship AISIMSRPAIR) and shows the
+# points each factor took off (DUPDISTPTS, DUPTIMEPTS), which add up with it to the AI score.
 #
 # Location comes from the Maps link QAlert writes into the long description
 # (".../maps/search/<lat>,<lon>"), because the SRs' service address holds no coordinates.
 #
 # Runs from an action launch point (action SRQDUPSCORE), called by an escalation on MAXAISIMILAROBJ
-# with condition aicfgname='SRSIMILARITY' and dupscore is null. The result goes into DUPSCORE, a
-# custom INTEGER attribute added to MAXAISIMILAROBJ in Database Configuration.
+# with condition aicfgname='SRSIMILARITY' and (dupscore is null or duptimepts is null). The results
+# go into DUPSCORE, DUPDISTPTS and DUPTIMEPTS, custom INTEGER attributes added to MAXAISIMILAROBJ in
+# Database Configuration.
 #
 # The scoring functions are plain Python so tests/test_duplicate_score.py can run them against the
 # pilot data outside Maximo. Maximo's Jython has no standard library, so the only import is the
@@ -95,12 +97,25 @@ def time_factor(days):
     return TIME_LATER
 
 
-def duplicate_score(ai_score, meters, days):
-    """The AI score weighted by distance and time, rounded half up to a whole number.
+def _round(x):
+    """Half up to a whole number. By hand because round() differs: Jython 2 rounds .5 up, Python 3 to even."""
+    return int(x + 0.5)
 
-    Rounded by hand because round() differs: Jython 2 rounds .5 up, Python 3 rounds it to even.
+
+def duplicate_score(ai_score, meters, days):
+    """The AI score weighted by distance and time, rounded to a whole number."""
+    return _round(ai_score * location_factor(meters) * time_factor(days))
+
+
+def deductions(ai_score, meters, days):
+    """(duplicate score, points taken off for distance, points taken off for time).
+
+    Distance is applied first, then time, so the three always add up to the AI score and a factor
+    of 1.0 takes off nothing.
     """
-    return int(ai_score * location_factor(meters) * time_factor(days) + 0.5)
+    after_distance = _round(ai_score * location_factor(meters))
+    score = duplicate_score(ai_score, meters, days)
+    return score, ai_score - after_distance, after_distance - score
 
 
 # ---- Maximo side -----------------------------------------------------------------------------
@@ -119,7 +134,10 @@ def _days_between(a, b):
 
 
 def score_pair(pair):
-    """Set DUPSCORE on one MAXAISIMILAROBJ row. Returns the score, or None if it was skipped."""
+    """Set DUPSCORE, DUPDISTPTS and DUPTIMEPTS on one MAXAISIMILAROBJ row.
+
+    Returns the score, or None if the row was skipped.
+    """
     if pair.getString("OBJECTNAME") != "SR" or pair.getString("AICFGNAME") != CONFIG:
         return None
     a, b = _sr(pair, "OBJECTID"), _sr(pair, "SIMILARTOOBJECTID")
@@ -127,8 +145,10 @@ def score_pair(pair):
         return None
     meters = distance_m(coordinates(a.getString("DESCRIPTION_LONGDESCRIPTION")),
                         coordinates(b.getString("DESCRIPTION_LONGDESCRIPTION")))
-    score = duplicate_score(pair.getInt("SCORE"), meters, _days_between(a, b))
+    score, distance_pts, time_pts = deductions(pair.getInt("SCORE"), meters, _days_between(a, b))
     pair.setValue("DUPSCORE", score)
+    pair.setValue("DUPDISTPTS", distance_pts)
+    pair.setValue("DUPTIMEPTS", time_pts)
     return score
 
 
