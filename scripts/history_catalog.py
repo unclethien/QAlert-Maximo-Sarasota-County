@@ -6,7 +6,7 @@ residents or wording with them. Every name, street and sentence here is invented
 """
 
 HISTORY_SEED = 20261106
-PER_CLASS = 30  # SRs per classification; raise it if Maximo's data check asks for more
+PER_CLASS = 90  # SRs per classification. The mcc template asks watsonx.ai for extra examples of any value with fewer than 50 training records (its training split is about two thirds), and that step fails on TechZone, so every value gets enough to skip it.
 
 # History dates end the day before the pilot window starts, so a REPORTDATE filter separates them.
 HISTORY_START = "2024-08-01"
