@@ -182,7 +182,7 @@ uv run --no-project python -m loader load --apply    # should create 0
 
 ## Step 7b: Load the training history (for MAS AI)
 
-MAS AI learns classification and team from past records. These are in a separate set of 390 closed or resolved SRs and 330 closed WOs: see [sample-dataset.md](sample-dataset.md#training-history-for-mas-ai). Load them the same way, with `--dataset history`:
+MAS AI learns classification and team from past records. These are in a separate set of 1,170 closed or resolved SRs and 990 closed WOs: see [sample-dataset.md](sample-dataset.md#training-history-for-mas-ai). Load them the same way, with `--dataset history`:
 
 ```bash
 uv run --no-project python -m loader load --dataset history --limit 3            # preview
@@ -192,7 +192,7 @@ uv run --no-project python -m loader verify --dataset history
 ```
 
 - This is about 6,000 calls, 3,600 of them writes, so expect it to take a while. If it stops partway, run the same command again; it resumes.
-- History records are SR600001 to SR600390 and WO2700001 to WO2700330.
+- History records are SR600001 to SR601170 and WO2700001 to WO2700990.
 - No answer key is written for the history, because only the pilot is scored.
 
 ## Step 7c: Load the draft work orders (for MAS AI)

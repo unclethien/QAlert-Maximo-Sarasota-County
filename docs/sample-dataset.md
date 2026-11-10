@@ -299,9 +299,9 @@ python3 scripts/validate_training_history.py   # exits 1 if any check fails
 
 | File | Rows | What it represents |
 |---|---|---|
-| `data/maximo/history/sr.csv` | 390 | Past requests, 30 for each of the 13 classifications, all closed or resolved |
-| `data/maximo/history/wo.csv` | 330 | One closed follow-up WO for each request that needed a crew, with the right job plan and team |
-| `data/maximo/history/worklog.csv` | 720 | Crew notes on the WOs, and the note that closed each request with no crew |
+| `data/maximo/history/sr.csv` | 1,170 | Past requests, 90 for each of the 13 classifications, all closed or resolved |
+| `data/maximo/history/wo.csv` | 990 | One closed follow-up WO for each request that needed a crew, with the right job plan and team |
+| `data/maximo/history/worklog.csv` | 2,160 | Crew notes on the WOs, and the note that closed each request with no crew |
 
 - **Same columns as the pilot files**, so the loader handles them with `--dataset history`.
 - **Dates:** everything happens between 2024-08-01 and 2026-07-31, and every pilot SR is reported on or after 2026-08-03.

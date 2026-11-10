@@ -237,9 +237,12 @@ HISTORY = Dataset(name="history")
 
 
 def test_history_is_its_own_dataset_without_an_answer_key():
-    assert len(HISTORY.srs) == 390 and len(HISTORY.wos) == 330 and HISTORY.answers == []
+    import history_catalog as hc  # on sys.path through loader.config
+
+    n_srs = hc.PER_CLASS * len(cat.REQUEST_TYPES)
+    assert len(HISTORY.srs) == n_srs and len(HISTORY.wos) == 11 * hc.PER_CLASS and HISTORY.answers == []
     assert HISTORY.sr_header == DATA.sr_header and HISTORY.wo_header == DATA.wo_header
-    assert len(HISTORY.chains()) == 390  # every history WO follows one history SR
+    assert len(HISTORY.chains()) == n_srs  # every history WO follows one history SR
     assert not {r["TICKETID"] for r in HISTORY.srs} & {r["TICKETID"] for r in DATA.srs}
 
 
