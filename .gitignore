@@ -23,3 +23,9 @@ dist/
 loader-state/
 .venv/
 .pytest_cache/
+
+# Local tooling and run output. Never commit.
+.claude/
+.bob/
+logs/
+audit.log
