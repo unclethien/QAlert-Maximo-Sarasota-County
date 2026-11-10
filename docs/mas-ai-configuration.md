@@ -273,10 +273,11 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
 
    | Query Clause Name | Query Clause | What it picks |
    |---|---|---|
-   | `SRSIMILARITYCFGFILTER` | `siteid='SRQSITE' and externalrecid like '7%'` | The reports a new one is compared with: all 65 pilot SRs, including the resolved first reports of each cluster |
-   | `SRSIMILARITYINFFILTER` | `siteid='SRQSITE' and externalrecid like '7%' and status in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue in ('NEW','QUEUED','PENDING','INPROG'))` | The reports that get suggestions: the open ones a reviewer is still vetting (45) |
+   | `SRSIMILARITYCFGFILTER` | `siteid='SRQSITE' and (externalrecid like '7%' or externalrecid is null) and status not in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue='CANCELLED')` | The reports a new one is compared with: the pilot SRs and any SR entered in Maximo, including the resolved first reports of each cluster, but not cancelled ones |
+   | `SRSIMILARITYINFFILTER` | `siteid='SRQSITE' and (externalrecid like '7%' or externalrecid is null) and status in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue in ('NEW','QUEUED','PENDING','INPROG'))` | The reports that get suggestions: the open ones a reviewer is still vetting (45 pilot SRs, plus any new one) |
 
-   - The training history is left out on purpose. It is all closed, and its streets differ from the pilot's, so it would only slow the comparison.
+   - The training history is left out on purpose (its external IDs start with 5). It is all closed, and its streets differ from the pilot's, so it would only slow the comparison.
+   - `externalrecid is null` takes in SRs created in Maximo, including with **Duplicate**, which does not copy the external ID. Without it a new SR never gets suggestions. Cancelled SRs are left out so a cancelled report and its copy do not top each other's list at 100.
 
 3. **Query templates.** Still in `MXAPISR`, click **More actions > Query Template** and add two templates. Add the same four attributes to both: `ticketuid`, `description`, `description_longdescription`, `reportdate`.
 
@@ -326,6 +327,7 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    - Click **Save**, then **Actions > Activate**, then **Actions > Create model**.
    - Training starts at once and the configuration list shows **Model status Ready** when it ends. The log only records the start; use **Actions > Check model status** for progress.
    - Results come from the AIINFJOB cron task, whose `DFLTINF` instance runs hourly by default (training is AITRAINJOB's `WOAI` instance, every 5 minutes). For the pilot, set `DFLTINF` to every 5 minutes and use **Reload Request**. Each run handles 10 open SRs (the inferencing template's page size), so the 45 open pilot SRs take about 25 minutes.
+   - After that first pass, a run picks up only SRs created or changed since the last one. On TechZone an SR got its suggestions about 5 minutes after it was saved inside the filter; one that was already outside it when the filter changed got nothing until it was saved again.
 
 6. **The duplicate score.** The AI's score is text only. Pilot SRs all read "*Type*, *address*" over the same Customer, Address and Map layout, so two sewer odor reports 6 km apart score 93 against 97 for the true duplicate. The duplicate score adds place and time:
 
@@ -336,19 +338,22 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    | Location, from the Maps link in each long description | 1.0 up to 150 m apart, falling in a straight line to 0.5 at 1 km and beyond; 0.75 if either SR has no Maps link |
    | Time, days between the two report dates | 1.0 up to 3 days, 0.85 up to 14 days, 0.7 beyond |
 
+   The dialog also shows the points each factor took off: distance first, then time, so `dupscore + distance deduction + time deduction` is the AI score. For SR800044 against SR800025 (6.1 km and 25 days apart) that is 33 + 46 + 14 = 93.
+
    A duplicate score of 85 or more marks a likely duplicate. The pilot's duplicates sit within 78 m and 2.1 days of the first report; wrong matches are 1.3 km or more apart, and look-alikes at the same place come 6 to 42 days later. The coordinates come from the Maps link because the SRs' service address rows hold none. The factors are in `scripts/autoscript/srqdupscore.py` and tested in `tests/test_duplicate_score.py`.
 
    1. **Back up.** Save the current `MAXAISIMILAROBJ` rows, for example through the API with the `MAXAISIMILARSR` relationship on `MXAPISR`. They are AI output, so the next AIINFJOB run would also rebuild them.
-   2. **Add the column.** In **Database Configuration**, open `MAXAISIMILAROBJ` and add attribute `DUPSCORE`, type `INTEGER`, not required. Save. Applying it is a structural change, so it needs admin mode:
+   2. **Add the columns.** In **Database Configuration**, open `MAXAISIMILAROBJ` and add three attributes, each type `INTEGER`, not required: `DUPSCORE` (Duplicate score), `DUPDISTPTS` (Distance deduction) and `DUPTIMEPTS` (Time deduction). Save. Applying it is a structural change, so it needs admin mode:
       - Admin mode needs `mail.smtp.host` and `mxe.adminEmail` set in **System Properties** (Live Refresh after each). It e-mails the administrator and, with no mail server, logs "BMXAA0259E - The e-mail cannot be sent", but it still turns on after its countdown. Everyone is signed out when the countdown ends, so warn other users first.
       - Every admin mode and structural step asks for an electronic signature. The password is your Manage **e-signature key**, not your sign-in password. Set it first from your profile menu (**Set or Modify E-signature**). Your sign-in password fails with BMXAA3840E and counts as a failed login.
       - With admin mode on, use **Apply Configuration Changes**, tick the backup box and click **Start Configuring the Database**. Use **Refresh Status** until it reads "ConfigDB completed without errors". Then turn admin mode off; escalations do not run while it is on.
    3. **The script.** In **Automation Scripts**, click **More Actions > Create > Script with Action Launch Point**. Launch point `SRQDUPSCORE` on object `MAXAISIMILAROBJ`, active; the action `SRQDUPSCORE` fills in. Script `SRQDUPSCORE`, language `python`, log level `ERROR`, no variables. Paste the source of `scripts/autoscript/srqdupscore.py` and click **Create**.
-   4. **The escalation.** In **Escalations**, create `SRQDUPSCORE`, applies to `MAXAISIMILAROBJ`, condition `aicfgname='SRSIMILARITY' and dupscore is null`, schedule every 5 minutes. Add one escalation point with no elapsed time and no condition, with action `SRQDUPSCORE` on its **Actions** tab. Save, then **More Actions > Activate/Deactivate Escalation**. Maximo creates cron task instance `ESCSRQDUPSCORE` under `ESCALATION`.
-   - Each run scores every pair that has none, so new AI results are scored within 5 minutes. On TechZone the first run scored all 450 pairs in one pass.
+   4. **The escalation.** In **Escalations**, create `SRQDUPSCORE`, applies to `MAXAISIMILAROBJ`, condition `aicfgname='SRSIMILARITY' and (dupscore is null or duptimepts is null)`, schedule every 5 minutes. Add one escalation point with no elapsed time and no condition, tick its **Repeat?** box, and add action `SRQDUPSCORE` on its **Actions** tab. Without **Repeat?**, Maximo acts on each row only once, so rows scored before a change to the script or condition are never scored again; the condition alone stops a filled row from being processed twice. Save, then **More Actions > Activate/Deactivate Escalation**. Maximo creates cron task instance `ESCSRQDUPSCORE` under `ESCALATION`.
+   - Each run scores every pair that has none, so new AI results are scored within 5 minutes. The `duptimepts is null` part also re-scores rows from before the deduction columns were added. On TechZone the first run scored all 450 pairs in one pass.
 
 7. **The dialog.** In **Application Designer**, open the **Service Requests** application (`SR`).
    1. Click **Export Application Definition** and keep the file. It is the way back.
+      The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `sr-original.xml` is the SR application before any change, and `sr-aisimsr-v1.xml` to `v4` are each version imported since. v4 is the one in use, with the duplicate score and the two deduction columns.
    2. Add this dialog at the end of the XML, just before `</presentation>`, then import it with **Import Application Definition**:
 
       ```xml
@@ -364,7 +369,8 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
             <tablecol id="aisimsr_c3" dataattribute="AISIMSRTICKET.reportdate" label="Reported Date"/>
             <tablecol id="aisimsr_c4" dataattribute="AISIMSRTICKET.description" label="Summary"/>
             <tablecol id="aisimsr_c6" dataattribute="dupscore" label="Duplicate score"/>
-            <tablecol id="aisimsr_c5" dataattribute="score" label="Text match"/>
+            <tablecol id="aisimsr_c7" dataattribute="dupdistpts" label="Distance deduction"/>
+            <tablecol id="aisimsr_c8" dataattribute="duptimepts" label="Time deduction"/>
           </tablebody>
         </table>
         <buttongroup id="aisimsr_buttons">
@@ -376,7 +382,8 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    - This is IBM's sample dialog cut down to a read-only list. IBM's version also has a **Generate/Re-generate similarity** button and a **Close selected SRs** button. Both need custom Java or a script.
      - We leave out regenerate because the cron task refreshes the list.
      - We leave out close because the County wants duplicates grouped onto one work order, not closed. Grouping is the next section.
-   - Add the `DUPSCORE` column (step 6) before importing; the table sorts on it.
+   - Add the columns from step 6 before importing; the table sorts on `DUPSCORE`.
+   - The AI's own text match (`score`) is not shown. The duplicate score and the two deductions add up to it.
    - If the import is refused, add the same dialog with the **Create Dialogs** toolbar button instead.
 
 8. **The menu entry and access.**
@@ -384,7 +391,7 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    2. Click **Select Action > Add/Modify Select Action Menu**. Add a row with element type `OPTION` and key value `AISIMSR`, then save. Maximo opens the dialog whose ID matches the option name.
    3. In **Security Groups**, open each reviewer group. Under **Applications > Service Requests**, grant **Similar service requests from AI**. Sign out and back in.
 
-**Check it:** open SR800019 in classic **Service Requests** (Service Desk > Service Requests) and click **Select Action > Similar service requests from AI**. SR800017 should be first, with a duplicate score of 96, and every other row below 50. Then try SR800044: SR800046 first at 97, and SR800025 (the same problem 6 km away) at 33 although its text match is 93.
+**Check it:** open SR800019 in classic **Service Requests** (Service Desk > Service Requests) and click **Select Action > Similar service requests from AI**. SR800017 should be first, with a duplicate score of 96, and every other row below 50. Then try SR800044: SR800046 first at 97, and SR800025 (the same problem 6 km away) at 33, with 46 points taken off for distance and 14 for time (its AI text match is 93). On TechZone SR800044 was cancelled by mistake on 2026-11-10; its copy SR700044 (external ID 799044) shows the same list.
 
 Expected matches in the pilot:
 
@@ -628,6 +635,7 @@ Deactivate the four configurations (**Actions > Deactivate**). This stops the tr
 | The similar SR dialog is empty | The SR is not open, so it is not in `SRSIMILARITYINFFILTER`. Or AIINFJOB has not run since activation. Or the AI configuration is not named `SRSIMILARITY`, which the `AISIMSRPAIR` relationship expects. |
 | A duplicate is missing from the dialog | It is not among the 10 closest stored for that SR (`max_similarity_records`), or its report date is outside `history_days`. If you added a `dupscore` cut to `AISIMSRPAIR`, it may score below it. |
 | The Duplicate score column is empty | The `SRQDUPSCORE` escalation has not run yet (every 5 minutes), is not active, or admin mode is still on. Check the `ESCSRQDUPSCORE` instance under `ESCALATION` in **Cron Task Setup** and its **History** tab. |
+| The escalation runs but leaves the deduction columns empty | The condition was not saved, or escalation point 1 has **Repeat?** clear, so rows already processed once are skipped. Deactivate the escalation, set the condition from step 6, tick **Repeat?**, save and activate. A condition naming a column that does not exist yet fails with BMXAA3056E: add the columns first. |
 | A duplicate score looks too low for a real duplicate | One SR has no Maps link (factor 0.75), the reports are more than 150 m apart, or they came more than 3 days apart. The factors are at the top of `srqdupscore.py`. |
 | A similarity score looks wrong, or the list is not sorted by score | The dialog still uses IBM's `SR`-to-`SR` relationship, which reads the score by the listed SR only. Use `AISIMSRPAIR` and `AISIMSRTICKET` from step 1 and the dialog in step 7. |
 | The similar SR dialog lists 10 reports every time | Expected: it stores the 10 closest per SR and lists them all. Read the duplicate score; 85 or more is a likely duplicate. |
