@@ -13,6 +13,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import id_map
 import pilot_catalog as cat
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -65,6 +66,64 @@ def read_json(name):
     return json.loads((DATA / name).read_text(encoding="utf-8"))
 
 
+def check_structured_fields(srs, wos, request_by_id, employee_by_id, persons, points):
+    """The SR's structured fields carry what QAlert holds, by the mapping proposed to the County."""
+    active_people = {p["PERSONID"] for p in persons if p["STATUS"] == "ACTIVE"}
+    point_by_code = {p["ADDRESS_ID"]: p for p in points}
+    known = {(p["STREETNO"], p["STREETNAME"].upper(), p["CITY"]) for p in points}
+    codes = set(cat.SOURCE_CODES.values())
+    for sr in srs:
+        t = sr["TICKETID"]
+        req = request_by_id.get(int(sr["EXTERNALSYSTEM_TICKETID"]))
+        check(id_map.kind_of(t, "new") == "sr", f"{t}: SR number outside SR{cat.SR_START}+")
+        check(id_map.kind_of(sr["EXTERNALSYSTEM_TICKETID"], "new") == "request",
+              f"{t}: QAlert request {sr['EXTERNALSYSTEM_TICKETID']} outside {cat.REQUEST_START}+")
+        if not req:
+            continue
+        check(sr["SOURCE"] in codes and sr["SOURCE"] == cat.SOURCE_CODES.get(req["intakeMethod"] or req["origin"]),
+              f"{t}: SOURCE {sr['SOURCE']!r} does not match QAlert origin {req['origin']!r} / {req['intakeMethod']!r}")
+        check(sr["REPORTEDPRIORITY"] == str(req["priorityToDisplay"]),
+              f"{t}: REPORTEDPRIORITY {sr['REPORTEDPRIORITY']!r} differs from QAlert priority {req['priorityToDisplay']}")
+
+        # Reporter: whoever entered the request; the resident is the affected contact.
+        emp = employee_by_id.get(req["employeeId"])
+        person = emp["id"] if emp and emp["id"] in active_people else ""
+        if req["intakeMethod"]:
+            reporter = (emp["phone"], emp["email"]) if emp else ("", "")
+        else:
+            reporter = (req["phone"], req["email"])
+        check(sr["REPORTEDBY"] == sr["AFFECTEDPERSON"] == person,
+              f"{t}: REPORTEDBY and AFFECTEDPERSON must be {person or 'blank'!r} (an active Maximo person entered it)")
+        check((sr["REPORTEDPHONE"], sr["REPORTEDEMAIL"]) == reporter, f"{t}: reported contact is not who entered it")
+        check((sr["AFFECTEDPHONE"], sr["AFFECTEDEMAIL"]) == (req["phone"], req["email"]),
+              f"{t}: affected contact differs from the QAlert resident")
+
+        # Service address: as written in QAlert, with the address point's code only when it matches one.
+        address = (req["streetNum"], req["streetName"], req["cityName"])
+        check((sr["STADDRNUMBER"], sr["STADDRSTREET"].upper(), sr["CITY"]) == address,
+              f"{t}: service address differs from the QAlert location")
+        check(sr["STREETADDRESS"] == " ".join(filter(None, (sr["STADDRNUMBER"], sr["STADDRSTREET"]))),
+              f"{t}: STREETADDRESS is not the number and street")
+        check((sr["STATEPROVINCE"], sr["COUNTRY"]) == (("FL", "US") if sr["CITY"] else ("", "")),
+              f"{t}: state and country are set exactly when there is a city")
+        point = point_by_code.get(sr["SADDRESSCODE"])
+        if sr["SADDRESSCODE"]:
+            check(point is not None and (point["STREETNO"], point["STREETNAME"], point["CITY"], point["ZIP"],
+                                         point["LATITUDE"], point["LONGITUDE"])
+                  == (sr["STADDRNUMBER"], sr["STADDRSTREET"], sr["CITY"], sr["POSTALCODE"], sr["LATITUDEY"], sr["LONGITUDEX"]),
+                  f"{t}: address {sr['SADDRESSCODE']} fields differ from the address point")
+        else:
+            check(address not in known, f"{t}: an address that matches an address point must carry its code")
+            check(sr["POSTALCODE"] == "", f"{t}: only a matched address has a ZIP")
+        if req["streetName"]:
+            check(sr["LATITUDEY"] != "" and (float(sr["LATITUDEY"]), float(sr["LONGITUDEX"])) == (req["latitude"], req["longitude"]),
+                  f"{t}: coordinates differ from where QAlert placed the request")
+        else:
+            check(sr["LATITUDEY"] == sr["LONGITUDEX"] == "", f"{t}: a request with no street has no coordinates")
+    for wo in wos:
+        check(id_map.kind_of(wo["WONUM"], "new") == "wo", f"{wo['WONUM']}: WO number outside WO{cat.WO_START}+")
+
+
 def main():
     srs = read_csv("maximo/sr.csv")
     wos = read_csv("maximo/wo.csv")
@@ -110,7 +169,6 @@ def main():
             check(match is None, f"{sr['TICKETID']}: resident-submitted SR must not have an 'Entered by' line")
             check(req["employeeId"] is None and req["intakeMethod"] is None,
                   f"{sr['TICKETID']}: resident-submitted request must not carry an employee or intake method")
-        check(sr["REPORTEDBY"] == "MWQSCINT", f"{sr['TICKETID']}: reporter is not the integration account")
     for wo in wos:
         if wo["ORIGRECORDID"]:
             check(wo["ORIGRECORDID"] in sr_ids, f"{wo['WONUM']}: origin {wo['ORIGRECORDID']} missing")
@@ -318,6 +376,11 @@ def main():
     check(any(a["FOLLOW_UP_CONTACT_TYPE"] == "Owning group supervisor" for a in answers),
           "at least one resident request must be anonymous")
 
+    check_structured_fields(srs, wos, request_by_id, employee_by_id, persons, points)
+    for log in logs:
+        check(id_map.kind_of(log["WORKLOGID"], "new") == "worklog",
+              f"work log {log['WORKLOGID']}: outside {cat.WORKLOG_START}+")
+
     # Maximo field lengths: PERSON.TITLE and PERSON.DEPARTMENT hold 30 characters.
     for p in persons:
         for col in ("TITLE", "DEPARTMENT"):
@@ -339,7 +402,8 @@ def main():
     for sr in srs:
         phones += LD_PHONES.findall(sr["DESCRIPTION_LONGDESCRIPTION"])
         emails += [e for e in LD_EMAILS.findall(sr["DESCRIPTION_LONGDESCRIPTION"]) if "google.com" not in e]
-        emails.append(sr["REPORTEDEMAIL"])
+        phones += filter(None, (sr["REPORTEDPHONE"], sr["AFFECTEDPHONE"]))
+        emails += filter(None, (sr["REPORTEDEMAIL"], sr["AFFECTEDEMAIL"]))
     for a in answers:
         phones += filter(None, (a["ENTERED_BY_PHONE"], a["FOLLOW_UP_CONTACT_PHONE"]))
         emails += filter(None, (a["ENTERED_BY_EMAIL"], a["FOLLOW_UP_CONTACT_EMAIL"]))

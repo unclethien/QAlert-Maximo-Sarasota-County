@@ -14,6 +14,7 @@ from pathlib import Path
 
 import history_catalog as hc
 import pilot_catalog as cat
+from generate_pilot_dataset import MAXIMO_SR_COLUMNS
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 PILOT, HISTORY = DATA / "maximo", DATA / "maximo" / "history"
@@ -39,7 +40,12 @@ def main():
     for name in ("sr", "wo", "worklog"):
         pilot_header, pilot_rows = read(PILOT / f"{name}.csv")
         header, rows = read(HISTORY / f"{name}.csv")
-        check(header == pilot_header, f"{name}.csv: history columns differ from the pilot's")
+        if name == "sr":
+            # The history was loaded before the pilot SRs carried structured fields, so it keeps
+            # the text-only shape.
+            check(header == MAXIMO_SR_COLUMNS, "sr.csv: history columns differ from the text-only SR shape")
+        else:
+            check(header == pilot_header, f"{name}.csv: history columns differ from the pilot's")
         files[name] = (rows, pilot_rows)
     (srs, pilot_srs), (wos, pilot_wos), (logs, pilot_logs) = files["sr"], files["wo"], files["worklog"]
     _, addresses = read(DATA / "reference" / "address-points.csv")

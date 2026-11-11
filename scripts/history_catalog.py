@@ -12,7 +12,7 @@ PER_CLASS = 90  # SRs per classification. The mcc template asks watsonx.ai for e
 HISTORY_START = "2024-08-01"
 HISTORY_END = "2026-07-31"
 
-# ID ranges below the pilot's (SR800001, request 700001, WO2900001, work log 3000001).
+# ID ranges below the pilot's (SR810001, request 710001, WO2910001, work log 3010001).
 SR_START, REQUEST_START, WO_START, WORKLOG_START = 600001, 500001, 2700001, 3500001
 
 # A share of requests arrive under the wrong QAlert type, and the planner corrects the

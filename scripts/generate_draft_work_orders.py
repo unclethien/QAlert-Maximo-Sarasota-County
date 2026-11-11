@@ -19,11 +19,11 @@ import csv
 from datetime import datetime, timedelta
 
 import pilot_catalog as cat
-from generate_pilot_dataset import (AS_OF, DATA, MAXIMO_SR_COLUMNS, MAXIMO_WO_COLUMNS, MAXIMO_WORKLOG_COLUMNS,
+from generate_pilot_dataset import (AS_OF, DATA, MAXIMO_WO_COLUMNS, MAXIMO_WORKLOG_COLUMNS, STRUCTURED_SR_COLUMNS,
                                     crew_for, maximo_date, write_csv)
 
 OUT = DATA / "maximo" / "drafts"
-WO_START = 2950001  # after the pilot's WO2900001-WO2900041, below nothing else
+WO_START = cat.DRAFT_WO_START  # after the pilot's WO2910001-WO2910041, below nothing else
 OPEN = ("NEW", "QUEUED", "PENDING")
 
 
@@ -75,7 +75,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     write_csv(OUT / "wo.csv", MAXIMO_WO_COLUMNS, drafts)
     # Header-only, so the loader reads every dataset the same way.
-    write_csv(OUT / "sr.csv", MAXIMO_SR_COLUMNS, [])
+    write_csv(OUT / "sr.csv", STRUCTURED_SR_COLUMNS, [])
     write_csv(OUT / "worklog.csv", MAXIMO_WORKLOG_COLUMNS, [])
     print(f"Draft work orders: {len(drafts)}")
 

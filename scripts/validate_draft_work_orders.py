@@ -11,6 +11,8 @@ import sys
 from datetime import datetime
 
 import generate_draft_work_orders as drafts_gen
+import id_map
+import pilot_catalog as cat
 from generate_pilot_dataset import AS_OF, DATA
 
 errors = []
@@ -59,7 +61,8 @@ def main():
     planners = {p["PERSONID"] for p in people}
     for d in drafts:
         tag, sr = d["WONUM"], sr_by_id.get(d["ORIGRECORDID"])
-        check(tag not in taken and tag.startswith("WO295"), f"{tag}: number outside WO2950001+ or already used")
+        check(tag not in taken and id_map.kind_of(tag, "new") == "draft",
+              f"{tag}: number outside WO{cat.DRAFT_WO_START}+ or already used")
         check(d["STATUS"] == "WAPPR" and d["ORIGRECORDCLASS"] == "SR" and d["WORKTYPE"] == "CM",
               f"{tag}: a draft is a WAPPR corrective work order that comes from an SR")
         check(not any(d[c] for c in ("PARENT", "PERSONGROUP", "OWNERGROUP", "JPNUM", "SUPERVISOR", "LEAD", "FAILURECODE",
