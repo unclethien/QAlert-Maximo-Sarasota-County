@@ -11,8 +11,9 @@
 # later keeps its AI score. The AISIMSR dialog sorts on it (relationship AISIMSRPAIR) and shows the
 # points each factor took off (DUPDISTPTS, DUPTIMEPTS), which add up with it to the AI score.
 #
-# Location comes from the Maps link QAlert writes into the long description
-# (".../maps/search/<lat>,<lon>"), because the SRs' service address holds no coordinates.
+# Location comes from the SR's service address (TKSERVICEADDRESS LATITUDEY and LONGITUDEX). An SR
+# whose service address has no coordinates, such as one from the text-only history, falls back to
+# the Maps link QAlert writes into the long description (".../maps/search/<lat>,<lon>").
 #
 # Runs from an action launch point (action SRQDUPSCORE), called by an escalation on MAXAISIMILAROBJ
 # with condition aicfgname='SRSIMILARITY' and (dupscore is null or duptimepts is null). The results
@@ -48,8 +49,11 @@ TIME_STEPS = ((3.0, 1.0), (14.0, 0.85))
 TIME_LATER = 0.7
 
 
-def coordinates(longdesc):
-    """(latitude, longitude) from the Maps link in the long description, or None."""
+def coordinates(longdesc, lat=None, lon=None):
+    """(latitude, longitude) from the service address when both are set, else from the Maps link
+    in the long description, else None."""
+    if lat not in (None, "") and lon not in (None, ""):
+        return float(lat), float(lon)
     text = longdesc or ""
     start = text.find(MAP_MARKER)
     if start < 0:
@@ -126,6 +130,24 @@ def _sr(pair, attribute):
     return srs.getMbo(0)
 
 
+def _service_point(sr):
+    """(lat, lon) from the SR's service address, or (None, None). The row is read through a set
+    scoped to the SR by ticket and class: its ORGID is another org's or blank on TechZone."""
+    try:
+        rows = sr.getMboSet("$SRQDUPADDR", "TKSERVICEADDRESS", "ticketid=:ticketid and class=:class")
+        row = rows.getMbo(0)
+        if row is None or row.isNull("LATITUDEY") or row.isNull("LONGITUDEX"):
+            return None, None
+        return row.getDouble("LATITUDEY"), row.getDouble("LONGITUDEX")
+    except:  # noqa: E722  an unknown relationship or attribute raises a Java exception
+        return None, None
+
+
+def _point(sr):
+    lat, lon = _service_point(sr)
+    return coordinates(sr.getString("DESCRIPTION_LONGDESCRIPTION"), lat, lon)
+
+
 def _days_between(a, b):
     da, db = a.getDate("REPORTDATE"), b.getDate("REPORTDATE")
     if da is None or db is None:
@@ -143,8 +165,7 @@ def score_pair(pair):
     a, b = _sr(pair, "OBJECTID"), _sr(pair, "SIMILARTOOBJECTID")
     if a is None or b is None:
         return None
-    meters = distance_m(coordinates(a.getString("DESCRIPTION_LONGDESCRIPTION")),
-                        coordinates(b.getString("DESCRIPTION_LONGDESCRIPTION")))
+    meters = distance_m(_point(a), _point(b))
     score, distance_pts, time_pts = deductions(pair.getInt("SCORE"), meters, _days_between(a, b))
     pair.setValue("DUPSCORE", score)
     pair.setValue("DUPDISTPTS", distance_pts)

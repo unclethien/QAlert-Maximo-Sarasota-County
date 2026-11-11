@@ -34,7 +34,9 @@ KEY = {r["TICKETID"]: r for r in _rows("data/answer-key.csv")}
 
 def _score(a, b, ai):
     sa, sb = SRS[a], SRS[b]
-    meters = distance_m(coordinates(sa["DESCRIPTION_LONGDESCRIPTION"]), coordinates(sb["DESCRIPTION_LONGDESCRIPTION"]))
+    # Scored as in Maximo: the service address coordinates, falling back to the Maps link.
+    meters = distance_m(coordinates(sa["DESCRIPTION_LONGDESCRIPTION"], *_field_point(sa)),
+                        coordinates(sb["DESCRIPTION_LONGDESCRIPTION"], *_field_point(sb)))
     days = abs((datetime.fromisoformat(sa["REPORTDATE"]) - datetime.fromisoformat(sb["REPORTDATE"])).total_seconds()) / 86400
     return duplicate_score(ai, meters, days)
 
@@ -47,28 +49,46 @@ def _pairs(scenario_word):
     return [(t, r) for t, row in KEY.items() if scenario_word in row["SCENARIO"] for r in _related_srs(t)]
 
 
+def _field_point(sr):
+    return (sr["LATITUDEY"], sr["LONGITUDEX"]) if sr["LATITUDEY"] else (None, None)
+
+
+def test_the_service_address_coordinates_agree_with_the_map_link():
+    located = [sr for sr in SRS.values() if sr["LATITUDEY"]]
+    assert len(located) == 63  # all but the two with no street
+    for sr in SRS.values():
+        assert coordinates(sr["DESCRIPTION_LONGDESCRIPTION"], *_field_point(sr)) == coordinates(
+            sr["DESCRIPTION_LONGDESCRIPTION"]), sr["TICKETID"]
+
+
+def test_the_service_address_wins_over_the_map_link():
+    assert coordinates("<a href='https://www.google.com/maps/search/27.1,-82.4'>Map</a>", "27.2", "-82.5") == (27.2, -82.5)
+    assert coordinates("no link", 27.2, -82.5) == (27.2, -82.5) and coordinates("no link", 27.2, None) is None
+    assert coordinates("no link", "", "") is None and coordinates("no link", "27.2", "-82.5") == (27.2, -82.5)
+
+
 def test_reads_the_map_link():
-    lat, lon = coordinates(SRS["SR800044"]["DESCRIPTION_LONGDESCRIPTION"])
+    lat, lon = coordinates(SRS["SR810044"]["DESCRIPTION_LONGDESCRIPTION"])
     assert (lat, lon) == pytest.approx((27.05563, -82.398293))
-    assert coordinates(SRS["SR800005"]["DESCRIPTION_LONGDESCRIPTION"]) is None
+    assert coordinates(SRS["SR810005"]["DESCRIPTION_LONGDESCRIPTION"]) is None
     assert coordinates("") is None and coordinates(None) is None
 
 
 def test_distance_between_the_gulfwren_and_willowmarsh_sewer_odors():
-    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR800044", "SR800025"))
+    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR810044", "SR810025"))
     assert distance_m(a, b) == pytest.approx(6107, abs=25)
     assert distance_m(a, a) == 0
     assert distance_m(a, None) is None
 
 
 def test_same_type_at_another_address_scores_40_to_50_on_location_alone():
-    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR800044", "SR800025"))
+    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR810044", "SR810025"))
     assert 40 <= duplicate_score(93, distance_m(a, b), 0) <= 50
-    assert _score("SR800044", "SR800025", 93) < 40  # and lower again, 25 days apart
+    assert _score("SR810044", "SR810025", 93) < 40  # and lower again, 25 days apart
 
 
 def test_the_true_duplicate_keeps_its_ai_score():
-    assert _score("SR800044", "SR800046", 97) == 97
+    assert _score("SR810044", "SR810046", 97) == 97
 
 
 @pytest.mark.parametrize("dup,first", _pairs("Duplicate cluster"))
@@ -102,7 +122,7 @@ def test_deductions_add_up_to_the_ai_score(ai, meters, days):
 
 
 def test_deductions_for_the_willowmarsh_match_and_the_true_duplicate():
-    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR800044", "SR800025"))
+    a, b = (coordinates(SRS[t]["DESCRIPTION_LONGDESCRIPTION"]) for t in ("SR810044", "SR810025"))
     assert deductions(93, distance_m(a, b), 25) == (33, 46, 14)
     assert deductions(97, 12, 2) == (97, 0, 0)
     assert deductions(92, 30, 42) == (64, 0, 28)
