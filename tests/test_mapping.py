@@ -14,13 +14,63 @@ def _followup():
 
 
 def test_sr_payload_sends_mapped_columns_and_skips_derived_and_blank():
-    row = _sr("SR800001")
+    row = _sr("SR810001")
     payload = mapping.sr_payload(row, mapping.Remap(classes={"9101": "1234"}))
-    assert payload["ticketid"] == "SR800001" and payload["externalrecid"] == "700001"
+    assert payload["ticketid"] == "SR810001" and payload["externalrecid"] == "710001"
     assert "externalsystem" not in payload and "externalsystem_ticketid" not in payload
     assert payload["classstructureid"] == "1234"
     assert "ownergroup" not in payload  # blank on every SR: the team belongs on the WO
     assert not {"status", "statusdate", "createdby", "creationdate", "class"} & set(payload)
+
+
+def _address(row):
+    payload = mapping.sr_payload(row, mapping.Remap())
+    assert not {c.lower() for c in mapping.SR_ADDRESS_COLUMNS} & set(payload)  # only in the child
+    child = payload[mapping.SR_ADDRESS_CHILD]
+    assert len(child) == 1
+    return child[0]
+
+
+def test_a_matched_address_sends_its_code_and_every_field():
+    row = next(r for r in DATA.srs if r["SADDRESSCODE"])
+    address = _address(row)
+    assert address["saddresscode"] == row["SADDRESSCODE"] and address["postalcode"] == row["POSTALCODE"]
+    assert address["streetaddress"] == f"{row['STADDRNUMBER']} {row['STADDRSTREET']}"
+    assert address["latitudey"] == float(row["LATITUDEY"]) and address["longitudex"] == float(row["LONGITUDEX"])
+    assert (address["stateprovince"], address["country"]) == ("FL", "US")
+
+
+def test_an_unmatched_address_is_sent_as_written_without_a_code():
+    row = next(r for r in DATA.srs if not r["SADDRESSCODE"] and r["STADDRSTREET"])
+    address = _address(row)
+    assert "saddresscode" not in address and "postalcode" not in address
+    assert address["staddrstreet"] == row["STADDRSTREET"] and address["city"] == row["CITY"]
+
+
+def test_a_request_with_no_street_sends_only_its_city():
+    row = next(r for r in DATA.srs if not r["STADDRSTREET"])
+    assert set(_address(row)) == {"city", "stateprovince", "country"}
+
+
+def test_reporter_fields_pass_through_and_a_blank_reporter_is_left_out():
+    resident = next(r for r in DATA.srs if r["SOURCE"] == "WEB" and r["REPORTEDEMAIL"])
+    payload = mapping.sr_payload(resident, mapping.Remap())
+    assert "reportedby" not in payload and "affectedperson" not in payload
+    assert payload["source"] == "WEB" and payload["reportedpriority"] == int(resident["REPORTEDPRIORITY"])
+    assert payload["reportedemail"] == payload["affectedemail"] == resident["REPORTEDEMAIL"]
+    staff = next(r for r in DATA.srs if r["REPORTEDBY"])
+    payload = mapping.sr_payload(staff, mapping.Remap())
+    assert payload["reportedby"] == payload["affectedperson"] == staff["REPORTEDBY"]
+    assert payload["source"] in ("PHONE", "EMAIL") and payload["reportedemail"] != payload.get("affectedemail")
+
+
+def test_the_text_only_history_still_maps():
+    history = Dataset(name="history")
+    payload = mapping.sr_payload(history.srs[0], mapping.Remap())
+    assert payload["reportedby"] == "MWQSCINT" and payload["ticketid"] == history.srs[0]["TICKETID"]
+    assert mapping.SR_ADDRESS_CHILD not in payload and "source" not in payload
+    assert set(mapping.dropped_columns("sr", history.sr_header, set())) == {
+        "CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE", "EXTERNALSYSTEM", "REPORTEDNAME", "AFFECTEDNAME"}
 
 
 def test_wo_payload_remaps_origin_and_keeps_our_id_as_external_ref():
@@ -46,8 +96,7 @@ def test_worklog_payload_is_a_child_row():
 
 def test_dropped_column_report_names_every_unsent_column():
     sr = mapping.dropped_columns("sr", DATA.sr_header, set())
-    assert set(sr) == {"CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE", "EXTERNALSYSTEM",
-                       "REPORTEDNAME", "AFFECTEDNAME"}
+    assert set(sr) == {"CLASS", "STATUS", "STATUSDATE", "CREATEDBY", "CREATIONDATE", "EXTERNALSYSTEM"}
     wo = mapping.dropped_columns("wo", DATA.wo_header, {"FAILURECODE", "PROBLEMCODE"})
     assert set(wo) == {"STATUS", "STATUSDATE", "FAILURECODE", "PROBLEMCODE"}
     assert set(mapping.dropped_columns("worklog", DATA.wl_header, set())) == {
@@ -69,19 +118,19 @@ def test_status_steps_resume_from_where_a_run_stopped():
 def test_chains_cover_every_record_once():
     chains = DATA.chains()
     assert sum(len(c.srs) for c in chains) == 65 and sum(len(c.wos) for c in chains) == 41
-    one = DATA.select(only=["SR800008"])
-    assert [r["TICKETID"] for r in one.srs] == ["SR800008"] and [w["WONUM"] for w in one.wos] == ["WO2900014"]
+    one = DATA.select(only=["SR810008"])
+    assert [r["TICKETID"] for r in one.srs] == ["SR810008"] and [w["WONUM"] for w in one.wos] == ["WO2910014"]
     assert len(DATA.select(limit=3).srs) == 3
 
 
 def test_manifest_writes_atomically_and_reloads(tmp_path):
     path = tmp_path / "manifest.json"
     m = Manifest(path)
-    m.record("sr", "SR800001", maximo_id="1001", href="h1")
-    m.set_status("sr", "SR800001", "QUEUED")
+    m.record("sr", "SR810001", maximo_id="1001", href="h1")
+    m.set_status("sr", "SR810001", "QUEUED")
     again = Manifest(path)
-    assert again.get("sr", "SR800001")["maximo_id"] == "1001"
-    assert again.get("sr", "SR800001")["status"] == "QUEUED"
+    assert again.get("sr", "SR810001")["maximo_id"] == "1001"
+    assert again.get("sr", "SR810001")["status"] == "QUEUED"
     assert not list(tmp_path.glob("*.tmp"))
 
 
@@ -101,3 +150,14 @@ def test_sr_in_progress_uses_maximo_inprog_and_reads_back_as_ours():
 def test_resolution_notes_are_written_as_update():
     row = next(w for w in DATA.worklogs if w["LOGTYPE"] == "RESOLUTION")
     assert mapping.worklog_payload(row)["logtype"] == "UPDATE"
+
+
+def test_every_pilot_sr_sends_one_address_row_and_no_history_sr_sends_one():
+    for row in DATA.srs:
+        payload = mapping.sr_payload(row, mapping.Remap())
+        assert len(payload[mapping.SR_ADDRESS_CHILD]) == 1 and isinstance(payload["reportedpriority"], int), row["TICKETID"]
+        child = payload[mapping.SR_ADDRESS_CHILD][0]
+        assert all(isinstance(child[k], float) for k in ("latitudey", "longitudex") if k in child)
+    for row in Dataset(name="history").srs:
+        payload = mapping.sr_payload(row, mapping.Remap())
+        assert mapping.SR_ADDRESS_CHILD not in payload and payload["reportedby"] == "MWQSCINT", row["TICKETID"]

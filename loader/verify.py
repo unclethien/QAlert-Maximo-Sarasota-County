@@ -26,9 +26,20 @@ def _norm(value):
     return value
 
 
-def compare(expected: dict, actual: dict) -> list[tuple[str, object, object]]:
+def compare(expected: dict, actual: dict, fold_case: bool = False) -> list[tuple[str, object, object]]:
     """(field, expected, actual) for every expected field Maximo holds differently."""
-    return [(k, v, actual.get(k)) for k, v in expected.items() if _norm(v) != _norm(actual.get(k))]
+    def norm(value):
+        value = _norm(value)
+        return value.lower() if fold_case and isinstance(value, str) else value
+    return [(k, v, actual.get(k)) for k, v in expected.items() if norm(v) != norm(actual.get(k))]
+
+
+def compare_address(expected: dict, rows) -> list[str]:
+    """The SR's one service address row against ours. Maximo uppercases the city, so text is
+    compared without case."""
+    if len(rows or []) != 1:
+        return [f"service address: expected one row, got {len(rows or [])}"]
+    return [f"service address {f}: expected {e!r}, got {a!r}" for f, e, a in compare(expected, rows[0], fold_case=True)]
 
 
 class Verifier:
@@ -54,7 +65,10 @@ class Verifier:
         expected = (mapping.sr_payload if kind == "sr" else mapping.wo_payload)(row, remap, drop)
         expected["status"] = mapping.maximo_status(kind, row["STATUS"])
         expected["ticketid" if kind == "sr" else "wonum"] = entry["maximo_id"]  # Maximo may renumber
+        address = (expected.pop(mapping.SR_ADDRESS_CHILD, None) or [None])[0]
         select = ",".join(sorted(set(expected) | {"statusdate"})) + ",worklog{createdate,description,logtype,createby}"
+        if address:
+            select += f",{mapping.SR_ADDRESS_CHILD}{{{','.join(sorted(address))}}}"
         try:
             actual = self.client.get(entry["href"], select)
         except MaximoError as e:
@@ -62,6 +76,8 @@ class Verifier:
             self.log(f"  ERROR    {what} - {e}")
             return
         problems = [f"{f}: expected {e!r}, got {a!r}" for f, e, a in compare(expected, actual)]
+        if address:
+            problems += compare_address(address, actual.get(mapping.SR_ADDRESS_CHILD))
         have = {_log_key(w.get("createdate"), w.get("description")) for w in actual.get("worklog") or []}
         problems += [f"work log {r['WORKLOGID']} not found ({r['CREATEDATE']})" for r in logs
                      if _log_key(r["CREATEDATE"], r["DESCRIPTION"]) not in have]

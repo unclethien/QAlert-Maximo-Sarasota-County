@@ -22,8 +22,8 @@ from .mapping import maximo_team
 from .config import DATA_DIR, ORGID, SITEID, Settings, cat
 
 DOMAIN_WRITE_STRUCTURE = "mxdomain"
-STEPS = ("org", "site", "persons", "person_groups", "statuses", "work_types", "classifications",
-         "job_plans", "failure_codes")
+STEPS = ("org", "site", "service_addresses", "persons", "person_groups", "statuses", "work_types",
+         "classifications", "job_plans", "failure_codes")
 
 # Our status values and the internal Maximo value each one is a synonym of. A value that
 # Maximo already has (as a synonym) is left alone. Standard SR statuses use INPROG internally.
@@ -45,8 +45,8 @@ FAILURE_STRUCTURES = ("mxapifailurelist", "mxfailurelist", "mxapifailurecode", "
 TEAM_WO_FILES = ("wo.csv", "history/wo.csv", "drafts/wo.csv")  # the pilot first, so its member order holds
 
 
-def read_csv(name: str) -> list[dict]:
-    with (DATA_DIR / "maximo" / name).open(newline="", encoding="utf-8") as f:
+def read_csv(name: str, folder: str = "maximo") -> list[dict]:
+    with (DATA_DIR / folder / name).open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -100,6 +100,20 @@ PERSON_FIELDS = {"personid": "PERSONID", "displayname": "DISPLAYNAME", "firstnam
 
 def person_payload(row: dict) -> JsonDict:
     return {attr: row[col] for attr, col in PERSON_FIELDS.items() if row.get(col)}
+
+
+SERVICE_ADDRESS_STRUCTURE = "mxapiseraddress"
+# Compared on a re-run; Maximo uppercases the city, and differences() ignores case.
+SERVICE_ADDRESS_COMPARED = ("staddrnumber", "staddrstreet", "city", "postalcode", "latitudey", "longitudex")
+
+
+def service_address_payload(row: dict) -> JsonDict:
+    """An address point from the GIS stand-in as a Maximo service address; SRs cite it by code."""
+    street = f"{row['STREETNO']} {row['STREETNAME']}"
+    return {"addresscode": row["ADDRESS_ID"], "orgid": ORGID, "siteid": SITEID, "description": street,
+            "staddrnumber": row["STREETNO"], "staddrstreet": row["STREETNAME"], "streetaddress": street,
+            "city": row["CITY"], "stateprovince": row["STATE"], "postalcode": row["ZIP"], "country": "US",
+            "latitudey": float(row["LATITUDE"]), "longitudex": float(row["LONGITUDE"])}
 
 
 def person_group_payload(group: str, members: list[str]) -> JsonDict:
@@ -244,6 +258,22 @@ class Provisioner:
                                            "until then Maximo refuses every SR and WO for it")
         except MaximoError as e:
             self._line("FAILED", f"site {SITEID}", str(e))
+
+    def service_addresses(self) -> None:
+        rows = read_csv("address-points.csv", folder="reference")
+        if not self.client.probe(SERVICE_ADDRESS_STRUCTURE)[0]:
+            self._manual("service addresses", f"no {SERVICE_ADDRESS_STRUCTURE.upper()}; create the {len(rows)} rows of "
+                                              f"data/reference/address-points.csv in Service Addresses for org {ORGID}")
+            return
+        existing = {a.get("addresscode"): a for a in self._find(
+            SERVICE_ADDRESS_STRUCTURE, f'orgid="{ORGID}"', "addresscode," + ",".join(SERVICE_ADDRESS_COMPARED))}
+        for row in rows:
+            payload = service_address_payload(row)
+            what = f"service address {row['ADDRESS_ID']}"
+            if row["ADDRESS_ID"] in existing:
+                self._exists(what, differences(existing[row["ADDRESS_ID"]], payload, SERVICE_ADDRESS_COMPARED))
+            else:
+                self._create(SERVICE_ADDRESS_STRUCTURE, what, payload, f"{payload['streetaddress']}, {row['CITY']}")
 
     def persons(self) -> None:
         rows = read_csv("person.csv")

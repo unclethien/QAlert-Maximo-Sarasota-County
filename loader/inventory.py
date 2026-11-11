@@ -76,11 +76,17 @@ def check_org_and_site(client: MaximoClient) -> dict:
 
 
 def check_record_counts(client: MaximoClient) -> dict:
-    return {
+    counts = {
         "status": "ok",
         "sr_at_site": client.count("mxapisr", f'siteid="{SITEID}"'),
         "wo_at_site": client.count("mxapiwodetail", f'siteid="{SITEID}"'),
     }
+    # The pilot SRs cite these by code; provision creates them from the GIS stand-in.
+    try:
+        counts["service_addresses_in_org"] = client.count("mxapiseraddress", f'orgid="{ORGID}"')
+    except MaximoError as e:
+        counts["service_addresses_in_org"] = f"unreadable ({e})"
+    return counts
 
 
 def check_domains(client: MaximoClient) -> dict:
@@ -199,6 +205,7 @@ def summarize(report: dict) -> str:
     else:
         out.append(f"  {'SRs at site':<24} {counts['sr_at_site']}")
         out.append(f"  {'WOs at site':<24} {counts['wo_at_site']}")
+        out.append(f"  {'service addresses (org)':<24} {counts.get('service_addresses_in_org', 'n/a')}")
     out.append(_line("SR key (externalrecid)", report["sr_attributes"]))
     out.append("Configuration values:")
     domains = report["domains"]
