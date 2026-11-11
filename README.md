@@ -23,6 +23,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 | Folder or file | What's inside |
 |---|---|
 | [`docs/sample-dataset.md`](docs/sample-dataset.md) | **Start here.** A plain-language guide to the whole dataset. |
+| [`docs/qalert-integration-proposal.md`](docs/qalert-integration-proposal.md) | A short proposal for the County: send QAlert's address, contact, channel and priority to Maximo as fields. |
 | [`data/answer-key.csv`](data/answer-key.csv) | **The most useful file.** One row per service request: what the AI should flag, who to contact, and what to ask. |
 | [`data/maximo/`](data/maximo) | The fake Maximo records: service requests (`sr.csv`), work orders (`wo.csv`), work logs (`worklog.csv`), and people (`person.csv`). |
 | [`data/qalert/`](data/qalert) | The fake QAlert records, including where each request came from (app, web portal, phone, or email) and the staff list (`employees.json`) used to look up who entered phone and email requests. |
@@ -32,7 +33,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 
 ## Reading the data
 
-- **`.csv` files** show as a table in your browser. Use the search box above the table to find a request, for example `SR800012`.
+- **`.csv` files** show as a table in your browser. Use the search box above the table to find a request, for example `SR810012`.
 - **`.json` files** show as text. The guide in [`docs/sample-dataset.md`](docs/sample-dataset.md) explains what they contain.
 
 ## Downloading files to open in Excel
@@ -45,7 +46,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 When something looks wrong or doesn't match how things really work, send Thien Nguyen:
 
 1. the file name, for example `answer-key.csv`;
-2. the request number, for example `SR800012`;
+2. the request number, for example `SR810012`;
 3. what you'd expect it to say instead.
 
 ## For developers

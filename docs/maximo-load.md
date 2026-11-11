@@ -44,13 +44,13 @@ Run each command with `.venv/bin/python -m loader` (or `uv run --no-project pyth
 | 1. See what the instance holds | `inventory` | No. It saves a report to `loader-state/inventory-<time>.json`. |
 | 2. Preview the setup records | `provision` | No |
 | 3. Create the setup records | `provision --apply` | Yes |
-| 4. Load one chain (the canary) | `load --only SR800008`, then `load --only SR800008 --apply` | Yes, with `--apply` |
-| 5. Check the canary | `verify --only SR800008` | No |
+| 4. Load one chain (the canary) | `load --only SR810008`, then `load --only SR810008 --apply` | Yes, with `--apply` |
+| 5. Check the canary | `verify --only SR810008` | No |
 | 6. Load everything | `load`, then `load --apply` | Yes, with `--apply` |
 | 7. Check everything | `verify` | No |
 | 8. Confirm a re-run creates nothing | `load --apply` | Should create 0 records |
 
-The canary, `SR800008`, is a water leak that has an SR work log and a follow-up WO, `WO2900014`, with crew notes.
+The canary, `SR810008`, is a water leak that has an SR work log and a follow-up WO, `WO2910014`, with crew notes.
 
 Options:
 
@@ -66,12 +66,13 @@ These steps run in order:
 
 1. the organization;
 2. the site, as a child of the organization;
-3. 18 people;
-4. 5 person groups, each with its supervisors and leads as members;
-5. the status values our data uses;
-6. work types;
-7. 13 classifications;
-8. 8 job plans, which are then set to `ACTIVE`.
+3. 244 service addresses, one per row of `data/reference/address-points.csv`, through `MXAPISERADDRESS`. The pilot SRs cite them by code. An address that already exists is left alone, and any field that differs is named. Case is ignored, because Maximo uppercases the city. If the instance has no `MXAPISERADDRESS`, the step is a `MANUAL` line: create the addresses in Service Addresses;
+4. 18 people;
+5. 5 person groups, each with its supervisors and leads as members;
+6. the status values our data uses;
+7. work types;
+8. 13 classifications;
+9. 8 job plans, which are then set to `ACTIVE`.
 
 `WCONT` is added as a synonym of `WAPPR`, and `SCHED` as a synonym of `WSCH`. On standard SR statuses, `INPRG` becomes a synonym of `INPROG`. If the instance doesn't have the internal value a status needs, the step fails and asks you to choose a mapping. It doesn't guess.
 
@@ -97,7 +98,7 @@ These steps run in order:
 
 - **Not sent, because Maximo sets them:**
   - SR `CLASS`, `CREATEDBY` and `CREATIONDATE`;
-  - SR `REPORTEDNAME` and `AFFECTEDNAME`: Maximo clears them when `REPORTEDBY` and `AFFECTEDPERSON` are people, and shows those people's names instead;
+  - SR `REPORTEDNAME` and `AFFECTEDNAME`, which only the training history still has: Maximo clears them when `REPORTEDBY` and `AFFECTEDPERSON` are people, and shows those people's names instead;
   - work log `WORKLOGID`;
   - every `STATUSDATE`.
 - **Status.** Applied after create with `changeStatus`, through the usual steps. For example, a closed WO goes `INPRG`, then `COMP`, then `CLOSE`. The loader passes the dataset's status date. If Maximo refuses a back-dated status, the loader sets the status without the date and lists it under *Known limitations*.
@@ -107,8 +108,28 @@ These steps run in order:
 - **Keys.** The loader sends our own `TICKETID` and `WONUM`. Each WO also gets `EXTERNALREFID` set to our WO number. If Maximo renumbers a record, `loader-state/manifest.json` records its number. `loader-state/answer-key-maximo.csv` then repeats the answer key with Maximo's numbers. Expected classifications keep our IDs (9101 and so on), because results are scored by classification name.
 - **Team codes.** Standard Maximo team codes (`PERSONGROUP`) hold 8 characters. The County's own code `SANCLINSP` has 9, so the loader writes it as `SANCLINS`. The dataset keeps `SANCLINSP`. `verify` uses the same mapping, and `loader-state/answer-key-maximo.csv` shows `SANCLINS`.
 - **Classification.** Maximo numbers classifications itself. The loader finds each classification by name, for example `WATER-LEAK`, and sends Maximo's number.
+- **Structured SR fields.** The pilot SRs send `SOURCE`, `REPORTEDPRIORITY` (a number), the reporter (`REPORTEDBY`, `REPORTEDPHONE`, `REPORTEDEMAIL`) and the affected contact (`AFFECTEDPERSON`, `AFFECTEDPHONE`, `AFFECTEDEMAIL`). A blank field is left out, so a resident's request has no `REPORTEDBY`.
+- **Service address.** The address columns (`SADDRESSCODE`, `STADDRNUMBER`, `STADDRSTREET`, `STREETADDRESS`, `CITY`, `STATEPROVINCE`, `POSTALCODE`, `COUNTRY`, `LATITUDEY`, `LONGITUDEX`) go into one `tkserviceaddress` child row, not onto the SR. A matched address sends its code and every field. Any other address sends what was written, with no code. `verify` reads the row back and compares it without case.
+- **Training history.** The history keeps the text-only SR shape of today's feed (no structured fields, `REPORTEDBY` = `MWQSCINT`), so its SRs are sent without an address row.
 
 The run report starts with the full list of columns it didn't send, with the reason for each.
+
+### Structured SR fields: what TechZone accepts
+
+These results come from four test SRs (`PRECHK1` to `PRECHK4`), created through `MXAPISR` on 2026-11-10 and then closed. They set the SR payload shape.
+
+| What was tested | What Maximo did |
+|---|---|
+| New service address `AP00001` through `MXAPISERADDRESS` | Created. Maximo uppercases `CITY`. |
+| SR with `tkserviceaddress: [{saddresscode}]` only | Stored the code and nothing else. **Setting the code does not copy the address from the service address record**, so the loader sends every address field along with the code. |
+| SR with the code and every address field | All stored as sent. |
+| SR with a free-text address and no code | Stored as sent. |
+| SR with no `reportedby` | `REPORTEDBY` and `AFFECTEDPERSON` stay blank. Reporter and affected phone and email are kept. |
+| SR with `reportedby` set to a person | Phone and email are kept as sent, not replaced with the person's. **Maximo copies `REPORTEDBY` into `AFFECTEDPERSON`.** |
+| `source`, `reportedpriority` | Stored. `2` shows as "High". |
+| Sending a `tkserviceaddress` child | The SR still has exactly one address row. Without the child, Maximo adds one empty row. |
+
+- The address row's `ORGID` is not the SR's. On a row with a code it is `BCPS`, which is probably the API user's default org, even though `AP00001` is in `SRQ`. On a row without a code it is blank. So scripts read the row with an ad-hoc relationship on `TICKETID` and `CLASS` only, the same way `SRQMISSINFO` reads work logs, never on `ORGID`. The loader doesn't send a child `ORGID`, because that payload is untested.
 
 ## Known limitations
 
@@ -119,7 +140,7 @@ The run report starts with the full list of columns it didn't send, with the rea
 - Standard Maximo has no `EXTERNALSYSTEM` or `EXTERNALSYSTEM_TICKETID` on tickets. The loader puts the QAlert request ID from `EXTERNALSYSTEM_TICKETID` into the standard `EXTERNALRECID`, and doesn't send `EXTERNALSYSTEM`, which is always `QAlert`. To find a request's QAlert record in Maximo, read the SR's `EXTERNALRECID`.
 - The natural keys are `EXTERNALRECID` at site `SRQSITE` for SRs, and `EXTERNALREFID` for WOs. The inventory checks that SRs can be queried by `EXTERNALRECID`. The canary shows whether Maximo keeps the work log `CREATEDATE` we send, which the work log check depends on.
 - To remove loaded records, do it by hand in the Maximo UI. The loader can't delete.
-- **One work log is missing on the TechZone instance.** Work log `3000126` on `SR800061` is missing there, and `verify` reports it as the one difference. The first full load closed `SR800061` before the loader held back closing a record with a missing work log. At that point the work log had failed on its `RESOLUTION` type. A closed SR is in history, so Maximo now refuses the work log both through the SR and through `mxapiworklog` (`commlog#ownerNull`). A fresh load on another instance loads it.
+- **One work log is missing on the TechZone instance (old pilot, before the reload).** Work log `3000126` on the old `SR800061` is missing there, and `verify` reports it as the one difference. The first full load closed `SR800061` before the loader held back closing a record with a missing work log. At that point the work log had failed on its `RESOLUTION` type. A closed SR is in history, so Maximo now refuses the work log both through the SR and through `mxapiworklog` (`commlog#ownerNull`). A fresh load on another instance loads it.
 
 ## Tests
 
