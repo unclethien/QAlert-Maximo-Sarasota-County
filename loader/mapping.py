@@ -8,10 +8,15 @@ codes when provisioning left them as a manual step); every dropped column is rep
 from dataclasses import dataclass, field
 
 # CSV column -> attribute. Attributes are the lowercase column names, except those in RENAMED.
-SR_COLUMNS = ("TICKETID", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "REPORTEDBY",
-              "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE", "AFFECTEDPERSON", "AFFECTEDEMAIL",
+SR_COLUMNS = ("TICKETID", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "SOURCE", "REPORTEDPRIORITY", "REPORTEDBY",
+              "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE", "AFFECTEDPERSON", "AFFECTEDPHONE", "AFFECTEDEMAIL",
               "EXTERNALSYSTEM_TICKETID", "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID",
               "OWNERGROUP", "SITEID", "ORGID")
+# The SR's service address, sent as its one TKSERVICEADDRESS child row. With a code, Maximo stores
+# only the code unless every field is sent too, so the dataset carries them all.
+SR_ADDRESS_COLUMNS = ("SADDRESSCODE", "STADDRNUMBER", "STADDRSTREET", "STREETADDRESS", "CITY", "STATEPROVINCE",
+                      "POSTALCODE", "COUNTRY", "LATITUDEY", "LONGITUDEX")
+SR_ADDRESS_CHILD = "tkserviceaddress"
 WO_COLUMNS = ("WONUM", "PARENT", "WORKTYPE", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "ORIGRECORDID",
               "ORIGRECORDCLASS", "REPORTEDBY", "REPORTDATE", "CLASSSTRUCTUREID", "JPNUM", "PERSONGROUP",
               "OWNERGROUP", "SUPERVISOR", "LEAD", "FAILURECODE", "PROBLEMCODE", "SCHEDSTART", "SCHEDFINISH",
@@ -37,6 +42,7 @@ DERIVED = {
            "STATUSDATE": "set by changeStatus", "CREATEDBY": "the API key's user",
            "CREATIONDATE": "the time of the load",
            "EXTERNALSYSTEM": "always QAlert; standard Maximo has no such ticket attribute",
+           # Only in the training history, which keeps the text-only shape of today's feed.
            "REPORTEDNAME": "Maximo clears it when REPORTEDBY is a person and shows that person's name",
            "AFFECTEDNAME": "Maximo clears it when AFFECTEDPERSON is a person and shows that person's name"},
     "wo": {"STATUS": "applied with changeStatus", "STATUSDATE": "set by changeStatus"},
@@ -44,6 +50,8 @@ DERIVED = {
                 "CLASS": "the parent record", "SITEID": "the parent record", "ORGID": "the parent record"},
 }
 BOOLEAN_COLUMNS = {"CLIENTVIEWABLE"}
+INTEGER_COLUMNS = {"REPORTEDPRIORITY"}
+DECIMAL_COLUMNS = {"LATITUDEY", "LONGITUDEX"}
 
 
 @dataclass
@@ -57,6 +65,10 @@ class Remap:
 def _value(column: str, raw: str):
     if column in BOOLEAN_COLUMNS:
         return raw.strip() in ("1", "true", "True", "Y")
+    if column in INTEGER_COLUMNS:
+        return int(raw)
+    if column in DECIMAL_COLUMNS:
+        return float(raw)
     return raw
 
 
@@ -68,6 +80,9 @@ def sr_payload(row: dict, remap: Remap, drop: set[str] = frozenset()) -> dict:
     payload = _payload(row, SR_COLUMNS, drop)
     if "classstructureid" in payload:
         payload["classstructureid"] = remap.classes.get(row["CLASSSTRUCTUREID"], row["CLASSSTRUCTUREID"])
+    address = _payload(row, SR_ADDRESS_COLUMNS, drop)
+    if address:  # the history's text-only rows have none
+        payload[SR_ADDRESS_CHILD] = [address]
     return payload
 
 
@@ -103,7 +118,7 @@ def worklog_payload(row: dict) -> dict:
 
 def dropped_columns(kind: str, header, drop: set[str]) -> dict[str, str]:
     """Every CSV column not sent on create, with the reason."""
-    columns = {"sr": SR_COLUMNS, "wo": WO_COLUMNS, "worklog": WORKLOG_COLUMNS}[kind]
+    columns = {"sr": SR_COLUMNS + SR_ADDRESS_COLUMNS, "wo": WO_COLUMNS, "worklog": WORKLOG_COLUMNS}[kind]
     out = {}
     for c in header:
         if c in DERIVED[kind]:

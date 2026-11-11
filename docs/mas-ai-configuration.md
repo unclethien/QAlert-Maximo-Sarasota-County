@@ -13,7 +13,7 @@ This guide sets up use case 1 from the Workshop Playback on the TechZone Maximo 
 
 The AI only recommends. A person accepts or ignores each recommendation, and no configuration here changes a record by itself. That is the pilot guardrail from the Playback.
 
-Status: **draft**. The steps come from IBM's documentation, listed under Sources at the end. The "Observed on TechZone" notes are filled in as each step is run.
+Status: **draft**. The steps come from IBM's documentation, listed under Sources at the end. The "Observed on TechZone" notes are filled in as each step is run. Notes marked "before the reload" come from the records loaded before the SRs carried structured fields, so they cite the old numbers (SR800001+, WO2900001+, drafts WO2950001+). Each old number maps to the new one by a fixed offset: SR800044 is now SR810044.
 
 ## Before you start
 
@@ -40,7 +40,7 @@ Do this first. If AI Service is not there, nothing else in this guide works.
 | A service request shows the **Global Issue** check box and a **Related to Global ID** field on its main tab | Open any SR in **Service Requests** | _pending_ |
 | We have cluster-admin on the OpenShift cluster (only needed to install AI Service ourselves) | `oc auth can-i '*' '*' --all-namespaces` | _pending_ |
 | AI Service is installed, and which catalog the cluster runs | `oc get aiserviceapp -A`, or `mas must-gather --collectors mas,aiservice --no-logs` for a full version summary | _pending_ |
-| A RESOLVED SR can be made a Global Issue, and a QUEUED SR can be linked to it | Try SR800030 and SR800031 | _pending_ |
+| A RESOLVED SR can be made a Global Issue, and a QUEUED SR can be linked to it | Try SR810030 and SR810031 | _pending_ |
 
 - **If AI Service is missing or not licensed:** stop. Escalate to the instance owner, Joseph Haney, or the IBM MAS AI contact, Divya. AI Service costs AppPoints, so ask before anyone installs it.
   - If the owner agrees, the MAS CLI adds it to an existing install with `mas aiservice-install` (see the AI Service install guide under Sources). It needs cluster-admin, a catalog of `v9-250828` or newer already on the cluster (`mas update` changes it), an IBM entitlement key, and a watsonx.ai API key, URL and project ID. It installs Db2, MinIO and Red Hat OpenShift AI in the cluster.
@@ -58,11 +58,11 @@ We filter on the external IDs the loader always preserves. Maximo may renumber `
 | Records | SR filter (`MXAPISR`) | WO filter (`MXAPIWODETAIL`) |
 |---|---|---|
 | Training history | `siteid='SRQSITE' and externalrecid like '5%'` | `siteid='SRQSITE' and externalrefid like 'WO27%'` |
-| Pilot (test) | `siteid='SRQSITE' and externalrecid like '7%'` | `siteid='SRQSITE' and externalrefid like 'WO29%'` |
+| Pilot (test) | `siteid='SRQSITE' and externalrecid like '71%'` | `siteid='SRQSITE' and externalrefid like 'WO291%'` |
 
 - **Alternative, for SRs only:** a date split. Every history SR is reported before 2026-08-01, and every pilot SR on or after 2026-08-03.
   - Use it only if the ID filters are refused. The date syntax depends on the database.
-  - It does not work for WOs: 12 pilot WOs (the past work, WO2900001 to WO2900012) are reported before August 2026. WOs must use the `externalrefid` filters.
+  - It does not work for WOs: 12 pilot WOs (the past work, WO2910001 to WO2910012) are reported before August 2026. WOs must use the `externalrefid` filters.
 - **Why `siteid` in every filter:** the instance also holds an earlier demo dataset. Without it, the model trains on that.
 
 ## Configuration 1: SR classification
@@ -74,7 +74,9 @@ IBM's examples classify work orders only. On TechZone, its `WOPROBLEMCODE` confi
    | Query Clause Name | Query Clause | What it picks |
    |---|---|---|
    | `SRCLASSTRAINFILTER` | `siteid='SRQSITE' and externalrecid like '5%'` | The 1,170 history SRs the model learns from (13 classes, 90 each) |
-   | `SRCLASSINFFILTER` | `siteid='SRQSITE' and externalrecid like '7%'` | The 65 pilot SRs that get a recommendation |
+   | `SRCLASSINFFILTER` | `siteid='SRQSITE' and externalrecid like '71%'` | The 65 pilot SRs that get a recommendation |
+
+   - Change these clauses here. The REST API cannot change them: `MXAPIOSLCQUERY` is read only (BMXAA0031E), and `MXAPIINTOBJECT` does not include them.
 
 2. **Query templates.** Still in `MXAPISR`, click **More actions > Query Template**. Tick **Public?** and leave **Default Projection?** clear on both.
 
@@ -130,7 +132,7 @@ IBM's examples classify work orders only. On TechZone, its `WOPROBLEMCODE` confi
    4. Results come from the AIINFJOB cron task's `DFLTINF` instance, already set to every 5 minutes for configuration 4. Each run handles 10 SRs (the inference template's page size), so the 65 pilot SRs take about 35 minutes.
    5. Leave **Auto apply** off. The AI recommends, and a person accepts.
 
-6. **Check it:** open a pilot SR, for example `SR800001` (expected **WATER-LEAK**), and make it editable. The Classification field should offer a recommendation.
+6. **Check it:** open a pilot SR, for example `SR810001` (expected **WATER-LEAK**), and make it editable. The Classification field should offer a recommendation.
 
 **Fallback if `MXAPISR` is refused:** IBM's examples all use work orders. If the SR structure is not accepted, set this configuration up on `MXAPIWODETAIL` with attribute `classstructureid` and the WO filters. Record the refusal as a pilot finding.
 
@@ -138,7 +140,7 @@ IBM's examples classify work orders only. On TechZone, its `WOPROBLEMCODE` confi
 - Run a copy of this configuration with `features` = `description_longdescription` only.
 - Compare the two runs on those five SRs with the scoring script.
 
-Observed on TechZone (2026-11-09):
+Observed on TechZone (2026-11-09, before the reload):
 - `mcc` is offered, as version 1.7.1-gpt. Its arguments are `features` (a string list) and `score_threshold` (default 0.5).
 - **Create** with `classstructure.description` as Target description fails with BMXAA4187E: the relationship does not exist for `MAXAIINFERENCEDET`. The `CLASSSTRUCTUREDESC` relationship in step 4 fixes it.
 - With 30 SRs per class, training reads all 390 history SRs and the model is created, but the model status ends in **Error** at step 3 of 4 (Training), with "unknown error". Maximo's training log stops at "Training initiated".
@@ -172,7 +174,7 @@ The same setup as configuration 1, on `MXAPIWODETAIL`. IBM's work order channels
    | Query Clause Name | Query Clause | What it picks |
    |---|---|---|
    | `WOTEAMTRAINFILTER` | `siteid='SRQSITE' and externalrefid like 'WO27%'` | The 990 history WOs |
-   | `WOTEAMINFFILTER` | `siteid='SRQSITE' and externalrefid like 'WO29%'` | The 76 pilot WOs, drafts included |
+   | `WOTEAMINFFILTER` | `siteid='SRQSITE' and externalrefid like 'WO291%'` | The 76 pilot WOs, drafts included |
 
 2. **Query templates** on `MXAPIWODETAIL` (**Public?** ticked, **Default Projection?** clear):
 
@@ -205,7 +207,7 @@ The same setup as configuration 1, on `MXAPIWODETAIL`. IBM's work order channels
    Then **Activate** and **Create model**, as in configuration 1.
 
 - A follow-up WO's long description repeats the resident's request, so the model sees the same words the planner saw.
-- **Where to test it:** 53 pilot SRs name an expected team and are not duplicates. 18 have a follow-up WO and the other 35 have a draft WO (WO2950001 onward). The pilot filter `externalrefid like 'WO29%'` covers both.
+- **Where to test it:** 53 pilot SRs name an expected team and are not duplicates. 18 have a follow-up WO and the other 35 have a draft WO (WO2915001 onward). The pilot filter `externalrefid like 'WO291%'` covers both.
 - **Prefer the drafts.** The 18 follow-up WOs already have their team filled in, so the reviewer sees the answer before judging the recommendation. A draft has no team yet.
 - Duplicate reports have no WO of their own and get no team recommendation. They join their cluster's work order (configuration 4).
 
@@ -213,10 +215,10 @@ Observed on TechZone: _pending_
 
 ## Configuration 3: Similar work orders
 
-`WOSIMILARITY` needs no training. In the pilot it answers "has a crew worked on this before, or is work already planned?" Run it from the draft WO of a related-work SR, for example SR800036's draft, which should list WO2900007 and WO2900012. Duplicate reports are found with similar service requests instead (configuration 4).
+`WOSIMILARITY` needs no training. In the pilot it answers "has a crew worked on this before, or is work already planned?" Run it from the draft WO of a related-work SR, for example SR810036's draft, which should list WO2910007 and WO2910012. Duplicate reports are found with similar service requests instead (configuration 4).
 
 1. Open the `WOSIMILARITY` configuration and click **Actions > Edit**.
-   - Set **Related Records** to `siteid='SRQSITE' and externalrefid like 'WO29%'`, so only pilot WOs are compared.
+   - Set **Related Records** to `siteid='SRQSITE' and externalrefid like 'WO291%'`, so only pilot WOs are compared.
      - Leaving it empty brings in the earlier demo data on the instance.
      - It would also bring in the 990 closed history WOs, which are worded like the pilot's and would crowd the top 10.
    - Pick the latest template version.
@@ -273,11 +275,13 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
 
    | Query Clause Name | Query Clause | What it picks |
    |---|---|---|
-   | `SRSIMILARITYCFGFILTER` | `siteid='SRQSITE' and (externalrecid like '7%' or externalrecid is null) and status not in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue='CANCELLED')` | The reports a new one is compared with: the pilot SRs and any SR entered in Maximo, including the resolved first reports of each cluster, but not cancelled ones |
-   | `SRSIMILARITYINFFILTER` | `siteid='SRQSITE' and (externalrecid like '7%' or externalrecid is null) and status in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue in ('NEW','QUEUED','PENDING','INPROG'))` | The reports that get suggestions: the open ones a reviewer is still vetting (45 pilot SRs, plus any new one) |
+   | `SRSIMILARITYCFGFILTER` | `siteid='SRQSITE' and historyflag = 0` | The reports a new one is compared with: every SR that is not closed or cancelled, whatever its source, including the resolved first reports of each cluster |
+   | `SRSIMILARITYINFFILTER` | `siteid='SRQSITE' and status in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue in ('NEW','QUEUED','PENDING','INPROG'))` | The reports that get suggestions: every open SR, whether loaded from QAlert or entered in Maximo |
 
-   - The training history is left out on purpose (its external IDs start with 5). It is all closed, and its streets differ from the pilot's, so it would only slow the comparison.
-   - `externalrecid is null` takes in SRs created in Maximo, including with **Duplicate**, which does not copy the external ID. Without it a new SR never gets suggestions. Cancelled SRs are left out so a cancelled report and its copy do not top each other's list at 100.
+   - The filters do not test the external ID, so an SR entered in Maximo, including with **Duplicate** (which does not copy the external ID), is covered like a loaded one.
+   - Maximo marks an SR as history (`historyflag = 1`) when it is closed or cancelled. Leaving those out keeps retired copies, test SRs and cancelled reports from topping a live SR's list at 100, without naming any ID range.
+   - On TechZone (2026-11-11) this compares against 152 SRs: 61 pilot SRs, the 90 resolved SRs of the training history and one SR entered in Maximo. The four closed pilot SRs (SR810006, SR810016, SR810033, SR810061) are left out; none of them is in a duplicate pair.
+   - Until 2026-11-11 both filters were limited to `externalrecid like '71%' or externalrecid is null`. That took in the closed test SRs and the retired hand-made copy SR700046, which have no external ID.
 
 3. **Query templates.** Still in `MXAPISR`, click **More actions > Query Template** and add two templates. Add the same four attributes to both: `ticketuid`, `description`, `description_longdescription`, `reportdate`.
 
@@ -326,7 +330,7 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    - Optional: in **Additional details for AI explained**, enter "Suggests other reports of the same problem. A reviewer decides which ones to group. Nothing is linked or closed automatically." Users see it behind the AI icon.
    - Click **Save**, then **Actions > Activate**, then **Actions > Create model**.
    - Training starts at once and the configuration list shows **Model status Ready** when it ends. The log only records the start; use **Actions > Check model status** for progress.
-   - Results come from the AIINFJOB cron task, whose `DFLTINF` instance runs hourly by default (training is AITRAINJOB's `WOAI` instance, every 5 minutes). For the pilot, set `DFLTINF` to every 5 minutes and use **Reload Request**. Each run handles 10 open SRs (the inferencing template's page size), so the 45 open pilot SRs take about 25 minutes.
+   - Results come from the AIINFJOB cron task, whose `DFLTINF` instance runs hourly by default (training is AITRAINJOB's `WOAI` instance, every 5 minutes). For the pilot, in **Cron Task Setup**, set `DFLTINF` to every 5 minutes and use **Reload Request** there so the new schedule takes effect. (The AI configuration screen has no Reload Request.) Each run handles 10 open SRs (the inferencing template's page size), so the 45 open pilot SRs take about 25 minutes.
    - After that first pass, a run picks up only SRs created or changed since the last one. On TechZone an SR got its suggestions about 5 minutes after it was saved inside the filter; one that was already outside it when the filter changed got nothing until it was saved again.
 
 6. **The duplicate score.** The AI's score is text only. Pilot SRs all read "*Type*, *address*" over the same Customer, Address and Map layout, so two sewer odor reports 6 km apart score 93 against 97 for the true duplicate. The duplicate score adds place and time:
@@ -335,12 +339,12 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
 
    | Factor | Value |
    |---|---|
-   | Location, from the Maps link in each long description | 1.0 up to 150 m apart, falling in a straight line to 0.5 at 1 km and beyond; 0.75 if either SR has no Maps link |
+   | Location, from each SR's service address coordinates, or the Maps link in its long description when the address has none | 1.0 up to 150 m apart, falling in a straight line to 0.5 at 1 km and beyond; 0.75 if either SR has no coordinates |
    | Time, days between the two report dates | 1.0 up to 3 days, 0.85 up to 14 days, 0.7 beyond |
 
-   The dialog also shows the points each factor took off: distance first, then time, so `dupscore + distance deduction + time deduction` is the AI score. For SR800044 against SR800025 (6.1 km and 25 days apart) that is 33 + 46 + 14 = 93.
+   The dialog also shows the points each factor took off: distance first, then time, so `dupscore + distance deduction + time deduction` is the AI score. For SR810044 against SR810025 (6.1 km and 25 days apart) that is 33 + 46 + 14 = 93.
 
-   A duplicate score of 85 or more marks a likely duplicate. The pilot's duplicates sit within 78 m and 2.1 days of the first report; wrong matches are 1.3 km or more apart, and look-alikes at the same place come 6 to 42 days later. The coordinates come from the Maps link because the SRs' service address rows hold none. The factors are in `scripts/autoscript/srqdupscore.py` and tested in `tests/test_duplicate_score.py`.
+   A duplicate score of 85 or more marks a likely duplicate. The pilot's duplicates sit within 78 m and 2.1 days of the first report; wrong matches are 1.3 km or more apart, and look-alikes at the same place come 6 to 42 days later. The coordinates come from the SR's service address (`LATITUDEY`, `LONGITUDEX`). An SR without them, such as one from the text-only history, falls back to the Maps link in its long description. The script reads the address row through a set scoped to the SR by ticket and class, because on TechZone the row's org is not the SR's. The factors are in `scripts/autoscript/srqdupscore.py` and tested in `tests/test_duplicate_score.py`.
 
    1. **Back up.** Save the current `MAXAISIMILAROBJ` rows, for example through the API with the `MAXAISIMILARSR` relationship on `MXAPISR`. They are AI output, so the next AIINFJOB run would also rebuild them.
    2. **Add the columns.** In **Database Configuration**, open `MAXAISIMILAROBJ` and add three attributes, each type `INTEGER`, not required: `DUPSCORE` (Duplicate score), `DUPDISTPTS` (Distance deduction) and `DUPTIMEPTS` (Time deduction). Save. Applying it is a structural change, so it needs admin mode:
@@ -353,7 +357,7 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
 
 7. **The dialog.** In **Application Designer**, open the **Service Requests** application (`SR`).
    1. Click **Export Application Definition** and keep the file. It is the way back.
-      The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `sr-original.xml` is the SR application before any change, and `sr-aisimsr-v1.xml` to `v4` are each version imported since. v4 is the one in use, with the duplicate score and the two deduction columns.
+      The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `sr-original.xml` is the SR application before any change, and `sr-aisimsr-v1.xml` to `v4` are each version imported since, and v4 added the duplicate score and the two deduction columns. `sr-source-v5.xml` is the one in use (2026-11-11): v4 plus a **Source** field (`SOURCE`, no lookup) under the class description in Service Request Details. Build any later change on v5.
    2. Add this dialog at the end of the XML, just before `</presentation>`, then import it with **Import Application Definition**:
 
       ```xml
@@ -391,27 +395,27 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    2. Click **Select Action > Add/Modify Select Action Menu**. Add a row with element type `OPTION` and key value `AISIMSR`, then save. Maximo opens the dialog whose ID matches the option name.
    3. In **Security Groups**, open each reviewer group. Under **Applications > Service Requests**, grant **Similar service requests from AI**. Sign out and back in.
 
-**Check it:** open SR800019 in classic **Service Requests** (Service Desk > Service Requests) and click **Select Action > Similar service requests from AI**. SR800017 should be first, with a duplicate score of 96, and every other row below 50. Then try SR800044: SR800046 first at 97, and SR800025 (the same problem 6 km away) at 33, with 46 points taken off for distance and 14 for time (its AI text match is 93). On TechZone SR800044 was cancelled by mistake on 2026-11-10; its copy SR700044 (external ID 799044) shows the same list.
+**Check it:** open SR810019 in classic **Service Requests** (Service Desk > Service Requests) and click **Select Action > Similar service requests from AI**. SR810017 should be first, with a duplicate score of 96, and every other row below 50. Then try SR810044: SR810046 first at 97, and SR810025 (the same problem 6 km away) at 33, with 46 points taken off for distance and 14 for time (its AI text match is 93). Before the reload, the old SR800044 was cancelled by mistake on 2026-11-10, and its copy SR700044 (external ID 799044) showed the same list.
 
 Expected matches in the pilot:
 
 | Cluster | First report: becomes the Global Issue | Duplicate reports | The one work order |
 |---|---|---|---|
-| A, main break, Corvina Bay Dr | SR800030 | SR800031, SR800032 | WO2900028 (complete) |
-| B, sewer odor, 6546 Gulfwren Ave | SR800044 | SR800046 (the same resident, calling two days later) | WO2950024 (draft) |
-| C, no water, Bramblewick Ln | SR800053 | SR800054, SR800055 | WO2900040 (complete) |
-| D, lift station alarm, Eldergrove Ct | SR800040 | SR800041 | WO2900035 (complete) |
-| E, water line leak, 5948 Thistlewood Dr | SR800017 | SR800019 | WO2900018 (complete) |
+| A, main break, Corvina Bay Dr | SR810030 | SR810031, SR810032 | WO2910028 (complete) |
+| B, sewer odor, 6546 Gulfwren Ave | SR810044 | SR810046 (the same resident, calling two days later) | WO2915024 (draft) |
+| C, no water, Bramblewick Ln | SR810053 | SR810054, SR810055 | WO2910040 (complete) |
+| D, lift station alarm, Eldergrove Ct | SR810040 | SR810041 | WO2910035 (complete) |
+| E, water line leak, 5948 Thistlewood Dr | SR810017 | SR810019 | WO2910018 (complete) |
 
 Look-alikes that must **not** be grouped, even if listed:
-- SR800042 resembles SR800040: a lift station alarm the same night, but at a different station in another city.
-- SR800059 resembles SR800030: a small meter leak six weeks after the repair.
-- SR800060 resembles SR800053: an account lock on the meter.
-- SR800065 resembles SR800053: water coming up again after the repair.
+- SR810042 resembles SR810040: a lift station alarm the same night, but at a different station in another city.
+- SR810059 resembles SR810030: a small meter leak six weeks after the repair.
+- SR810060 resembles SR810053: an account lock on the meter.
+- SR810065 resembles SR810053: water coming up again after the repair.
 
 The AI compares words only. It cannot tell that 1370 and 1364 Corvina Bay Dr are neighbors, or that two lift stations are different. The duplicate score (step 6) adds distance and time between reports, so a look-alike weeks later ranks below a same-day report next door. The reviewer still judges what the list shows, and the look-alikes test exactly that.
 
-Observed on TechZone, AI score only (2026-11-08, `history_days` 365, all 8 open duplicates checked):
+Observed on TechZone, AI score only (2026-11-08, `history_days` 365, all 8 open duplicates checked, before the reload):
 
 | Open duplicate | Top match | At `score>=93` the reviewer sees |
 |---|---|---|
@@ -428,7 +432,7 @@ Observed on TechZone, AI score only (2026-11-08, `history_days` 365, all 8 open 
 - Scores bunch between 83 and 97 because the pilot summaries share one pattern ("Water Line Leak, *address*"). Across 40 open SRs, a cut at 93 keeps 6 of 12 duplicate pairs with 20 wrong pairs (about one in two SRs shows one). At 96 there are no wrong pairs but only 4 duplicates.
 - Two look-alikes (SR800059, SR800060) score as high as true duplicates, so the reviewer's judgement stays essential, as planned.
 
-Observed on TechZone with the duplicate score (2026-11-10, all 450 stored pairs scored):
+Observed on TechZone with the duplicate score (2026-11-10, all 450 stored pairs scored, before the reload):
 
 | Open duplicate | Likely duplicates (duplicate score 85 or more) | Highest other row |
 |---|---|---|
@@ -450,18 +454,18 @@ Observed on TechZone with the duplicate score (2026-11-10, all 450 stored pairs 
 
 This uses standard Manage features, no AI. Do it after the reviewer agrees with a suggestion from configuration 4.
 
-1. **Make the first report the Global Issue.** Open the cluster's first report, for example SR800030. Tick **Global Issue** on its main tab and save.
-2. **Link each duplicate.** Open SR800031. In **Related to Global ID**, select SR800030 and save. Do the same for SR800032. Or, on SR800030, use **Show Similar Tickets**, select the duplicates and press **Relate Records to Global Issue**.
+1. **Make the first report the Global Issue.** Open the cluster's first report, for example SR810030. Tick **Global Issue** on its main tab and save.
+2. **Link each duplicate.** Open SR810031. In **Related to Global ID**, select SR810030 and save. Do the same for SR810032. Or, on SR810030, use **Show Similar Tickets**, select the duplicates and press **Relate Records to Global Issue**.
    - Link duplicates this way only. A plain related-record link made earlier does not follow the Global Issue's status, even after the first report becomes global. Delete it and link again.
    - Once reports are linked, you cannot untick **Global Issue** (BMXAA4272E). Remove the links first.
-3. **Only the first report's work order is dispatched.** For cluster A that is WO2900028. For cluster B, approve the draft WO2950024. The duplicates never get a work order of their own.
+3. **Only the first report's work order is dispatched.** For cluster A that is WO2910028. For cluster B, approve the draft WO2915024. The duplicates never get a work order of their own.
 4. **Status follows the Global Issue.** When the first report's status changes, Maximo changes every report linked to it. Its work order drives it: when the work order completes, its SR is resolved, and so is every linked report. The communication template `SRTGTEMP` can email everyone who reported the problem.
    - In clusters A, C, D and E the first report is already RESOLVED, so the linked reports follow its next change, to CLOSED.
-   - Or resolve a duplicate directly, with a note such as "Duplicate of SR800030".
+   - Or resolve a duplicate directly, with a note such as "Duplicate of SR810030".
 
 Labels may differ by version. Step 0 checks that the fields are there. If SRs on TechZone have no Global Issue fields, use the **Related Records** tab instead: relate each duplicate to the first report. This links them, but status does not follow, so resolve each duplicate by hand.
 
-Observed on TechZone (2026-11-08, cluster B):
+Observed on TechZone (2026-11-08, cluster B, before the reload):
 - The fields are on the **Service Request** tab of classic Service Requests (Service Desk > Service Requests), in the **Global Issues** section next to **Dates**: the **Global Issue** check box, the global ID field with a lookup, and **Global Class**.
 - SR800044 ticked as Global Issue, then SR800046 linked to it: SR800046 shows global ID SR800044, class SR, related to global = yes. The AI dialog on SR800046 had listed SR800044 first, at 97.
 - Status follows: WO2950024 approved (APPR), then SR800044 moved to INPROG. SR800046 changed to INPROG at the same second, with no edit of its own. Only WO2950024 is dispatched for the cluster.
@@ -477,14 +481,14 @@ What the script checks, from [required-information.csv](../data/reference/requir
 
 | Rule | The script flags | Pilot SRs flagged |
 |---|---|---|
-| `ADDR` | No house number in the address | SR800001, SR800005, SR800008, SR800020 |
-| `LS-ID` | A lift station alarm with no street and no station name or number | SR800020 |
-| `ADDR-VALID` | An address in a city outside Sarasota County | SR800012 (Bradenton) |
+| `ADDR` | No house number in the address | SR810001, SR810005, SR810008, SR810020 |
+| `LS-ID` | A lift station alarm with no street and no station name or number | SR810020 |
+| `ADDR-VALID` | An address in a city outside Sarasota County, or a house number and street with no address code, meaning it matched nothing in the County address file | SR810002, SR810012 (Bradenton), SR810033 |
 
 - Against the answer key, the script finds every `ADDR` and `LS-ID` gap and flags nothing that is complete, in the pilot or the training history. `tests/test_missing_info_rules.py` checks this.
-- It misses two `ADDR-VALID` gaps, SR800002 and SR800033. Catching a misspelled or unknown street needs the County address file in Maximo.
-- The other 10 SRs with gaps break only rules that need the text to be understood: 10 of the 18 gaps in the answer key. The script catches 6 of the 18.
-- TechZone's SR service address rows are empty, so the script reads the address from the `Address:` line of the long description. It uses the structured house number when one is filled in.
+- It catches the misspelled or unknown streets, SR810002 and SR810033, from the service address: each has a house number and a street but no address code. The text alone can't tell, so an SR without a service address would miss them.
+- The other 10 gaps in the answer key break only rules that need the text to be understood. The script catches 8 of the 18 gaps, against 6 from the text alone.
+- The script reads the SR's service address first. When the address is empty, as on the text-only history or an SR typed into Maximo without one, it falls back to the `Address:` line of the long description. On an SR being added, it reads the row Maximo holds in memory. Otherwise it reads a set scoped to the SR by ticket and class.
 
 ### Set it up
 
@@ -510,13 +514,18 @@ What the script checks, from [required-information.csv](../data/reference/requir
    - The wizard leaves the script's **status** at `Draft` even with **Active?** ticked, and a Draft script does not run. Use **Change Status > Active**.
    - To replace the source later without the UI, merge `{"source": "<the file>"}` into the script's `MXAPIAUTOSCRIPT` record. The API accepts `source` but does not return it on a read.
    - The script must import nothing. Maximo's Jython has no standard library, so `import re` fails, and a failing Before Save script blocks **every** SR save. If a new version fails, switch the launch point off first (merge `{"scriptlaunchpoint": [{"launchpointname": "SRQMISSINFO", "active": false}]}`), then fix it.
+   - **Deploy it before loading SRs.** The loader closes some pilot SRs, and a closed SR refuses new work logs. With the script live, each SR is noted when it is created. On 2026-11-11 the reload noted all 7 expected SRs this way, SR810033 included, although it ends up Closed.
+   - **How the script reads the service address.**
+     - A new SR's address row is still only in memory, so the script reads it through the SR's relationship `SERVICEADDRESS`. That is the relationship `MXAPISR` uses for its `TKSERVICEADDRESS` child. There is no relationship named `TKSERVICEADDRESS` on SR.
+     - A saved SR is read through a set the script scopes itself, by ticket and class.
+     - If either lookup fails, the script falls back to the text without an error. So test a new version on a canary SR whose flag depends on the address row, such as SR810002 (`ADDR-VALID`).
 
 3. **Check the SRs already loaded.** The launch point only runs on saves from now on. Run [scripts/flag_missing_info.py](../scripts/flag_missing_info.py) once. It reads the 65 pilot SRs through the REST API, applies the same rules, and adds the missing notes. Without `--apply` it only previews. A second run adds nothing, because gaps already noted are skipped.
    - The SR's `worklog` child in `MXAPISR` lists only client-viewable notes, and `MISSINFO` notes are internal. Read them through `MXAPIWORKLOG` instead.
    - Calling the script itself through `/maximo/api/script/SRQMISSINFO` returns BMXAA4216E "Unknown Object" on TechZone, so the backfill runs from outside.
 
 4. **The reviewer's list.** A Work Queue lists the results of a saved query, so the query comes first.
-   1. In **Service Requests**, open **Advanced Search > Where Clause**, paste this clause and run it. It should list the open flagged SRs: on TechZone SR800001, SR800005, SR800012 and SR800020. SR800008 is flagged but Resolved.
+   1. In **Service Requests**, open **Advanced Search > Where Clause**, paste this clause and run it. It should list the open flagged SRs: on TechZone SR810001, SR810002, SR810005, SR810012 and SR810020. SR810008 is also flagged, but it is Resolved, and SR810033 is Closed.
 
       ```sql
       siteid='SRQSITE'
@@ -537,9 +546,9 @@ What the script checks, from [required-information.csv](../data/reference/requir
    - The public query on its own is the fallback if a Work Queue cannot be used.
    - When the resident answers, the reviewer updates the SR and closes the gap by adding a CLIENTNOTE. The MISSINFO note stays as the record of what was asked.
 
-5. **Check it:** open SR800020 in Service Requests. Its **Log** tab should show two `MISSINFO` entries, `ADDR` and `LS-ID`.
+5. **Check it:** open SR810020 in Service Requests. Its **Log** tab should show two `MISSINFO` entries, `ADDR` and `LS-ID`.
 
-Observed on TechZone (2026-11-09):
+Observed on TechZone (2026-11-09, before the reload):
 - The `MISSINFO` log type, the script and its launch point are in place. The backfill added 6 notes to 5 SRs, exactly the local test's result: SR800001, SR800005 and SR800008 (`ADDR`), SR800012 (`ADDR-VALID`) and SR800020 (`ADDR` and `LS-ID`). A second run added none.
 - The launch point works on new and updated SRs. Tested with five test SRs, which were then closed:
   - A new lift station alarm with only "North Port, FL" got `ADDR` and `LS-ID`.
@@ -559,9 +568,9 @@ Ask the Maximo Assistant (the AI icon in Service Requests) about three SRs whose
 
 | SR | Ask | The answer key says is missing |
 |---|---|---|
-| SR800048 | "Read service request SR800048. What information is missing for a crew to act on it, and what should we ask the resident?" | What the meter problem is: high bill, leak, damage or reading |
-| SR800027 | Same question for SR800027 | It reports two problems (high pressure and meter accuracy); they need separate requests |
-| SR800021 | Same question for SR800021 | The symptom (backup, overflow or odor) and whether it is inside or outside the house |
+| SR810048 | "Read service request SR810048. What information is missing for a crew to act on it, and what should we ask the resident?" | What the meter problem is: high bill, leak, damage or reading |
+| SR810027 | Same question for SR810027 | It reports two problems (high pressure and meter accuracy); they need separate requests |
+| SR810021 | Same question for SR810021 | The symptom (backup, overflow or odor) and whether it is inside or outside the house |
 
 - If it names the gap in at least two of the three, the 9.2 route (an agent that calls this script and explains the rest) is worth building.
 - If it only restates the request, the reviewer judges these gaps until IBM says how to call the `almwatsonx` template.
@@ -614,7 +623,7 @@ python3 scripts/score_ai_results.py evaluation/ai-results.csv
 Team recommendations and similar work orders appear on a **work order**, but most pilot SRs had none. `data/maximo/drafts/` holds 35 draft work orders, one for each open pilot SR that names a team and has no work order. Duplicate reports are left out: they join their cluster's work order.
 
 - Each draft is WAPPR and linked to its SR. It carries the SR's text and classification, and no team, job plan or crew yet. That is what a planner sees before deciding who goes.
-- They are numbered WO2950001 onward, so the pilot WO filters (`externalrefid like 'WO29%'`) already include them.
+- They are numbered WO2915001 onward, so the pilot WO filters (`externalrefid like 'WO291%'`) already include them.
 - Load them after the pilot (step 7c of the import guide). The loader refuses a draft whose SR is not loaded yet.
 - Regenerate and check them with `scripts/generate_draft_work_orders.py` and `scripts/validate_draft_work_orders.py`.
 
@@ -636,7 +645,7 @@ Deactivate the four configurations (**Actions > Deactivate**). This stops the tr
 | A duplicate is missing from the dialog | It is not among the 10 closest stored for that SR (`max_similarity_records`), or its report date is outside `history_days`. If you added a `dupscore` cut to `AISIMSRPAIR`, it may score below it. |
 | The Duplicate score column is empty | The `SRQDUPSCORE` escalation has not run yet (every 5 minutes), is not active, or admin mode is still on. Check the `ESCSRQDUPSCORE` instance under `ESCALATION` in **Cron Task Setup** and its **History** tab. |
 | The escalation runs but leaves the deduction columns empty | The condition was not saved, or escalation point 1 has **Repeat?** clear, so rows already processed once are skipped. Deactivate the escalation, set the condition from step 6, tick **Repeat?**, save and activate. A condition naming a column that does not exist yet fails with BMXAA3056E: add the columns first. |
-| A duplicate score looks too low for a real duplicate | One SR has no Maps link (factor 0.75), the reports are more than 150 m apart, or they came more than 3 days apart. The factors are at the top of `srqdupscore.py`. |
+| A duplicate score looks too low for a real duplicate | One SR has no coordinates in its service address or its text (factor 0.75), the reports are more than 150 m apart, or they came more than 3 days apart. The factors are at the top of `srqdupscore.py`. |
 | A similarity score looks wrong, or the list is not sorted by score | The dialog still uses IBM's `SR`-to-`SR` relationship, which reads the score by the listed SR only. Use `AISIMSRPAIR` and `AISIMSRTICKET` from step 1 and the dialog in step 7. |
 | The similar SR dialog lists 10 reports every time | Expected: it stores the 10 closest per SR and lists them all. Read the duplicate score; 85 or more is a likely duplicate. |
 | BMXAA3840E, the electronic signature is not valid, with the right password | The signature wants your Manage e-signature key, not your sign-in password. Set it from the profile menu (**Set or Modify E-signature**). Each failure counts as a failed login. |

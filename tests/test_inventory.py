@@ -25,6 +25,7 @@ def _empty_instance():
         "mxapijobplan": [],
         "mxapisr": [],
         "mxapiwodetail": [],
+        "mxapiseraddress": [],
     }
 
 
@@ -37,7 +38,8 @@ def test_inventory_on_an_empty_instance(fake_maximo):
     assert report["structures"]["mxapifailurelist"]["status"] == "missing"
     assert report["org_and_site"]["status"] == "missing" and report["org_and_site"]["org"] is None
     assert report["org_and_site"]["existing_orgs"][0]["itemsetid"] == "SET1"
-    assert report["record_counts"] == {"status": "ok", "sr_at_site": 0, "wo_at_site": 0}
+    assert report["record_counts"] == {"status": "ok", "sr_at_site": 0, "wo_at_site": 0,
+                                      "service_addresses_in_org": 0}
     assert report["domains"]["SRSTATUS"]["status"] == "ok"
     assert report["domains"]["WOSTATUS"]["missing"] == ["WCONT", "SCHED"]
     assert report["domains"]["LOGTYPE"]["missing"] == ["UPDATE"]  # what RESOLUTION is written as
@@ -52,7 +54,7 @@ def test_inventory_spots_earlier_demo_data_and_our_org(fake_maximo):
     records = _empty_instance()
     records["mxapiorganization"].append({"orgid": "SRQ", "active": False, "itemsetid": "SET1"})
     records["mxapisite"].append({"siteid": "SRQSITE", "orgid": "SRQ", "active": True})
-    records["mxapisr"] = [{"siteid": "SRQSITE", "externalrecid": "700001"}] * 3
+    records["mxapisr"] = [{"siteid": "SRQSITE", "externalrecid": "710001"}] * 3
     records["mxapiperson"].append({"personid": "MWQSCINT", "status": "ACTIVE"})
     report = inventory.run_inventory(fake_maximo(records).client())
 

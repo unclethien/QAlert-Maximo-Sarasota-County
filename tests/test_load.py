@@ -59,15 +59,15 @@ def test_full_load_then_rerun_creates_nothing(fake_maximo, tmp_path):
 
 def test_renumbered_keys_are_remapped(fake_maximo, tmp_path):
     fake = fake_maximo(_instance(), renumber=True)
-    _, code, _ = _load(fake, tmp_path, only=["SR800008"])
+    _, code, _ = _load(fake, tmp_path, only=["SR810008"])
     assert code == 0
     sr, = fake.records["mxapisr"]
     wo, = fake.records["mxapiwodetail"]
-    assert sr["ticketid"] != "SR800008" and wo["origrecordid"] == sr["ticketid"]
-    assert wo["externalrefid"] == "WO2900014"
+    assert sr["ticketid"] != "SR810008" and wo["origrecordid"] == sr["ticketid"]
+    assert wo["externalrefid"] == "WO2910014"
     key = write_answer_key(DATA, _remap_from(tmp_path), tmp_path / "answer-key-maximo.csv")
     rows = list(csv.DictReader(key.open()))
-    assert sr["ticketid"] in {r["TICKETID"] for r in rows} and "SR800008" not in {r["TICKETID"] for r in rows}
+    assert sr["ticketid"] in {r["TICKETID"] for r in rows} and "SR810008" not in {r["TICKETID"] for r in rows}
 
 
 def _remap_from(tmp_path):
@@ -92,48 +92,63 @@ def test_failure_mid_run_resumes_cleanly(fake_maximo, tmp_path):
 
 def test_a_wo_number_taken_by_someone_else_is_left_alone(fake_maximo, tmp_path):
     records = _instance()
-    records["mxapiwodetail"] = [{"wonum": "WO2900014", "siteid": "SRQSITE", "externalrefid": "OTHER-1"}]
+    records["mxapiwodetail"] = [{"wonum": "WO2910014", "siteid": "SRQSITE", "externalrefid": "OTHER-1"}]
     fake = fake_maximo(records)
-    _, code, lines = _load(fake, tmp_path, only=["SR800008"])
+    _, code, lines = _load(fake, tmp_path, only=["SR810008"])
     assert code == 1 and any("already exists with external ref OTHER-1" in line for line in lines)
-    assert fake.records["mxapiwodetail"][0] == {"href": fake.records["mxapiwodetail"][0]["href"], "wonum": "WO2900014",
+    assert fake.records["mxapiwodetail"][0] == {"href": fake.records["mxapiwodetail"][0]["href"], "wonum": "WO2910014",
                                                 "siteid": "SRQSITE", "externalrefid": "OTHER-1"}
 
 
 def test_refused_historical_status_date_falls_back_and_is_reported(fake_maximo, tmp_path):
     fake = fake_maximo(_instance(), refuse_dated_status=True)
-    loader, code, lines = _load(fake, tmp_path, only=["SR800008"])
+    loader, code, lines = _load(fake, tmp_path, only=["SR810008"])
     assert code == 0 and loader.limitations
     assert any("historical date refused" in line for line in lines)
 
 
 def test_verify_matches_after_load_and_flags_a_changed_field(fake_maximo, tmp_path):
     fake = fake_maximo(_instance())
-    _load(fake, tmp_path, only=["SR800008", "SR800001"])
+    _load(fake, tmp_path, only=["SR810008", "SR810001"])
     lines = []
     manifest = Manifest(tmp_path / "manifest.json")
     verifier = Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append)
-    assert verifier.run(only=["SR800008", "SR800001"]) == 0, "\n".join(lines)
+    assert verifier.run(only=["SR810008", "SR810001"]) == 0, "\n".join(lines)
     assert verifier.ok == 3
 
     fake.records["mxapisr"][0]["description"] = "changed by hand"
     lines.clear()
     verifier = Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append)
-    assert verifier.run(only=["SR800008", "SR800001"]) == 1
+    assert verifier.run(only=["SR810008", "SR810001"]) == 1
     assert any("description: expected" in line for line in lines)
+
+
+def test_verify_compares_the_service_address_without_case(fake_maximo, tmp_path):
+    ticket = next(r["TICKETID"] for r in DATA.srs if r["SADDRESSCODE"])
+    fake = fake_maximo(_instance())
+    _load(fake, tmp_path, only=[ticket])
+    address = fake.records["mxapisr"][0][mapping.SR_ADDRESS_CHILD][0]
+    address["city"] = address["city"].upper()  # as Maximo stores it
+    lines = []
+    manifest = Manifest(tmp_path / "manifest.json")
+    assert Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append).run(only=[ticket]) == 0, lines
+    address["staddrstreet"] = "Elsewhere Rd"
+    lines.clear()
+    assert Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append).run(only=[ticket]) == 1
+    assert any("service address staddrstreet: expected" in line for line in lines)
 
 
 def test_verify_reports_records_never_loaded(fake_maximo, tmp_path):
     lines = []
     verifier = Verifier(fake_maximo(_instance()).client(), Manifest(tmp_path / "m.json"), DATA, log=lines.append)
-    assert verifier.run(only=["SR800001"]) == 1 and verifier.missing == 1
+    assert verifier.run(only=["SR810001"]) == 1 and verifier.missing == 1
 
 
 def test_a_wo_number_with_a_blank_ref_is_not_adopted(fake_maximo, tmp_path):
     records = _instance()
-    records["mxapiwodetail"] = [{"wonum": "WO2900014", "siteid": "SRQSITE", "status": "WAPPR"}]
+    records["mxapiwodetail"] = [{"wonum": "WO2910014", "siteid": "SRQSITE", "status": "WAPPR"}]
     fake = fake_maximo(records)
-    _, code, lines = _load(fake, tmp_path, only=["SR800008"])
+    _, code, lines = _load(fake, tmp_path, only=["SR810008"])
     assert code == 1 and any("external ref (blank), so it is not ours" in line for line in lines)
     wo = fake.records["mxapiwodetail"][0]
     assert wo["status"] == "WAPPR" and "worklog" not in wo
@@ -141,35 +156,35 @@ def test_a_wo_number_with_a_blank_ref_is_not_adopted(fake_maximo, tmp_path):
 
 def test_a_wo_is_never_linked_to_an_sr_that_failed(fake_maximo, tmp_path):
     fake = fake_maximo(_instance(), refuse={"mxapisr"})
-    loader, code, lines = _load(fake, tmp_path, only=["SR800008"])
+    loader, code, lines = _load(fake, tmp_path, only=["SR810008"])
     assert code == 1 and fake.records["mxapiwodetail"] == []
-    assert any("ORIGRECORDID SR800008 is not loaded yet" in line for line in lines)
+    assert any("ORIGRECORDID SR810008 is not loaded yet" in line for line in lines)
 
 
 def test_a_status_change_whose_answer_was_lost_is_not_retried_forever(fake_maximo, tmp_path):
     fake = fake_maximo(_instance(), lose_status_answers=1)
-    loader, code, _ = _load(fake, tmp_path, only=["SR800008"])
+    loader, code, _ = _load(fake, tmp_path, only=["SR810008"])
     assert code == 0, loader.counts
     sr, = fake.records["mxapisr"]
     assert sr["status"] == "RESOLVED" and not loader.limitations
-    again, code2, _ = _load(fake, tmp_path, only=["SR800008"])
+    again, code2, _ = _load(fake, tmp_path, only=["SR810008"])
     assert code2 == 0 and again.counts["status"]["CREATED"] == 0
 
 
 def test_a_record_with_no_href_is_looked_up_again(fake_maximo, tmp_path):
     fake = fake_maximo(_instance())
-    _load(fake, tmp_path, only=["SR800001"])
+    _load(fake, tmp_path, only=["SR810001"])
     manifest = Manifest(tmp_path / "manifest.json")
-    manifest.entries["sr:SR800001"]["href"] = None
+    manifest.entries["sr:SR810001"]["href"] = None
     manifest.save()
-    again, code, _ = _load(fake, tmp_path, only=["SR800001"])
+    again, code, _ = _load(fake, tmp_path, only=["SR810001"])
     assert code == 0 and again.counts["sr"]["EXISTS"] == 1
-    assert Manifest(tmp_path / "manifest.json").get("sr", "SR800001")["href"]
+    assert Manifest(tmp_path / "manifest.json").get("sr", "SR810001")["href"]
 
 
 def test_dry_run_against_a_loaded_instance_writes_no_state(fake_maximo, tmp_path):
     fake = fake_maximo(_instance())
-    _load(fake, tmp_path, only=["SR800008"])
+    _load(fake, tmp_path, only=["SR810008"])
     (tmp_path / "manifest.json").unlink()
     _, code, _ = _load(fake, tmp_path, apply=False)
     assert code == 0 and not (tmp_path / "manifest.json").exists()
@@ -184,21 +199,21 @@ def test_manifest_from_another_instance_is_refused(tmp_path):
 
 def test_verify_accepts_renumbered_records(fake_maximo, tmp_path):
     fake = fake_maximo(_instance(), renumber=True)
-    _load(fake, tmp_path, only=["SR800008"])
+    _load(fake, tmp_path, only=["SR810008"])
     lines = []
     verifier = Verifier(fake.client(), Manifest(tmp_path / "manifest.json"), DATA,
                         drop=DEFAULT_DROP, log=lines.append)
-    assert verifier.run(only=["SR800008"]) == 0, "\n".join(lines)
+    assert verifier.run(only=["SR810008"]) == 0, "\n".join(lines)
 
 
 def test_sr_in_progress_is_sent_as_maximo_inprog(fake_maximo, tmp_path):
     # The real instance rejects the SRSTATUS synonym INPRG in changeStatus.
     fake = fake_maximo(_instance(), refuse_status={"mxapisr": {"INPRG"}})
-    chains = ["SR800008", "SR800058"]  # one goes through in-progress to RESOLVED, one stops there
+    chains = ["SR810008", "SR810058"]  # one goes through in-progress to RESOLVED, one stops there
     _, code, lines = _load(fake, tmp_path, only=chains)
     assert code == 0, "\n".join(lines)
     status = {r["ticketid"]: r["status"] for r in fake.records["mxapisr"]}
-    assert status == {"SR800008": "RESOLVED", "SR800058": "INPROG"}
+    assert status == {"SR810008": "RESOLVED", "SR810058": "INPROG"}
 
     writes = len(fake.writes())
     again, code2, _ = _load(fake, tmp_path, only=chains)
@@ -211,7 +226,7 @@ def test_sr_in_progress_is_sent_as_maximo_inprog(fake_maximo, tmp_path):
 
 def test_srs_go_in_progress_before_their_work_orders_start_and_resolve_after(fake_maximo, tmp_path):
     fake = fake_maximo(_instance())
-    _load(fake, tmp_path, only=["SR800008"])
+    _load(fake, tmp_path, only=["SR810008"])
     sr = fake.records["mxapisr"][0]["href"]
     order = [(url.split("?")[0] == sr, body["status"]) for _, url, params, _, body in fake.session.calls
              if params and params.get("action") == "wsmethod:changeStatus"]
@@ -219,17 +234,17 @@ def test_srs_go_in_progress_before_their_work_orders_start_and_resolve_after(fak
 
 
 def test_a_record_is_not_closed_while_one_of_its_work_logs_is_missing(fake_maximo, tmp_path):
-    # SR800061 ends CLOSED, and its RESOLUTION work log fails on an instance without that log type.
+    # SR810061 ends CLOSED, and its RESOLUTION work log fails on an instance without that log type.
     fake = fake_maximo(_instance())
     manifest = Manifest(tmp_path / "manifest.json")
     loader = Loader(fake.client(), manifest, DATA, apply=True, log=[].append, state_dir=tmp_path)
     loader._load_worklogs = lambda logs: None  # every work log fails to load
-    assert loader.run(only=["SR800061"]) == 1
+    assert loader.run(only=["SR810061"]) == 1
     sr = fake.records["mxapisr"][0]
     assert sr["status"] == "RESOLVED"
     assert loader.counts["status"]["FAILED"] == 1
 
-    _, code, _ = _load(fake, tmp_path, only=["SR800061"])  # the log loads now, so the SR closes
+    _, code, _ = _load(fake, tmp_path, only=["SR810061"])  # the log loads now, so the SR closes
     assert code == 0 and sr["status"] == "CLOSED"
 
 
@@ -238,10 +253,13 @@ HISTORY = Dataset(name="history")
 
 def test_history_is_its_own_dataset_without_an_answer_key():
     import history_catalog as hc  # on sys.path through loader.config
+    from generate_pilot_dataset import MAXIMO_SR_COLUMNS
 
     n_srs = hc.PER_CLASS * len(cat.REQUEST_TYPES)
     assert len(HISTORY.srs) == n_srs and len(HISTORY.wos) == 11 * hc.PER_CLASS and HISTORY.answers == []
-    assert HISTORY.sr_header == DATA.sr_header and HISTORY.wo_header == DATA.wo_header
+    # The history keeps the text-only SR shape it was loaded with; the pilot SRs carry structured fields.
+    assert HISTORY.sr_header == MAXIMO_SR_COLUMNS and HISTORY.wo_header == DATA.wo_header
+    assert set(DATA.sr_header) - set(HISTORY.sr_header) >= {"SOURCE", "SADDRESSCODE"}
     assert len(HISTORY.chains()) == n_srs  # every history WO follows one history SR
     assert not {r["TICKETID"] for r in HISTORY.srs} & {r["TICKETID"] for r in DATA.srs}
 
@@ -280,7 +298,7 @@ def test_drafts_load_after_the_pilot_link_to_its_srs_and_stay_wappr(fake_maximo,
     manifest = tmp_path / "manifest.json"
     loader = Loader(fake.client(), Manifest(manifest), DRAFTS, apply=True, log=lambda _: None, state_dir=tmp_path)
     assert loader.run() == 0
-    drafts = [r for r in fake.records["mxapiwodetail"] if r["externalrefid"].startswith("WO295")]
+    drafts = [r for r in fake.records["mxapiwodetail"] if r["externalrefid"].startswith("WO2915")]
     assert len(drafts) == 35 and all(r["status"] == "WAPPR" for r in drafts)
     loaded = {r["ticketid"] for r in fake.records["mxapisr"]}
     origin = {w["WONUM"]: w["ORIGRECORDID"] for w in DRAFTS.wos}

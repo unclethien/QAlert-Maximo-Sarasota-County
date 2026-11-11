@@ -28,7 +28,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ## 1. A practice dataset for the Sarasota AI pilot (about 30 seconds)
 
-**On screen:** the title, and request SR800001 with "Came in through the 311Connect mobile app" highlighted in orange.
+**On screen:** the title, and request SR810001 with "Came in through the 311Connect mobile app" highlighted in orange.
 
 **Say:**
 
@@ -40,7 +40,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ## 2. Today, Maximo can't tell who to ask (about 45 seconds)
 
-**On screen:** service request SR800001 as Maximo shows it today, with three notes on the right.
+**On screen:** service request SR810001 as Maximo shows it today, with three notes on the right.
 
 **Say:**
 
@@ -94,7 +94,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ## 6. Where it came from decides who to ask (about 1 minute 15 seconds)
 
-**On screen:** two requests side by side with who to ask. SR800001 came from the app, so ask the resident, Theresa Sheffield. SR800008 was a phone call, with "Entered by: 0820533", so ask Daniel Okafor in the Contact Center.
+**On screen:** two requests side by side with who to ask. SR810001 came from the app, so ask the resident, Theresa Sheffield. SR810008 was a phone call, with "Entered by: 0820533", so ask Daniel Okafor in the Contact Center.
 
 **Say:**
 
@@ -120,7 +120,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 >
 > And look at the 8 on the left. In 8 of these, a crew had already been sent out. Those are trips that one question could have saved. That's the value we're after.
 
-## 8. What the AI should do with SR800001 (about 50 seconds)
+## 8. What the AI should do with SR810001 (about 50 seconds)
 
 **On screen:** four steps: spot the gap, check the source, ask one question, then dispatch.
 
@@ -166,7 +166,7 @@ The numbers on the slides are read from the files in `data/`. If the dataset is 
 
 ## 11. Requests arrive with no team (about 50 seconds)
 
-**On screen:** SR800024 with a blank team, the team the AI suggests, then work order WO2900020 with job plan LEAK, team WTRPIPE, and its crew lead and supervisor.
+**On screen:** SR810024 with a blank team, the team the AI suggests, then work order WO2910020 with job plan LEAK, team WTRPIPE, and its crew lead and supervisor.
 
 **Say:**
 

@@ -23,6 +23,7 @@ def _instance(**overrides):
         ],
         "mxapiclassstructure": [],
         "mxapijobplan": [],
+        "mxapiseraddress": [],
     }
     records.update(overrides)
     return records
@@ -100,6 +101,7 @@ def test_dry_run_plans_everything_and_writes_nothing(fake_maximo):
     planned = [line for line in lines if "PLAN" in line]
     assert any("organization SRQ" in line for line in planned)
     assert sum("person " in line and "group" not in line for line in planned) == 18
+    assert sum("service address AP" in line for line in planned) == 244
     assert any("WOSTATUS value WCONT - synonym of WAPPR" in line for line in planned)
     assert any("SRSTATUS value INPRG - synonym of INPROG" in line for line in planned)
     assert p.counts["MANUAL"] == 2  # work types and failure codes: no object structure on this instance
@@ -210,3 +212,34 @@ def test_status_values_are_written_through_mxdomain_when_it_exists(fake_maximo):
     written = {s["value"] for d in fake.records["mxdomain"] for s in d["synonymdomain"]}
     assert written == {"INPRG", "WCONT", "SCHED"}
     assert all(s["orgid"] == "SRQ" for d in fake.records["mxdomain"] for s in d["synonymdomain"])
+
+
+ADDRESS_POINT = {"ADDRESS_ID": "AP00001", "STREETNO": "7012", "STREETNAME": "Aldersea Cir", "CITY": "Venice",
+                 "STATE": "FL", "ZIP": "34292", "LATITUDE": "27.054919", "LONGITUDE": "-82.447975"}
+
+
+def test_service_address_payload():
+    assert prov.service_address_payload(ADDRESS_POINT) == {
+        "addresscode": "AP00001", "orgid": "SRQ", "siteid": "SRQSITE", "description": "7012 Aldersea Cir",
+        "staddrnumber": "7012", "staddrstreet": "Aldersea Cir", "streetaddress": "7012 Aldersea Cir",
+        "city": "Venice", "stateprovince": "FL", "postalcode": "34292", "country": "US",
+        "latitudey": 27.054919, "longitudex": -82.447975}
+
+
+def test_service_addresses_are_created_once_and_a_difference_is_reported(fake_maximo):
+    first = prov.read_csv("address-points.csv", folder="reference")[0]
+    existing = {**prov.service_address_payload(first), "city": first["CITY"].upper(), "postalcode": "00000"}
+    fake = fake_maximo(_instance(mxapiseraddress=[existing]))
+    p, code, lines = _run(fake, apply=True, only=["service_addresses"])
+    assert code == 0 and p.counts["CREATED"] == 243 and len(fake.records["mxapiseraddress"]) == 244
+    line = next(line for line in lines if f"service address {first['ADDRESS_ID']}" in line)
+    assert "EXISTS" in line and "postalcode" in line and "city" not in line  # Maximo uppercases the city
+    writes = len(fake.writes())
+    p2, _, _ = _run(fake, apply=True, only=["service_addresses"])
+    assert p2.counts["CREATED"] == 0 and len(fake.writes()) == writes
+
+
+def test_service_addresses_are_a_manual_step_without_their_object_structure(fake_maximo):
+    p, code, lines = _run(fake_maximo(_instance(), missing=("mxapiseraddress",)), apply=False,
+                          only=["service_addresses"])
+    assert code == 0 and p.counts["MANUAL"] == 1 and any("244 rows" in line for line in lines)

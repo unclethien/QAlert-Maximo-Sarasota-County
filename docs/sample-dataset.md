@@ -97,20 +97,35 @@ ID ranges are distinct from real Sarasota ranges:
 
 | Record | ID range |
 |---|---|
-| SR | `SR800001` and up |
-| WO | `WO2900001` and up |
-| QAlert request | `700001` and up |
-| Work log | `3000001` and up |
+| SR | `SR810001` and up |
+| WO | `WO2910001` and up |
+| QAlert request | `710001` and up |
+| Work log | `3010001` and up |
+| Draft WO | `WO2915001` and up |
 | Address point | `AP00001` and up |
 
-## Maximo SRs: today's shape, plus the employee ID for staff-entered requests
+The pilot was first loaded under `SR800001`, `WO2900001`, QAlert `700001`, work log `3000001` and drafts `WO2950001`, in the text-only shape. Those records stay in TechZone, closed, as the "before" copies. [`scripts/id_map.py`](../scripts/id_map.py) maps each old ID to its new one by a fixed offset. The training history keeps its own ranges (`SR600001`, `WO2700001`, QAlert `500001`, work log `3500001`) and the text-only shape.
 
-Each SR looks the way the current integration produces it:
+## Maximo SRs: fields
 
-- `REPORTEDBY`, `AFFECTEDPERSON`, and `CREATEDBY` are `MWQSCINT`, and `REPORTEDNAME` is "QAlert Integration". `REPORTEDPHONE` is empty.
-- `EXTERNALSYSTEM` is `QAlert`, and `EXTERNALSYSTEM_TICKETID` holds the QAlert request ID.
+Today's integration writes everything it knows about a request into the long description, and stamps the integration account on every SR. The County's sample records look like that, and so do the training history and the pilot's first load. The pilot SRs now carry the same information in Maximo fields too, by the mapping proposed to the County in [qalert-integration-proposal.md](qalert-integration-proposal.md). `maximo_sr_fields` in `scripts/generate_pilot_dataset.py` implements it.
+
+| Value | Before: text only | Now: field |
+|---|---|---|
+| Channel | Not in Maximo. Look up the QAlert request's `origin`. | `SOURCE`: `APP-IOS`, `APP-ANDROID`, `WEB`, `PHONE` or `EMAIL` |
+| Priority | Not in Maximo | `REPORTEDPRIORITY`, the request type's QAlert priority (1 Urgent to 4 Low) |
+| Who entered it | `REPORTEDBY` is `MWQSCINT` on every SR; staff-entered SRs have an "Entered by" line | `REPORTEDBY` is the employee's PERSONID when they have an active Maximo person record, and Maximo copies it into `AFFECTEDPERSON`; blank otherwise |
+| Reporter's contact | `REPORTEDEMAIL` is the integration account's; `REPORTEDPHONE` is empty | `REPORTEDPHONE` and `REPORTEDEMAIL` are whoever entered it: the resident, or the employee's QAlert phone and email |
+| Resident's contact | The `Customer` line | `AFFECTEDPHONE` and `AFFECTEDEMAIL` |
+| Resident's name | The `Customer` line | Still only the `Customer` line: Maximo has no field for a free-text name |
+| Address | The `Address` line | The SR's service address: `SADDRESSCODE` (only when it matches an address point), `STADDRNUMBER`, `STADDRSTREET`, `STREETADDRESS`, `CITY`, `STATEPROVINCE`, `POSTALCODE`, `COUNTRY` |
+| Coordinates | The Maps link | `LATITUDEY` and `LONGITUDEX` on the service address |
+
+- The long description is unchanged, so the AI reads the same text as before.
+- A missing or invalid address stays missing or invalid in the fields. It has no address code and no ZIP. A street-only address has no house number, and an SR with no usable address has only its city. Of the 65 SRs, 58 have an address code.
+- `SOURCE`: 32 app (17 Android, 15 iOS), 19 web, 11 phone, 3 email. 7 staff-entered SRs name a person in `REPORTEDBY`. The employee who has left (SR810005) has an inactive person record, so she isn't named there; her QAlert phone and email are the reported contact.
+- `CREATEDBY` stays `MWQSCINT`, the account that writes the record. `EXTERNALSYSTEM` is `QAlert`, and `EXTERNALSYSTEM_TICKETID` holds the QAlert request ID.
 - `DESCRIPTION` is `<request type>, <street address>`.
-- Maximo does not record the channel. As in the real County samples, `REPORTEDBY` is the integration account for every SR. To know how a request came in, look up the QAlert request by `EXTERNALSYSTEM_TICKETID` and read its `origin`.
 - `DESCRIPTION_LONGDESCRIPTION` follows the observed HTML pattern. Staff-entered SRs add one line, **"Entered by"**, which shows how the QAlert employee ID could reach Maximo:
 
 ```html
@@ -316,7 +331,7 @@ python3 scripts/validate_training_history.py   # exits 1 if any check fails
   - Every stormwater request was filed under a Utilities type, as they are in real life. Each was closed with a `RESOLUTION` note that refers it to Public Works.
   - Backflow requests are resolved with a note that the device belongs to the property owner. Neither stormwater nor backflow requests get a work order.
 - **Size:** `PER_CLASS` in `scripts/history_catalog.py` sets the count per classification. Raise it if Maximo's **Check data requirement** asks for more data, then load the history again; only the new records are created.
-- **Coverage:** the misfiled pairs are general confusions (leak and main break, sewer issue and odor, and so on). They do not include every confusion in the pilot. For example, no history leak is filed as Sewer Issue, as SR800018 is. Read that SR's result with this in mind.
+- **Coverage:** the misfiled pairs are general confusions (leak and main break, sewer issue and odor, and so on). They do not include every confusion in the pilot. For example, no history leak is filed as Sewer Issue, as SR810018 is. Read that SR's result with this in mind.
 
 See [mas-ai-configuration.md](mas-ai-configuration.md) for how the AI uses it.
 
@@ -334,10 +349,10 @@ python3 scripts/validate_draft_work_orders.py   # exits 1 if any check fails
 | `data/maximo/drafts/wo.csv` | 35 | One WAPPR work order for each open pilot SR that names a team and has no work order |
 | `data/maximo/drafts/sr.csv`, `worklog.csv` | 0 | Header only, so the loader reads every dataset the same way |
 
-- **Duplicate reports get no draft.** Several residents reporting one problem should end up on one work order: the one their cluster's first report already has, or that report's draft (WO2950024 for SR800044). Grouping them is what similar service requests suggest.
+- **Duplicate reports get no draft.** Several residents reporting one problem should end up on one work order: the one their cluster's first report already has, or that report's draft (WO2915024 for SR810044). Grouping them is what similar service requests suggest.
 - **Nothing is decided yet.** A draft has the SR's text and classification, and no team, job plan, crew, codes or field dates. The validator checks this.
 - **Created by the planner.** `REPORTEDBY` is the planner for the request type. The draft is dated within the hour after the SR, and never after the as-of time.
-- **The pilot files are not changed**, so its 65 SRs and 41 WOs stay as reviewed. The drafts are WO2950001 onward and load with `--dataset drafts`, after the pilot.
+- **The pilot files are not changed**, so its 65 SRs and 41 WOs stay as reviewed. The drafts are WO2915001 onward and load with `--dataset drafts`, after the pilot.
 
 ## Assumptions to revisit
 
@@ -348,7 +363,9 @@ python3 scripts/validate_draft_work_orders.py   # exits 1 if any check fails
 - The QAlert API returns each request's `origin` and, for staff-entered requests, the employee ID. The `origin` labels other than `Control Panel` and `QAlert Mobile iOS` are assumed.
 - App users always have an email on file; web, phone, and email requests may lack one.
 - QAlert employee IDs equal Maximo PERSONIDs.
-- For staff-entered requests, the employee ID reaches Maximo as an "Entered by" line in the long description. In production, a dedicated field would be cleaner.
+- For staff-entered requests, the employee ID reaches Maximo as `REPORTEDBY` (when the employee has an active Maximo person record) and as an "Entered by" line in the long description.
+- The resident's name stays in the long description only, because standard Maximo stores a name only on a person record. The County integration proposal asks the County to choose: the text, a custom field, or a person record per resident.
+- The structured fields assume the County adopts the integration mapping in [qalert-integration-proposal.md](qalert-integration-proposal.md). The `SOURCE` codes are our convention, because `SOURCE` has no domain.
 - The QAlert `employees.json` schema and the fields `phone`, `intakeMethod`, and `employeeId` are provisional until Sarasota confirms what the QAlert API returns.
 - These Maximo values come from the County's sample records: the SR statuses, `WCONT` and `SCHED`; the work types `CM`, `CS` and `IN`; the teams `WTRPIPE`, `SANCLINSP` and `LSCENT`; the job plans `LEAK`, `PRESSURE` and `SAN INSP`; the failure codes `SERVLINE` and `SERVICELATERAL`; and the problem codes `LEAKBROKEN`, `LOWPRESSURE`, `CURBSTOP` and `CUSTCOMPLAINT`. The meanings of `SANCLINSP`, `LSCENT` and `WCONT` are read from the code names and are unconfirmed.
 - These Maximo values are illustrative, not Sarasota's actual configuration:

@@ -85,12 +85,13 @@ uv run --no-project python -m loader provision --apply    # creates them
 This creates, in order:
 
 1. the `SRQ` organization and `SRQSITE` site;
-2. 18 people;
-3. 5 teams (person groups);
-4. the status values the data uses;
-5. work types;
-6. 13 classifications;
-7. 8 job plans.
+2. 244 service addresses, the County address points that pilot SRs link to (`AP00001` to `AP00244`);
+3. 18 people;
+4. 5 teams (person groups);
+5. the status values the data uses;
+6. work types;
+7. 13 classifications;
+8. 8 job plans.
 
 Each line of output starts with a tag:
 
@@ -136,15 +137,15 @@ Some instances, including TechZone, refuse some of these writes even for an admi
 
 ## Step 5: Load one record first
 
-Try one chain before loading everything. SR800008 is a water leak, with a follow-up work order and crew notes.
+Try one chain before loading everything. SR810008 is a water leak, with a follow-up work order and crew notes.
 
 ```bash
-uv run --no-project python -m loader load --only SR800008            # preview
-uv run --no-project python -m loader load --only SR800008 --apply    # load it
-uv run --no-project python -m loader verify --only SR800008          # check it
+uv run --no-project python -m loader load --only SR810008            # preview
+uv run --no-project python -m loader load --only SR810008 --apply    # load it
+uv run --no-project python -m loader verify --only SR810008          # check it
 ```
 
-`verify` should print `OK` for SR800008 and for WO2900014. If it doesn't, fix the problem before step 6. The *Troubleshooting* section below covers the errors we've seen.
+`verify` should print `OK` for SR810008 and for WO2910014. If it doesn't, fix the problem before step 6. The *Troubleshooting* section below covers the errors we've seen.
 
 ## Step 6: Load everything
 
@@ -205,16 +206,39 @@ uv run --no-project python -m loader load --dataset drafts --apply              
 uv run --no-project python -m loader verify --dataset drafts
 ```
 
-- The drafts are WO2950001 to WO2950035. They stay in status WAPPR, with no team, job plan or crew.
+- The drafts are WO2915001 to WO2915035. They stay in status WAPPR, with no team, job plan or crew.
 - If a draft's SR is not loaded yet, the loader reports "is not loaded yet; re-run after it is" and creates nothing for it.
 - See [mas-ai-configuration.md](mas-ai-configuration.md#draft-work-orders).
 
+## Step 7d: Close the old pilot copies (TechZone only)
+
+The pilot was first loaded as SR800001 to SR800065, WO2900001 to WO2900041 and drafts WO2950001 to WO2950035, before the SRs carried structured fields. It was then reloaded under the numbers above. Skip this step on an instance that never held the first load.
+
+`scripts/retire_superseded_records.py` gives each old copy that is still open a work log "Superseded by <new number>" and moves it to a final status:
+
+- an old SR is moved through the usual steps to `CLOSED`;
+- an old completed WO (`COMP`) is closed;
+- an in-progress one (`INPRG`) is completed and then closed;
+- any other open WO or draft is cancelled.
+
+```bash
+uv run --no-project --with-requirements requirements.txt python scripts/retire_superseded_records.py            # preview
+uv run --no-project --with-requirements requirements.txt python scripts/retire_superseded_records.py --apply
+```
+
+- **What it skips.** A record whose new copy is not loaded yet is skipped, and so is a status the script does not know. An SR waits while one of its old WOs stays open. A second run does nothing, and nothing is deleted.
+- **What Maximo enforces** (seen on TechZone, 2026-11-11):
+  - Closing or cancelling a WO also closes the SR it came from.
+  - A closed SR is in history and refuses new work logs (BMXAA4301E). That is why the script writes every note before it changes any status.
+  - Maximo refuses to cancel an `INPRG` WO (BMXAA4626E). That is why such a WO is completed and closed instead.
+- **The 2026-11-11 run.** It closed or cancelled all 120 old open copies. The script's first version changed statuses before it wrote the notes, so 17 old SRs were closed along with their WO before their notes went in. Those 17 SRs have no note. Their WOs carry the pointer instead, and the new number is the old one with `81` in place of `80`, so SR800008 became SR810008.
+
 ## Step 8: Find the data in Maximo
 
-- **Service requests:** open **Service Requests** and filter Site = `SRQSITE`. You'll see SR800001 to SR800065.
+- **Service requests:** open **Service Requests** and filter Site = `SRQSITE`. You'll see SR810001 to SR810065.
   - The QAlert request number is in the **External Record ID** field.
   - Follow-up work orders are on the **Related Records** tab.
-- **Work orders:** open **Work Order Tracking** and filter Site = `SRQSITE`. You'll see WO2900001 to WO2900041.
+- **Work orders:** open **Work Order Tracking** and filter Site = `SRQSITE`. You'll see WO2910001 to WO2910041.
   - Crew notes are on the **Work Log** tab.
 
 Maximo may give a record a different number from ours. If it does, `loader-state/answer-key-maximo.csv` lists the answer key with Maximo's numbers.
@@ -238,7 +262,7 @@ Maximo may give a record a different number from ours. If it does, `loader-state
 | Command | Writes? | What it does |
 |---|---|---|
 | `inventory` | No | Reports what the instance holds. |
-| `provision` | With `--apply` | Creates the setup records. `--only org,site,persons,person_groups,statuses,work_types,classifications,job_plans,failure_codes` runs only some steps. |
+| `provision` | With `--apply` | Creates the setup records. `--only org,site,service_addresses,persons,person_groups,statuses,work_types,classifications,job_plans,failure_codes` runs only some steps. |
 | `load` | With `--apply` | Loads the SRs, WOs and work logs, then sets their statuses. |
 | `verify` | No | Compares what's in Maximo with the data. |
 
@@ -246,7 +270,7 @@ Options for `load` and `verify`:
 
 - `--dataset history`: the AI training history instead of the 65 pilot SRs (the default is `pilot`).
 - `--dataset drafts`: the 35 draft work orders for open pilot SRs. Load them after the pilot.
-- `--only SR800008,WO2900001`: only these records. Each brings its linked records.
+- `--only SR810008,WO2910001`: only these records. Each brings its linked records.
 - `--limit 5`: only the first 5 chains.
 - `--keep-failure-codes`: send failure codes, once they exist in Maximo.
 - `--keep-commodities`: send service groups, once they exist in Maximo with codes of 8 characters or fewer.

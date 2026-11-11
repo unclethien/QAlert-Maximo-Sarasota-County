@@ -106,6 +106,11 @@ const WO_STATUS: Record<string, string> = {
 /* ---------- Totals ---------- */
 
 const mappedPersonIds = new Set(personRows.map((p) => p.PERSONID))
+// Today's QAlert feed stamps this account as the reporter of every SR (the County's samples and the
+// training history). The pilot SRs carry the proposed fields instead, so the "today" slide shows
+// the request as today's feed would write it.
+const INTEGRATION_ID = 'MWQSCINT'
+const integrationAccount = need(new Map(personRows.map((p) => [p.PERSONID, p])), INTEGRATION_ID)
 
 export const totals = {
   serviceRequests: srRows.length,
@@ -197,9 +202,9 @@ function buildRequestExample(ticketId: string) {
     summary: sr.DESCRIPTION,
     status: sr.STATUS,
     reportedOn: formatDate(sr.REPORTDATE),
-    reportedName: sr.REPORTEDNAME,
-    reportedBy: sr.REPORTEDBY,
-    reportedPhone: sr.REPORTEDPHONE,
+    reportedName: integrationAccount.DISPLAYNAME,
+    reportedBy: INTEGRATION_ID,
+    reportedPhone: '',
     detailLines: lines.filter((l) => l !== enteredByLine),
     customerLine: lines.find((l) => l.startsWith('Customer:')) ?? '',
     enteredByLine,
@@ -220,7 +225,7 @@ function buildRequestExample(ticketId: string) {
 const firstMissing = (contactType: string) =>
   missingRows.find((r) => r.FOLLOW_UP_CONTACT_TYPE === contactType)?.TICKETID ?? ''
 
-export const requestExample = buildRequestExample('SR800001')
+export const requestExample = buildRequestExample('SR810001')
 export const staffExample = buildRequestExample(firstMissing('Entered-by employee'))
 
 /* ---------- Duplicates ---------- */
@@ -277,8 +282,8 @@ function buildContextExample(ticketId: string) {
   }
 }
 
-export const pastExample = buildContextExample('SR800036')
-export const plannedExample = buildContextExample('SR800004')
+export const pastExample = buildContextExample('SR810036')
+export const plannedExample = buildContextExample('SR810004')
 
 /* ---------- Teams ---------- */
 
@@ -321,7 +326,7 @@ function buildTeamExample(workOrderId: string) {
   }
 }
 
-export const teamExample = buildTeamExample('WO2900020')
+export const teamExample = buildTeamExample('WO2910020')
 export const teamTotals = {
   requestsWithoutTeam: srRows.filter((r) => !r.OWNERGROUP).length,
   withSuggestedTeam: answerRows.filter((r) => r.EXPECTED_PERSONGROUP).length,
@@ -373,7 +378,7 @@ export const statusLists = {
 
 const firstControl = answerRows.find((r) => r.USE_CASE === USE_CASES[3].key)
 
-export const answerSamples = [requestExample.id, staffExample.id, 'SR800054', 'SR800004', firstControl?.TICKETID ?? '']
+export const answerSamples = [requestExample.id, staffExample.id, 'SR810054', 'SR810004', firstControl?.TICKETID ?? '']
   .filter(Boolean)
   .map((id) => {
     const r = need(answerById, id)

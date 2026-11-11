@@ -8,6 +8,13 @@ from the real pilot workbook.
 SEED = 20261030
 SITEID, ORGID = "SRQSITE", "SRQ"
 
+# Pilot ID ranges. The pilot loaded before the SRs carried structured fields used SR800001,
+# request 700001, WO2900001, work log 3000001 and draft WO2950001; those records stay in TechZone,
+# closed, as the "before" copies. The work logs move too, because the loader's manifest keys them
+# by WORKLOGID. scripts/id_map.py maps each old ID to its new one.
+SR_START, REQUEST_START, WO_START, WORKLOG_START = 810001, 710001, 2910001, 3010001
+DRAFT_WO_START = 2915001
+
 # The integration service account that the current QAlert -> Maximo feed stamps on every SR.
 INTEGRATION_ACCOUNT = {
     "id": "MWQSCINT",
@@ -28,6 +35,12 @@ CHANNELS = {
     "phone": (("Control Panel",), "Phone", True, "phone call to 311"),
     "email": (("Control Panel",), "Email", True, "email to the Contact Center"),
 }
+
+# Maximo TICKET.SOURCE for each way in: the QAlert origin, or for staff-entered requests (origin
+# "Control Panel") the intake method. SOURCE has no domain, so these codes are a convention the
+# County would adopt (docs/qalert-integration-proposal.md).
+SOURCE_CODES = {"QAlert Mobile iOS": "APP-IOS", "QAlert Mobile Android": "APP-ANDROID", "Web Portal": "WEB",
+                "Phone": "PHONE", "Email": "EMAIL"}
 
 # QAlert staff who enter phone and email requests.
 # (employee id, username, first, last, department, active, has Maximo PERSON record)

@@ -119,7 +119,7 @@ def test_only_a_maximo_rejection_counts_as_refused():
 
 def test_unsafe_where_literals_are_refused():
     from loader.client import oslc_str, quote_list
-    assert oslc_str("SR800001") == '"SR800001"' and quote_list(["A", "B"]) == '["A","B"]'
+    assert oslc_str("SR810001") == '"SR810001"' and quote_list(["A", "B"]) == '["A","B"]'
     for bad in ('a"b', "50%", "caf\u00e9"):
         with pytest.raises(ValueError):
             oslc_str(bad)

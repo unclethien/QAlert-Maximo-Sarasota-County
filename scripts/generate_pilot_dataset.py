@@ -29,11 +29,26 @@ AS_OF = datetime(2026, 10, 27, 17, 0, tzinfo=TZ)
 ACTIVITY_CODES = {"Created": 1, "Assigned": 4, "Closed": 15}
 QALERT_STATUS = {"open": 0, "closed": 1, "in_progress": 3}
 
+# The text-only SR shape of today's QAlert feed. The training history keeps it.
 MAXIMO_SR_COLUMNS = [
     "TICKETID", "CLASS", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "STATUS", "STATUSDATE",
     "REPORTEDBY", "REPORTEDNAME", "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE",
     "AFFECTEDPERSON", "AFFECTEDNAME", "AFFECTEDEMAIL", "EXTERNALSYSTEM", "EXTERNALSYSTEM_TICKETID",
     "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID", "OWNERGROUP", "SITEID", "ORGID", "CREATEDBY", "CREATIONDATE",
+]
+# The service address Maximo keeps on an SR (its TKSERVICEADDRESS child).
+SR_ADDRESS_COLUMNS = [
+    "SADDRESSCODE", "STADDRNUMBER", "STADDRSTREET", "STREETADDRESS", "CITY", "STATEPROVINCE", "POSTALCODE",
+    "COUNTRY", "LATITUDEY", "LONGITUDEX",
+]
+# The pilot's SR shape: what QAlert knows goes into Maximo fields, not only into the text.
+# REPORTEDNAME and AFFECTEDNAME are gone because Maximo does not store a free-text name.
+STRUCTURED_SR_COLUMNS = [
+    "TICKETID", "CLASS", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "STATUS", "STATUSDATE",
+    "SOURCE", "REPORTEDPRIORITY", "REPORTEDBY", "REPORTEDPHONE", "REPORTEDEMAIL", "REPORTDATE",
+    "AFFECTEDPERSON", "AFFECTEDPHONE", "AFFECTEDEMAIL", "EXTERNALSYSTEM", "EXTERNALSYSTEM_TICKETID",
+    "COMMODITYGROUP", "COMMODITY", "CLASSSTRUCTUREID", "OWNERGROUP", *SR_ADDRESS_COLUMNS,
+    "SITEID", "ORGID", "CREATEDBY", "CREATIONDATE",
 ]
 MAXIMO_WO_COLUMNS = [
     "WONUM", "PARENT", "STATUS", "STATUSDATE", "WORKTYPE", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION",
@@ -161,7 +176,8 @@ def resolve_address(form, points, centroids):
         _, street, city, house = form
         p = points[(street, house)]
         return dict(line=f"{p['STREETNO']} {street}, {city}", short=f"{p['STREETNO']} {street}",
-                    num=p["STREETNO"], street=street, city=city, lat=p["LATITUDE"], lon=p["LONGITUDE"])
+                    num=p["STREETNO"], street=street, city=city, lat=p["LATITUDE"], lon=p["LONGITUDE"],
+                    code=p["ADDRESS_ID"], zip=p["ZIP"])
     if kind == "street_only":
         _, street, city = form
         lat, lon = centroids[street]
@@ -230,6 +246,43 @@ def long_description(resident, loc, text, employee_id):
         address = f"<div>Address: {html_text(loc['line'])}, FL</div>"
     entered_by = f"<div>Entered by: {employee_id}</div>" if employee_id else ""
     return f"{customer}{address}<div>{html_text(text)}</div>{entered_by}"
+
+
+def maximo_sr_fields(origin, intake, rtype, loc, resident, employee):
+    """The Maximo SR fields for what QAlert holds about a request.
+
+    This is the field mapping proposed to the County (docs/qalert-integration-proposal.md):
+    - SOURCE: the QAlert origin, or the intake method for staff-entered requests.
+    - REPORTEDPRIORITY: the request type's QAlert priority, on Maximo's 1-4 scale.
+    - Reporter: whoever entered the request. A resident reports their own request. A Contact
+      Center employee is REPORTEDBY only with an active Maximo person record (Maximo then also
+      sets AFFECTEDPERSON to that person); otherwise their QAlert phone and email are the reported
+      contact. The resident is always the affected contact.
+    - Service address: a matched address point sends its code and every field, because Maximo
+      stores only the code when the code is sent alone. Anything else keeps what was written,
+      so a missing or invalid address stays missing or invalid.
+    """
+    staff = intake is not None
+    person = employee and employee["in_maximo"] and employee["active"]
+    reporter = employee if staff else resident
+    fields = {
+        "SOURCE": cat.SOURCE_CODES[intake or origin],
+        "REPORTEDPRIORITY": str(cat.REQUEST_TYPES[rtype]["priority"]),
+        "REPORTEDBY": employee["id"] if person else "",
+        "REPORTEDPHONE": reporter["phone"] if reporter else "",
+        "REPORTEDEMAIL": reporter["email"] if reporter else "",
+        "AFFECTEDPERSON": employee["id"] if person else "",
+        "AFFECTEDPHONE": resident["phone"], "AFFECTEDEMAIL": resident["email"],
+    }
+    street_address = " ".join(filter(None, (loc["num"], loc["street"])))
+    fields.update({
+        "SADDRESSCODE": loc.get("code", ""), "STADDRNUMBER": loc["num"], "STADDRSTREET": loc["street"],
+        "STREETADDRESS": street_address, "CITY": loc["city"],
+        "STATEPROVINCE": "FL" if loc["city"] else "", "POSTALCODE": loc.get("zip", ""),
+        "COUNTRY": "US" if loc["city"] else "",
+        "LATITUDEY": str(loc["lat"]) if loc["lat"] else "", "LONGITUDEX": str(loc["lon"]) if loc["lat"] else "",
+    })
+    return fields
 
 
 def crew_for(discipline, field):
@@ -335,11 +388,8 @@ def build():
 
         sr = dict(key=key, reported=reported, row={
             "CLASS": "SR", "DESCRIPTION": description, "DESCRIPTION_LONGDESCRIPTION": ld,
-            "STATUS": sr_status, "STATUSDATE": maximo_date(sr_status_date),
-            "REPORTEDBY": cat.INTEGRATION_ACCOUNT["id"], "REPORTEDNAME": cat.INTEGRATION_ACCOUNT["name"],
-            "REPORTEDPHONE": "", "REPORTEDEMAIL": cat.INTEGRATION_ACCOUNT["email"], "REPORTDATE": maximo_date(reported),
-            "AFFECTEDPERSON": cat.INTEGRATION_ACCOUNT["id"], "AFFECTEDNAME": cat.INTEGRATION_ACCOUNT["name"],
-            "AFFECTEDEMAIL": cat.INTEGRATION_ACCOUNT["email"], "EXTERNALSYSTEM": "QAlert",
+            "STATUS": sr_status, "STATUSDATE": maximo_date(sr_status_date), "REPORTDATE": maximo_date(reported),
+            **maximo_sr_fields(origin, intake, rtype, loc, resident, employee), "EXTERNALSYSTEM": "QAlert",
             "COMMODITYGROUP": rt["cgroup"], "COMMODITY": rt["commodity"], "CLASSSTRUCTUREID": rt["classid"],
             "OWNERGROUP": "",
             "SITEID": cat.SITEID, "ORGID": cat.ORGID, "CREATEDBY": cat.INTEGRATION_ACCOUNT["id"],
@@ -398,16 +448,16 @@ def build():
 
     # Assign IDs in chronological order.
     for i, sr in enumerate(sorted(srs, key=lambda r: (r["reported"], r["key"]))):
-        sr["id"] = f"SR{800001 + i}"
+        sr["id"] = f"SR{cat.SR_START + i}"
     for i, req in enumerate(sorted(requests, key=lambda r: (r["created"], r["key"]))):
-        req["id"] = 700001 + i
+        req["id"] = cat.REQUEST_START + i
     request_id_by_key = {r["key"]: r["id"] for r in requests}
     for sr in srs:
         sr["row"]["TICKETID"] = sr["id"]
         sr["row"]["EXTERNALSYSTEM_TICKETID"] = str(request_id_by_key[sr["key"]])
     work_orders.sort(key=lambda w: (w["date"], w["desc"]))
     for i, wo in enumerate(work_orders):
-        wo["id"] = f"WO{2900001 + i}"
+        wo["id"] = f"WO{cat.WO_START + i}"
         if wo["kind"] == "followup":
             wo_by_key[wo["key"]] = wo
 
@@ -452,7 +502,7 @@ def build():
     for i, (at, (cls, record), author, desc, text, *logtype) in enumerate(pending_logs):
         record_id = sr_by_key[record]["id"] if cls == "SR" else record
         logs.append({
-            "WORKLOGID": str(3000001 + i), "RECORDKEY": record_id, "CLASS": cls,
+            "WORKLOGID": str(cat.WORKLOG_START + i), "RECORDKEY": record_id, "CLASS": cls,
             "LOGTYPE": logtype[0] if logtype else "CLIENTNOTE",
             "CREATEBY": author, "CREATEDATE": maximo_date(at), "CLIENTVIEWABLE": "1",
             "DESCRIPTION": desc, "DESCRIPTION_LONGDESCRIPTION": text, "SITEID": cat.SITEID, "ORGID": cat.ORGID,
@@ -642,7 +692,7 @@ def main():
                             "STATUS": "ACTIVE" if s["active"] else "INACTIVE"})
     persons.sort(key=lambda p: p["PERSONID"])
 
-    write_csv(DATA / "maximo" / "sr.csv", MAXIMO_SR_COLUMNS, d["srs"])
+    write_csv(DATA / "maximo" / "sr.csv", STRUCTURED_SR_COLUMNS, d["srs"])
     write_csv(DATA / "maximo" / "wo.csv", MAXIMO_WO_COLUMNS, d["wos"])
     write_csv(DATA / "maximo" / "worklog.csv", MAXIMO_WORKLOG_COLUMNS, d["logs"])
     write_csv(DATA / "maximo" / "person.csv", MAXIMO_PERSON_COLUMNS, persons)
