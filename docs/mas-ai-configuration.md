@@ -7,7 +7,7 @@ This guide sets up use case 1 from the Workshop Playback on the TechZone Maximo 
 | The right classification for a new request | Field value recommendation on the SR's `CLASSSTRUCTUREID` | A recommendation option on the Classification field of a service request |
 | The right team | Field value recommendation on the WO's `PERSONGROUP` | A recommendation option on the Person Group field of a work order |
 | Several residents reporting one problem (duplicates) | Similar service requests (`similarity` template on `MXAPISR`), then a Global Issue groups them onto one work order | **Select Action > Similar service requests from AI** on a service request. We build this dialog; see configuration 4 |
-| Related past or planned work | Similar work orders (`WOSIMILARITY`) | **Actions > View similar work orders** on a work order |
+| Related past or planned work | Similar work orders (`WOSIMILARITY`), and an address match that is not AI | **Actions > View similar work orders** on a work order, and **Select Action > Nearby work** in classic Work Order Tracking. We build the second; see "Nearby work orders" |
 | Questions in plain language during reviews | Maximo Assistant | The AI icon in Service Requests and Work Order Tracking |
 | Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. A watsonx.ai check outside Maximo reads the request for the rest and drafts the question to the resident. See "Missing information" below |
 
@@ -291,6 +291,82 @@ Observed on TechZone (2026-11-12, model `s3-a1658510dec311f`, the 22 `similar_wo
 - **No threshold helps.** A higher threshold cuts real matches before it quiets the controls.
 - **Re-ranking can't recover the misses.** The 6 missed WOs are not among the 10 that Maximo stores for each WO, and 10 is the most it allows. So a same-street score on the stored results, like the SR duplicate score, could not bring them up. Finding work on the same street would need an address match outside the AI.
 - **What this means:** similar work orders find repeat work when the wording repeats. They do not find work at the same place described in different words. A reviewer reads the list for the street name, not for the score.
+
+## Nearby work orders (address match)
+
+Similar work orders miss work at the same place written in different words (configuration 3). This adds what a reviewer would look for by hand: other work orders within about 150 m. It is not AI. It is a relationship on `WORKORDER` and a read-only dialog in classic **Work Order Tracking**, with no script or escalation once the data is in place.
+
+1. **Give the WOs a service address.** The pilot and draft WOs carry the SR's address columns without `SADDRESSCODE` ([sample-dataset.md](sample-dataset.md#service-address)), and the loader sends them as the WO's `woserviceaddress` row. The WOs loaded before that were filled once with [scripts/fill_wo_service_addresses.py](../scripts/fill_wo_service_addresses.py). It previews unless given `--apply`, backs up each WO's address row to `logs/` first, skips a WO that already matches, and reads each written WO back.
+   - **Closed and cancelled WOs refuse it through the API.** Setting the coordinates adds a `GEOMETRY` row, and a WO in history takes no new child rows: "BMXAA0024E - The action ADD is not allowed on object GEOMETRY". **Edit History Work Order** does not unlock the service address either.
+   - `--history` fills them through a one-off automation script, [srqfillwoaddr.py](../scripts/autoscript/srqfillwoaddr.py). The run creates it as `SRQFILLWOADDR` through `MXAPIAUTOSCRIPT`, POSTs to `/maximo/api/script/SRQFILLWOADDR`, and deletes it afterwards, even on failure. The script sets the address fields with access checks off and without field actions, so no `GEOMETRY` row is added. A preview runs it too and rolls back. This goes around Maximo's history lock, so it is for the synthetic pilot data only; a real WO gets its address when it is created, long before it closes.
+   - Those WOs show no pin on the **Map** tab. The relationship reads the coordinates, so the match is not affected.
+
+   ```bash
+   uv run --no-project --with-requirements requirements.txt python scripts/fill_wo_service_addresses.py                      # preview
+   uv run --no-project --with-requirements requirements.txt python scripts/fill_wo_service_addresses.py --apply              # open WOs
+   uv run --no-project --with-requirements requirements.txt python scripts/fill_wo_service_addresses.py --history --apply    # closed and cancelled WOs too
+   ```
+
+2. **The relationship.** In **Database Configuration**, open `WORKORDER`, and on **Relationships** add `NEARBYWO`, child object `WORKORDER`:
+
+   ```sql
+   siteid = :siteid and wonum != :wonum
+   and status not in (select value from synonymdomain where domainid = 'WOSTATUS' and maxvalue = 'CAN')
+   and exists (select 1 from woserviceaddress n, woserviceaddress m
+               where n.wonum = workorder.wonum and n.siteid = workorder.siteid
+                 and m.wonum = :wonum and m.siteid = :siteid
+                 and abs(n.latitudey - m.latitudey) <= 0.00135
+                 and abs(n.longitudex - m.longitudex) <= 0.00152)
+   ```
+
+   - 0.00135° of latitude and 0.00152° of longitude are each about 150 m at 27° N, the "near" distance of the SR duplicate score. The match is a square, so its corners reach about 210 m.
+   - A WO without coordinates matches nothing, and cancelled WOs are never listed. Closed past work is.
+   - Check it over REST before the dialog: `rel.nearbywo{wonum}` on `MXAPIWODETAIL`.
+   - The WO's own address relationship is `SERVICEADDRESS`, as on SR; there is no relationship named `WOSERVICEADDRESS`.
+   - `WOSERVICEADDRESS` has no index on the coordinates. That is fine for the pilot; a County rollout would need one.
+3. **The dialog.** In **Application Designer**, open `WOTRACK` and export it first. The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `wotrack-original.xml` is the application before any change, and `wotrack-nearbywo-v1.xml` adds this dialog before `</presentation>`. Import it with **Import Application Definition**.
+
+   ```xml
+   <dialog id="NEARBYWO" label="Nearby work (within about 150 m)" datasrc="MAINRECORD">
+     <section id="nearbywo_head">
+       <textbox id="nearbywo_wonum" dataattribute="wonum" inputmode="readonly"/>
+       <textbox id="nearbywo_desc" dataattribute="description" inputmode="readonly"/>
+     </section>
+     <table id="nearbywo_tbl" relationship="NEARBYWO" orderby="reportdate desc" label="Other work orders within about 150 m, newest first" inputmode="readonly">
+       <tablebody id="nearbywo_tbl_body" displayrowsperpage="10">
+         <tablecol id="nearbywo_c1" dataattribute="wonum" label="Work Order"/>
+         <tablecol id="nearbywo_c2" dataattribute="description" label="Description"/>
+         <tablecol id="nearbywo_c3" dataattribute="status" label="Status"/>
+         <tablecol id="nearbywo_c4" dataattribute="worktype" label="Work Type"/>
+         <tablecol id="nearbywo_c5" dataattribute="origrecordid" label="Originating Record"/>
+         <tablecol id="nearbywo_c6" dataattribute="reportdate" label="Reported Date"/>
+         <tablecol id="nearbywo_c7" dataattribute="schedstart" label="Scheduled Start"/>
+         <tablecol id="nearbywo_c8" dataattribute="SERVICEADDRESS.streetaddress" label="Street Address"/>
+       </tablebody>
+     </table>
+     <buttongroup id="nearbywo_buttons">
+       <pushbutton id="nearbywo_ok" label="OK" default="true" mxevent="dialogok"/>
+     </buttongroup>
+   </dialog>
+   ```
+
+4. **The menu entry and access.** Still in Application Designer, add signature option `NEARBYWO` ("Nearby work") with **Add/Modify Signature Options**, then a Select Action menu row with element type `OPTION`, key value `NEARBYWO`, position `999` and subposition `0`. In **Security Groups**, grant **Nearby work** under **Applications > Work Order Tracking** to the reviewer groups and `MAXADMIN`. Sign out and back in.
+5. **Collect the results** for every `nearby_wo` row of the results sheet. Nothing needs refreshing; the relationship is live.
+
+   ```bash
+   uv run --no-project python scripts/harvest_similar_work_orders.py --feature nearby_wo           # preview
+   uv run --no-project python scripts/harvest_similar_work_orders.py --feature nearby_wo --write   # save
+   ```
+
+**Check it:** open WO2915021 (SR810036) and click **Select Action > Nearby work**. It lists WO2910012 and WO2910007, both closed service line leaks at 1382 Larkspur Bay Dr. WO2915004 (SR810004) lists the planned Starling Cove Dr water main replacement, WO2910037. WO2915003 (control SR810003) lists nothing.
+
+Observed on TechZone (2026-11-12, the 22 rows that also score similar work orders):
+
+- **All 76 pilot WOs** list exactly the WOs the dataset puts within the box. 25 have neighbours.
+- **Related WOs surfaced 12/12** across 10 SRs, and **10/10 SRs got every related WO**, including all 4 planned projects and SR810056's two sewer WOs, which text similarity missed.
+- **Control SRs with any match: 0/12.** Text similarity listed 10 WOs for every control.
+- **One extra:** SR810065's WO also lists WO2915034, a draft for a different request 78 m away. The scorer does not count extras, so read the list as "work nearby", not "the same problem".
+- **What this means:** the address match finds work at the same place whatever its wording, and similarity finds the same problem worded the same way elsewhere. A reviewer gets both on the work order: **Nearby work** for the place, **View similar work orders** for the problem.
 
 ## Configuration 4: Similar service requests (duplicate reports)
 
@@ -697,11 +773,12 @@ python3 scripts/score_ai_results.py evaluation/ai-results.csv
 - **Classification:** record the classification **name** Maximo shows, for example `WATER-LEAK`. Maximo numbers classifications itself, so a numeric ID is refused with a hint.
 - **Team:** `SANCLINS` and `SANCLINSP` both count.
 - **Similar work orders:** list the WO numbers Maximo showed, separated by `;`. `scripts/harvest_similar_work_orders.py` fills these rows from Maximo (configuration 3, step 7).
+- **Nearby work orders:** the WO numbers the **Nearby work** dialog showed, separated by `;`. `scripts/harvest_similar_work_orders.py --feature nearby_wo` fills these rows.
 - **Similar service requests:** list the SR numbers the dialog showed, separated by `;`. Use `accept` when the reviewer grouped them under the Global Issue, and `override` when the reviewer kept them apart.
 - **Which rows the template asks for:**
   - classification on all 65 SRs
   - team on the 53 SRs that name a team and are not duplicates
-  - similar work orders where related WOs are expected, and on controls
+  - similar and nearby work orders where related WOs are expected, and on controls
   - similar service requests on the 18 open SRs that are in a duplicate cluster, are look-alikes, or are controls
 - **Special values for `AI_VALUE`:**
   - leave it blank: not tried yet, left out of the score
@@ -743,6 +820,9 @@ Deactivate the four configurations (**Actions > Deactivate**). This stops the tr
 | Similar work orders list retired or cancelled copies | The model was built before the filter changed. Run **Create model** again. |
 | BMXAA10138E, "The target AI Model is not ready" | The model is still training after **Create model**. Wait a few minutes and try again. If **Check model status** shows "BMXAA1482E ... Not Found", the model creation failed: read the configuration's **Log** for the reason. |
 | The log shows "invalid argument max_similarity_records value must be less than or equal to 10" | Set `max_similarity_records` back to 10 or less, then **Create model** again. |
+| **Nearby work** is missing from Select Action | The `NEARBYWO` option is not granted to your group, or you have not signed out and back in. |
+| The Nearby work dialog is empty for a WO that should have neighbours | The WO, or the other WO, has no coordinates on its service address. Run `scripts/fill_wo_service_addresses.py` to see which WOs differ from the dataset. A cancelled WO is never listed. |
+| BMXAA0024E, "The action ADD is not allowed on object GEOMETRY", when filling a WO's address | The WO is closed or cancelled. Use `--history` ("Nearby work orders", step 1). |
 | **Similar service requests from AI** is missing from Select Action | The `AISIMSR` option is not granted to your group, or you have not signed out and back in. |
 | The similar SR dialog is empty | The SR is not open, so it is not in `SRSIMILARITYINFFILTER`. Or AIINFJOB has not run since activation. Or the AI configuration is not named `SRSIMILARITY`, which the `AISIMSRPAIR` relationship expects. |
 | A duplicate is missing from the dialog | It is not among the 10 closest stored for that SR (`max_similarity_records`), or its report date is outside `history_days`. If you added a `dupscore` cut to `AISIMSRPAIR`, it may score below it. |
