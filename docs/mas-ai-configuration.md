@@ -158,6 +158,7 @@ Observed on TechZone (2026-11-09, before the reload):
   - It disagrees with 8 SRs that were already filed correctly. 6 of those are at confidence 50, the lowest the default threshold shows.
   - Most of its misses send a water line leak to Water Main, Storm Flooding, Pressure or No Water: the neighbouring water classes.
   - SR800027 (Pressure instead of Meter) reports both problems, so Pressure is defensible.
+- **After the reload (2026-11-11):** the inference filter was changed to `'71%'`, the configuration was reactivated with the same model, and inference ran on the 65 reloaded SRs (SR810001 onward). The result is unchanged: 56 of 65 agree with the answer key, and 4 of the 5 misfiled SRs are corrected. This was expected, because the model reads only the description text, and the reload did not change it.
 
   | `score_threshold` | Shown | Right | Wrong |
   |---|---|---|---|
@@ -280,7 +281,8 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
 
    - The filters do not test the external ID, so an SR entered in Maximo, including with **Duplicate** (which does not copy the external ID), is covered like a loaded one.
    - Maximo marks an SR as history (`historyflag = 1`) when it is closed or cancelled. Leaving those out keeps retired copies, test SRs and cancelled reports from topping a live SR's list at 100, without naming any ID range.
-   - On TechZone (2026-11-11) this compares against 152 SRs: 61 pilot SRs, the 90 resolved SRs of the training history and one SR entered in Maximo. The four closed pilot SRs (SR810006, SR810016, SR810033, SR810061) are left out; none of them is in a duplicate pair.
+   - On TechZone (2026-11-11) the filter matches 152 SRs: 61 pilot SRs, the 90 resolved SRs of the training history and one SR entered in Maximo. The four closed pilot SRs (SR810006, SR810016, SR810033, SR810061) are left out; none of them is in a duplicate pair.
+   - Training also applies `retention_days` (step 5) to `reportdate`, so the model compares against 84 of them: the 61 pilot SRs, the 22 history SRs reported in the last 365 days, and the one entered in Maximo.
    - Until 2026-11-11 both filters were limited to `externalrecid like '71%' or externalrecid is null`. That took in the closed test SRs and the retired hand-made copy SR700046, which have no external ID.
 
 3. **Query templates.** Still in `MXAPISR`, click **More actions > Query Template** and add two templates. Add the same four attributes to both: `ticketuid`, `description`, `description_longdescription`, `reportdate`.
@@ -331,7 +333,12 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
    - Click **Save**, then **Actions > Activate**, then **Actions > Create model**.
    - Training starts at once and the configuration list shows **Model status Ready** when it ends. The log only records the start; use **Actions > Check model status** for progress.
    - Results come from the AIINFJOB cron task, whose `DFLTINF` instance runs hourly by default (training is AITRAINJOB's `WOAI` instance, every 5 minutes). For the pilot, in **Cron Task Setup**, set `DFLTINF` to every 5 minutes and use **Reload Request** there so the new schedule takes effect. (The AI configuration screen has no Reload Request.) Each run handles 10 open SRs (the inferencing template's page size), so the 45 open pilot SRs take about 25 minutes.
-   - After that first pass, a run picks up only SRs created or changed since the last one. On TechZone an SR got its suggestions about 5 minutes after it was saved inside the filter; one that was already outside it when the filter changed got nothing until it was saved again.
+   - **The cron task scores each SR once.** Once an SR has its inference record (`MAXAIINFERENCE`), no later run scores it again. None of these makes it score again: a retrain, a filter change, Deactivate and Activate, or a later save of the SR. All four were tried on TechZone on 2026-11-11. A new SR gets its suggestions within about 5 minutes of being created inside the filter.
+   - **To refresh SRs that already have suggestions,** for example after a retrain or a reload, send IBM's regenerate request once for each SR:
+     - `POST <MAXIMO_URL>/api/aicfg_srsimilarity`, with header `content-type: application/json` and body `{"href": "<MAXIMO_URL>/api/os/mxapisr/<the SR's resource ID>", "usecache": false}`.
+     - On TechZone, Manage answers with a 400 error (BMXAA9757E), but within a few seconds it still replaces the SR's inference record and its 10 pairs. Check the result by reading the new pairs, not the reply.
+     - The `SRQDUPSCORE` escalation scores the new pairs within 5 minutes.
+     - On 2026-11-11 this refreshed all 45 open pilot SRs. Their stored pairs had been made before the filter change, and 342 of them pointed at retired copies.
 
 6. **The duplicate score.** The AI's score is text only. Pilot SRs all read "*Type*, *address*" over the same Customer, Address and Map layout, so two sewer odor reports 6 km apart score 93 against 97 for the true duplicate. The duplicate score adds place and time:
 
@@ -384,7 +391,7 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
       ```
 
    - This is IBM's sample dialog cut down to a read-only list. IBM's version also has a **Generate/Re-generate similarity** button and a **Close selected SRs** button. Both need custom Java or a script.
-     - We leave out regenerate because the cron task refreshes the list.
+     - We leave out regenerate. The cron task does not refresh the list, so after a retrain or a reload, refresh the SRs with the request in step 5.
      - We leave out close because the County wants duplicates grouped onto one work order, not closed. Grouping is the next section.
    - Add the columns from step 6 before importing; the table sorts on `DUPSCORE`.
    - The AI's own text match (`score`) is not shown. The duplicate score and the two deductions add up to it.
@@ -449,6 +456,14 @@ Observed on TechZone with the duplicate score (2026-11-10, all 450 stored pairs 
 - 14 of the 450 pairs reach 85: the 12 duplicate pairs and SR800060 with SR800065. Those two are look-alikes of cluster C, but against each other they are 12 m and 4 hours apart, so they may be one new problem reported twice. With the AI score alone, 34 pairs reached 93, 22 of them at another address.
 - Look-alikes against the cluster they resemble score 64 to 82, so they stay visible, below the true duplicates. SR800042's closest row scores 47.
 - The factors were tuned on these pilot pairs, so expect some drift on real data, especially SRs without a Maps link.
+
+Observed after the reload (2026-11-11). The model was retrained on the ID-free filters, and all 45 open pilot SRs (SR810xxx) were refreshed:
+- The likely duplicates (score 85 or more) are the same as in the table above, with the same scores and SR810xxx in place of SR800xxx.
+  - 14 of the 450 pairs reach 85: the 12 duplicate pairs and SR810060 with SR810065.
+  - The scorer reports 8 of 8 duplicates matched to their group, and 7 of 7 shown their first report.
+  - No look-alike is matched to the group it resembles, and no control SR gets a match.
+- 27 pairs now point at resolved history SRs. Their highest duplicate score is 47, because the history SRs are at other streets and dates, so they never reach the cut.
+- No pair points at a retired SR800xxx copy, because closed SRs are out of the corpus.
 
 ## Group duplicate reports under one work order
 
