@@ -36,7 +36,7 @@ Do this first. If AI Service is not there, nothing else in this guide works.
 | Configurations already listed (look for the `mcc`, `pcc`, `similarity`, `nl2oslc` templates, and on 9.2 the agentic tools) | AI configuration list | Active and Ready: `ASSISTANT` (`nl2oslc`), `WOSIMILARITY`, `IBMDOCS` (`docsearch`). Inactive: `WOPROBLEMCODE` (`pcc`), **`TICKETSIMILARITY`** (`similarity` on `MXAPITKSRVAD`, IBM-shipped), `MREF_LEASE_ABSTRACT` (`fieldextractor`), and our own tests `SR-MISSING-INFO` (`insightsgenerator`) and `SR-MISSINGINFO-TEST` (`almwatsonx`). No `mcc` configuration yet; check that the template is offered under **Create**. |
 | `WOSIMILARITY` is listed | AI configuration list | Yes, active, model Ready |
 | The AITRAINJOB and AIINFJOB cron tasks exist | **Cron Task Setup** | _pending_ |
-| The invocation channels `AIWOSIMILARITYCFG` and `AIWOSIMILARITYINF` exist (configuration 4 copies them) | **Invocation Channels** | _pending_ |
+| The invocation channels `AIWOSIMILARITYCFG` and `AIWOSIMILARITYINF` exist (configuration 4 copies them) | **Invocation Channels** | Yes (2026-11-12, read through `MXIFACEINVOKE`) |
 | A service request shows the **Global Issue** check box and a **Related to Global ID** field on its main tab | Open any SR in **Service Requests** | _pending_ |
 | We have cluster-admin on the OpenShift cluster (only needed to install AI Service ourselves) | `oc auth can-i '*' '*' --all-namespaces` | Yes, for the reservation's IBMid (2026-11-12). The cluster is Red Hat OpenShift on IBM Cloud in `us-south`. Sign in with an IBM Cloud one-time passcode, as `oc login -s <cluster service endpoint> -u passcode -p <passcode>`. |
 | AI Service is installed, and which catalog the cluster runs | `oc get aiserviceapp -A`, or `mas must-gather --collectors mas,aiservice --no-logs` for a full version summary | Installed: `aiserviceapp` `inst1` in namespace `aiservice-inst1`, tenant `aiservice-inst1-user`, licensed 2026-09-25 to 2027-09-25 (2026-11-12). Catalog not checked. |
@@ -220,35 +220,77 @@ Observed on TechZone: _pending_
 
 `WOSIMILARITY` needs no training. In the pilot it answers "has a crew worked on this before, or is work already planned?" Run it from the draft WO of a related-work SR, for example SR810036's draft, which should list WO2910007 and WO2910012. Duplicate reports are found with similar service requests instead (configuration 4).
 
-1. Open the `WOSIMILARITY` configuration and click **Actions > Edit**.
-   - Set **Related Records** to `siteid='SRQSITE' and externalrefid like 'WO291%'`, so only pilot WOs are compared.
-     - Leaving it empty brings in the earlier demo data on the instance.
-     - It would also bring in the 990 closed history WOs, which are worded like the pilot's and would crowd the top 10.
-   - Pick the latest template version.
-   - Save.
-2. **Actions > Set arguments:**
+1. **Limit and widen what is compared.** The two filters live in **Object Structures** > `MXAPIWODETAIL` > **Query definition**. They are read-only over the REST API. On TechZone, the configuration has no separate Related Records value (2026-11-12), so the comparison filter sets the scope.
+
+   | Clause | IBM's value | Pilot value |
+   |---|---|---|
+   | `WOSIMILARITYCFGFILTER` (the WOs compared against) | `status in (select value from synonymdomain where domainid ='WOSTATUS' and maxvalue not in ('CAN','CLOSE')) and historyflag = :no` | `siteid='SRQSITE' and externalrefid like 'WO291%' and status not in (select value from synonymdomain where domainid='WOSTATUS' and maxvalue='CAN')` |
+   | `WOSIMILARITYINFFILTER` (the WOs that get suggestions) | `status not in (select value from synonymdomain where domainid ='WOSTATUS' and maxvalue in ('CAN','CLOSE')) and worktype != 'PM'` | `siteid='SRQSITE' and externalrefid like 'WO291%' and status not in (select value from synonymdomain where domainid='WOSTATUS' and maxvalue in ('CAN','CLOSE')) and worktype != 'PM'` |
+
+   - **IBM's comparison filter drops closed work twice:** by status, and by `historyflag = :no`, because a closed WO has `historyflag` set. All 7 related past-work WOs in the pilot are closed, so the pilot value removes both conditions. Allowing `CLOSE` alone is not enough.
+   - **The pilot value keeps out:**
+     - the earlier demo data on the instance
+     - the retired 2900xxx and 2950xxx copies
+     - the 990 closed history WOs, which are worded like the pilot's and would crowd the top 10.
+   - **The inference filter only narrows IBM's value to the pilot.** Closed WOs need to be found, not to get suggestions of their own.
+   - Read both back through `GET /api/os/mxapiwodetail?savedQuery=<clause name>`. The comparison filter should return 75 WOs.
+2. **Actions > Set arguments.** You can also patch them through `MXAPIMAXAICONFIG` in the REST API, with a merge on `maxaiconfigarg` by `maxaiconfigargid`.
 
    | Argument | Default | Pilot value | Why |
    |---|---|---|---|
    | `date_field` | `changedate` | `reportdate` | Maximo stamps `changedate` at load time, so every loaded record would look new. |
    | `history_days` | 30 | 1000 | The related past work in the pilot goes back to July 2025. |
    | `features` | `description, description_longdescription` | keep | |
-   | `similarity_threshold` | 70 | 70; try 60 if nothing comes back | |
-   | `max_similarity_records` | 10 | keep | |
+   | `similarity_threshold` | 70 | keep 70 | Every pilot pair scores 83 or more, so nothing is cut here. A higher value cuts real matches before it cuts noise (see Observed). |
+   | `max_similarity_records` | 10 | keep | 10 is AI Service's maximum. On 2026-11-12, 20 made **Create model** fail with `400 ... invalid argument max_similarity_records value must be less than or equal to 10`, and the model was unusable until it was created again with 10. |
    | `retention_days` | 90 | 1000 (IBM's limit) | It counts back from today, so at 90 the past work from 2025 and early 2026 is left out and can never be listed. |
 
-3. **Include finished work.**
-   - By default only WOs that are not closed or cancelled, and not PM work, are compared.
-   - Our related past work is closed, so edit the similarity inference query definition for `MXAPIWODETAIL` to include `CLOSE` and `COMP`.
-   - If `date_field` or `features` change, the similarity query templates in `MXAPIWODETAIL` need the same change.
-4. **Actions > Activate**, wait a few minutes, then **Actions > Create model**. **Actions > Check model status** shows Ready when it is done.
+3. **Match the query templates.**
+   - The `WOSIMILARITYCFG` and `WOSIMILARITYINF` query templates on `MXAPIWODETAIL` must select the `date_field` attribute and every attribute in `features`.
+   - IBM's templates select `changedate`, `description`, `description_longdescription` and `workorderid`.
+   - For `date_field=reportdate`, add `reportdate` to both. A merge through `MXAPIQUERYTEMPLATE` (`querytemplateattr: [{selectattrname: reportdate}]`) works.
+4. **Actions > Create model**. Maximo marks the configuration for training, and the training job picks it up within a few minutes. A new model ID appears first.
+   - While it trains, a similarity request fails with BMXAA10138E ("The target AI Model is not ready").
+   - On 2026-11-12 the job took 7 minutes from the click (11:58) to a model that answers (12:05 new ID, 12:08 answering).
+   - **Actions > Check model status** shows Ready when it is done.
+   - A rebuild is needed after a filter change. Until then, the old model keeps listing WOs the new filter leaves out.
 5. **Grant access:**
    - In **Security Groups**, open your group, then **Object Structures** > `MXAPIWODETAIL`.
    - Under **Options**, tick **View similar work order**.
    - Repeat this for each reviewer group.
 6. **Check it:** open a pilot WO and click **Actions > View similar work orders**.
+7. **Collect the results** for every `similar_wo` row of the results sheet:
 
-Observed on TechZone: _pending_
+   ```bash
+   uv run --no-project python scripts/harvest_similar_work_orders.py                     # preview, reads only
+   uv run --no-project python scripts/harvest_similar_work_orders.py --refresh --write   # re-run each WO, save
+   ```
+
+   - **Which WO it asks about for each SR:** the SR's draft, otherwise an open follow-up WO, otherwise a closed one.
+   - **Re-running a WO:** `--refresh` calls `POST /api/aicfg_wosimilarity` with `{"href": <the WO>, "usecache": false}`.
+   - **Reading the list:** it uses the saved query the dialog uses, `GET /api/os/mxapiwodetail?savedQuery=similarObjects&sqp:objectId=<workorderid>`.
+   - **Reading the scores:** they come from IBM's `MAXAISIMILARWO` relationship. That relationship is keyed by the WO that was found, so the script reads it on each listed WO and keeps the row for the WO it asked about.
+   - It never changes the reviewer columns.
+
+Observed on TechZone (2026-11-12, model `s3-a1658510dec311f`, the 22 `similar_wo` rows):
+
+- **Before the change, closed past work could never be listed.** The model also still listed the retired 2900xxx and 2950xxx copies, and each draft's own old copy came first at 100.
+- **Related past work: 4 of the 5 SRs** were shown every related WO, at ranks 1 to 4.
+  - SR810009 (WO2910011, rank 1), SR810034 (WO2910002, rank 2), SR810036 (WO2910007 and WO2910012, ranks 3 and 4) and SR810045 (WO2910010, rank 1).
+  - These matched because the old WO repeats the address and the problem words. For example, "1382 Larkspur Bay Dr: WATER LINE LEAK" matched "1382 Larkspur Bay Dr: SERVICE LINE LEAK".
+- **The miss:** SR810056 ("slow to drain and gurgle") is not shown WO2910015 ("MAIN LINE STOPPAGE") or WO2910022 ("CCTV INSPECTION") on the same street. Other "SEWER ISSUE" WOs elsewhere rank higher.
+- **Related planned work: 0 of 4.**
+  - Capital projects are written differently from a resident's report. For example, "Starling Cove Dr water main replacement" against "LOW WATER PRESSURE", or "Willowmarsh Rd sanitary sewer main lining" against "SEWER ODOR".
+  - Every top 10 fills with same-problem reports from other streets.
+- **The look-alike:** SR810065 is shown WO2910040 first, which is the expected related WO.
+- **Scorer:** related WOs surfaced 6/12 (50%) across 10 SRs, and 5/10 SRs got every related WO.
+- **The controls are always matched.** Every list holds 10 WOs, so all 12 control SRs get matches. Scores do not separate real from unrelated:
+  - the 6 expected WOs score 88 to 95
+  - the 94 other WOs listed on related-work SRs score 83 to 95
+  - the 120 WOs listed on controls score 83 to 93.
+- **No threshold helps.** A higher threshold cuts real matches before it quiets the controls.
+- **Re-ranking can't recover the misses.** The 6 missed WOs are not among the 10 that Maximo stores for each WO, and 10 is the most it allows. So a same-street score on the stored results, like the SR duplicate score, could not bring them up. Finding work on the same street would need an address match outside the AI.
+- **What this means:** similar work orders find repeat work when the wording repeats. They do not find work at the same place described in different words. A reviewer reads the list for the street name, not for the score.
 
 ## Configuration 4: Similar service requests (duplicate reports)
 
@@ -654,7 +696,7 @@ python3 scripts/score_ai_results.py evaluation/ai-results.csv
 
 - **Classification:** record the classification **name** Maximo shows, for example `WATER-LEAK`. Maximo numbers classifications itself, so a numeric ID is refused with a hint.
 - **Team:** `SANCLINS` and `SANCLINSP` both count.
-- **Similar work orders:** list the WO numbers Maximo showed, separated by `;`.
+- **Similar work orders:** list the WO numbers Maximo showed, separated by `;`. `scripts/harvest_similar_work_orders.py` fills these rows from Maximo (configuration 3, step 7).
 - **Similar service requests:** list the SR numbers the dialog showed, separated by `;`. Use `accept` when the reviewer grouped them under the Global Issue, and `override` when the reviewer kept them apart.
 - **Which rows the template asks for:**
   - classification on all 65 SRs
@@ -696,7 +738,11 @@ Deactivate the four configurations (**Actions > Deactivate**). This stops the tr
 | No recommendation option on a record | The record is not in the inference filter, the record is not editable, or inference has not run yet (AIINFJOB). |
 | Training never starts | AITRAINJOB is inactive, or its `WOAI` instance schedule is long. |
 | **View similar work orders** is missing from Actions | The security group lacks the **View similar work order** option on `MXAPIWODETAIL`. Sign out and back in after granting it. |
-| Similar work orders list nothing for a related-work SR | Closed work is still excluded (step 3), `history_days` is too small, or the threshold is too high. |
+| Similar work orders list nothing for a related-work SR | Closed work is still excluded (configuration 3, step 1), `history_days` is too small, or the threshold is too high. |
+| Closed related WOs are never listed, even with `CLOSE` allowed | IBM's comparison filter also has `historyflag = :no`, and closed WOs are history. Remove it (configuration 3, step 1), then **Create model** again. |
+| Similar work orders list retired or cancelled copies | The model was built before the filter changed. Run **Create model** again. |
+| BMXAA10138E, "The target AI Model is not ready" | The model is still training after **Create model**. Wait a few minutes and try again. If **Check model status** shows "BMXAA1482E ... Not Found", the model creation failed: read the configuration's **Log** for the reason. |
+| The log shows "invalid argument max_similarity_records value must be less than or equal to 10" | Set `max_similarity_records` back to 10 or less, then **Create model** again. |
 | **Similar service requests from AI** is missing from Select Action | The `AISIMSR` option is not granted to your group, or you have not signed out and back in. |
 | The similar SR dialog is empty | The SR is not open, so it is not in `SRSIMILARITYINFFILTER`. Or AIINFJOB has not run since activation. Or the AI configuration is not named `SRSIMILARITY`, which the `AISIMSRPAIR` relationship expects. |
 | A duplicate is missing from the dialog | It is not among the 10 closest stored for that SR (`max_similarity_records`), or its report date is outside `history_days`. If you added a `dupscore` cut to `AISIMSRPAIR`, it may score below it. |
