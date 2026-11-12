@@ -138,6 +138,24 @@ def test_verify_compares_the_service_address_without_case(fake_maximo, tmp_path)
     assert any("service address staddrstreet: expected" in line for line in lines)
 
 
+def test_verify_reads_back_the_wo_service_address(fake_maximo, tmp_path):
+    wo = next(w for w in DATA.wos if w["ORIGRECORDID"])
+    fake = fake_maximo(_instance())
+    _load(fake, tmp_path, only=[wo["ORIGRECORDID"]])
+    [loaded] = [r for r in fake.records["mxapiwodetail"] if r["externalrefid"] == wo["WONUM"]]
+    [address] = loaded[mapping.WO_ADDRESS_CHILD]
+    assert address["latitudey"] == float(wo["LATITUDEY"]) and "saddresscode" not in address
+    lines = []
+    manifest = Manifest(tmp_path / "manifest.json")
+    assert Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append).run(
+        only=[wo["ORIGRECORDID"]]) == 0, lines
+    address["staddrstreet"] = "Elsewhere Rd"
+    lines.clear()
+    assert Verifier(fake.client(), manifest, DATA, drop=DEFAULT_DROP, log=lines.append).run(
+        only=[wo["ORIGRECORDID"]]) == 1
+    assert any("service address staddrstreet: expected" in line for line in lines)
+
+
 def test_verify_reports_records_never_loaded(fake_maximo, tmp_path):
     lines = []
     verifier = Verifier(fake_maximo(_instance()).client(), Manifest(tmp_path / "m.json"), DATA, log=lines.append)
@@ -253,12 +271,12 @@ HISTORY = Dataset(name="history")
 
 def test_history_is_its_own_dataset_without_an_answer_key():
     import history_catalog as hc  # on sys.path through loader.config
-    from generate_pilot_dataset import MAXIMO_SR_COLUMNS
+    from generate_pilot_dataset import MAXIMO_SR_COLUMNS, MAXIMO_WO_COLUMNS
 
     n_srs = hc.PER_CLASS * len(cat.REQUEST_TYPES)
     assert len(HISTORY.srs) == n_srs and len(HISTORY.wos) == 11 * hc.PER_CLASS and HISTORY.answers == []
     # The history keeps the text-only SR shape it was loaded with; the pilot SRs carry structured fields.
-    assert HISTORY.sr_header == MAXIMO_SR_COLUMNS and HISTORY.wo_header == DATA.wo_header
+    assert HISTORY.sr_header == MAXIMO_SR_COLUMNS and HISTORY.wo_header == MAXIMO_WO_COLUMNS
     assert set(DATA.sr_header) - set(HISTORY.sr_header) >= {"SOURCE", "SADDRESSCODE"}
     assert len(HISTORY.chains()) == n_srs  # every history WO follows one history SR
     assert not {r["TICKETID"] for r in HISTORY.srs} & {r["TICKETID"] for r in DATA.srs}

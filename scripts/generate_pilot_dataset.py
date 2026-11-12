@@ -56,6 +56,11 @@ MAXIMO_WO_COLUMNS = [
     "PERSONGROUP", "OWNERGROUP", "SUPERVISOR", "LEAD", "FAILURECODE", "PROBLEMCODE",
     "SCHEDSTART", "SCHEDFINISH", "ACTSTART", "ACTFINISH", "SITEID", "ORGID",
 ]
+# The pilot and draft WOs also carry the service address Maximo keeps on a WO (its WOSERVICEADDRESS
+# child): the SR's fields without the address code, because past and planned work may sit at an
+# address Maximo has no record of. The history keeps the text-only shape above.
+WO_ADDRESS_COLUMNS = SR_ADDRESS_COLUMNS[1:]
+STRUCTURED_WO_COLUMNS = MAXIMO_WO_COLUMNS[:-2] + WO_ADDRESS_COLUMNS + MAXIMO_WO_COLUMNS[-2:]
 MAXIMO_WORKLOG_COLUMNS = [
     "WORKLOGID", "RECORDKEY", "CLASS", "LOGTYPE", "CREATEBY", "CREATEDATE", "CLIENTVIEWABLE",
     "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "SITEID", "ORGID",
@@ -274,15 +279,20 @@ def maximo_sr_fields(origin, intake, rtype, loc, resident, employee):
         "AFFECTEDPERSON": employee["id"] if person else "",
         "AFFECTEDPHONE": resident["phone"], "AFFECTEDEMAIL": resident["email"],
     }
-    street_address = " ".join(filter(None, (loc["num"], loc["street"])))
-    fields.update({
+    fields.update(service_address(loc))
+    return fields
+
+
+def service_address(loc):
+    """The service address fields for a resolved location, as an SR stores them. A WO takes the
+    same fields without SADDRESSCODE (WO_ADDRESS_COLUMNS)."""
+    return {
         "SADDRESSCODE": loc.get("code", ""), "STADDRNUMBER": loc["num"], "STADDRSTREET": loc["street"],
-        "STREETADDRESS": street_address, "CITY": loc["city"],
+        "STREETADDRESS": " ".join(filter(None, (loc["num"], loc["street"]))), "CITY": loc["city"],
         "STATEPROVINCE": "FL" if loc["city"] else "", "POSTALCODE": loc.get("zip", ""),
         "COUNTRY": "US" if loc["city"] else "",
         "LATITUDEY": str(loc["lat"]) if loc["lat"] else "", "LONGITUDEX": str(loc["lon"]) if loc["lat"] else "",
-    })
-    return fields
+    }
 
 
 def crew_for(discipline, field):
@@ -326,7 +336,9 @@ def build():
         start = AS_OF - timedelta(days=30 * months_ago + rng.randint(0, 20), hours=rng.randint(0, 6))
         start = start.replace(hour=rng.randint(7, 14), minute=rng.randrange(60))
         addr = f"{points[(street, house)]['STREETNO']} {street}" if house is not None else street
+        form = ("valid", street, city, house) if house is not None else ("street_only", street, city)
         work_orders.append(dict(kind="historical", street=street, house=house, date=start, rtype=rtype,
+                                loc=resolve_address(form, points, centroids),
                                 desc=f"{addr}:  {short}", ld=f"<div>{html_text(addr)}, {city}, FL</div><div>{html_text(short.capitalize())}</div>",
                                 worktype="IN" if "INSPECTION" in short else "CM", status="CLOSE", sup=sup, lead=lead,
                                 actstart=start, actfinish=start + timedelta(hours=rng.randint(2, 5)), notes=notes,
@@ -336,7 +348,9 @@ def build():
         sched_start = datetime.strptime(start, "%Y-%m-%d").replace(hour=7, tzinfo=TZ)
         sched_finish = datetime.strptime(finish, "%Y-%m-%d").replace(hour=16, tzinfo=TZ)
         created = min(sched_start, AS_OF) - timedelta(days=rng.randint(20, 45))
+        # A project covers its street, so it sits at the street's centroid with no house number.
         work_orders.append(dict(kind="planned", street=street, house=None, date=created, rtype=rtype,
+                                loc=resolve_address(("street_only", street, city), points, centroids),
                                 desc=desc, ld=f"<div>{html_text(scope)}</div>", worktype="CP", status=status,
                                 sup=sup, lead=planner, schedstart=sched_start,
                                 schedfinish=sched_finish, actstart=sched_start if status == "INPRG" else None,
@@ -421,7 +435,7 @@ def build():
             if discipline == "water":
                 wo_lead = water_leads[ord(key[-1]) % len(water_leads)]
             short_addr = loc["short"] or loc["city"]
-            work_orders.append(dict(kind="followup", key=key, street=loc["street"], house=None, date=reported,
+            work_orders.append(dict(kind="followup", key=key, street=loc["street"], house=None, date=reported, loc=loc,
                                     rtype=rtype, desc=f"{short_addr}:  {wo_spec['short']}", ld=ld,
                                     worktype=wo_spec["worktype"], status=wo_spec["status"],
                                     sup=sup, lead=wo_lead, actstart=dispatched, actfinish=finished,
@@ -484,6 +498,7 @@ def build():
             "SCHEDFINISH": maximo_date(wo["schedfinish"]) if wo.get("schedfinish") else "",
             "ACTSTART": maximo_date(wo["actstart"]) if wo.get("actstart") else "",
             "ACTFINISH": maximo_date(wo["actfinish"]) if finished else "",
+            **{c: v for c, v in service_address(wo["loc"]).items() if c in WO_ADDRESS_COLUMNS},
             "SITEID": cat.SITEID, "ORGID": cat.ORGID,
         })
         author = wo.get("author") or wo["lead"]
@@ -693,7 +708,7 @@ def main():
     persons.sort(key=lambda p: p["PERSONID"])
 
     write_csv(DATA / "maximo" / "sr.csv", STRUCTURED_SR_COLUMNS, d["srs"])
-    write_csv(DATA / "maximo" / "wo.csv", MAXIMO_WO_COLUMNS, d["wos"])
+    write_csv(DATA / "maximo" / "wo.csv", STRUCTURED_WO_COLUMNS, d["wos"])
     write_csv(DATA / "maximo" / "worklog.csv", MAXIMO_WORKLOG_COLUMNS, d["logs"])
     write_csv(DATA / "maximo" / "person.csv", MAXIMO_PERSON_COLUMNS, persons)
     write_csv(DATA / "reference" / "address-points.csv", ADDRESS_COLUMNS, d["address_rows"])

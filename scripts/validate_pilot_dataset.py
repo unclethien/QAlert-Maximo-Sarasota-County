@@ -120,8 +120,38 @@ def check_structured_fields(srs, wos, request_by_id, employee_by_id, persons, po
                   f"{t}: coordinates differ from where QAlert placed the request")
         else:
             check(sr["LATITUDEY"] == sr["LONGITUDEX"] == "", f"{t}: a request with no street has no coordinates")
+    sr_by_id = {sr["TICKETID"]: sr for sr in srs}
     for wo in wos:
         check(id_map.kind_of(wo["WONUM"], "new") == "wo", f"{wo['WONUM']}: WO number outside WO{cat.WO_START}+")
+        check_wo_address(wo, sr_by_id.get(wo["ORIGRECORDID"]), points)
+
+
+WO_ADDRESS_COLUMNS = ("STADDRNUMBER", "STADDRSTREET", "STREETADDRESS", "CITY", "STATEPROVINCE", "POSTALCODE",
+                      "COUNTRY", "LATITUDEY", "LONGITUDEX")
+
+
+def check_wo_address(wo, sr, points):
+    """A WO's service address is its SR's. With no SR, it is an address point, or for street-wide
+    work a point among the street's address points, with no number or ZIP."""
+    w = wo["WONUM"]
+    if sr:
+        check(all(wo[c] == sr[c] for c in WO_ADDRESS_COLUMNS), f"{w}: service address differs from its SR's")
+        return
+    street = [p for p in points if (p["STREETNAME"], p["CITY"]) == (wo["STADDRSTREET"], wo["CITY"])]
+    check(bool(street) and wo["LATITUDEY"] != "", f"{w}: past or planned work must sit on a known street")
+    if not street or wo["LATITUDEY"] == "":
+        return
+    check(wo["STREETADDRESS"] == " ".join(filter(None, (wo["STADDRNUMBER"], wo["STADDRSTREET"])))
+          and (wo["STATEPROVINCE"], wo["COUNTRY"]) == ("FL", "US"), f"{w}: street address, state or country is wrong")
+    if wo["STADDRNUMBER"]:
+        check(any((p["STREETNO"], p["ZIP"], p["LATITUDE"], p["LONGITUDE"])
+                  == (wo["STADDRNUMBER"], wo["POSTALCODE"], wo["LATITUDEY"], wo["LONGITUDEX"]) for p in street),
+              f"{w}: address differs from its address point")
+    else:
+        lat, lon = float(wo["LATITUDEY"]), float(wo["LONGITUDEX"])
+        lats, lons = [float(p["LATITUDE"]) for p in street], [float(p["LONGITUDE"]) for p in street]
+        check(wo["POSTALCODE"] == "" and min(lats) <= lat <= max(lats) and min(lons) <= lon <= max(lons),
+              f"{w}: street-wide work must sit among its street's address points, with no ZIP")
 
 
 def main():
