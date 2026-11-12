@@ -324,7 +324,7 @@ Similar work orders miss work at the same place written in different words (conf
    - Check it over REST before the dialog: `rel.nearbywo{wonum}` on `MXAPIWODETAIL`.
    - The WO's own address relationship is `SERVICEADDRESS`, as on SR; there is no relationship named `WOSERVICEADDRESS`.
    - `WOSERVICEADDRESS` has no index on the coordinates. That is fine for the pilot; a County rollout would need one.
-3. **The dialog.** In **Application Designer**, open `WOTRACK` and export it first. The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `wotrack-original.xml` is the application before any change, and `wotrack-nearbywo-v1.xml` adds this dialog before `</presentation>`. Import it with **Import Application Definition**.
+3. **The dialog.** In **Application Designer**, open `WOTRACK` and export it first. The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `wotrack-original.xml` is the application before any change, and `wotrack-nearbywo-v1.xml` adds this dialog before `</presentation>`. Import it with **Import Application Definition**. `wotrack-nearbywo-current.xml` is the definition exported back after the import: the same dialog, with Maximo's attribute order and two trimmed labels. The export does not hold the signature option or the menu entry, so after importing any of these files, check step 4 again.
 
    ```xml
    <dialog id="NEARBYWO" label="Nearby work (within about 150 m)" datasrc="MAINRECORD">
