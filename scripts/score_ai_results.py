@@ -7,6 +7,7 @@ FEATURE is one of:
     classification  the recommended classification, by name as Maximo shows it (e.g. WATER-LEAK)
     team            the recommended PERSONGROUP on the SR's work order (its draft, if it had none)
     similar_wo      the work orders Maximo listed as similar, separated by ";"
+    nearby_wo       the work orders the Nearby work dialog listed (within about 150 m), separated by ";"
     similar_sr      the service requests Maximo listed as similar to an open SR, separated by ";"
 AI_VALUE can also be:
     (blank)  not tried yet; the row is left out of the score
@@ -30,7 +31,9 @@ import pilot_catalog as cat
 
 ROOT = Path(__file__).resolve().parent.parent
 COLUMNS = ["TICKETID", "FEATURE", "AI_VALUE", "AI_SCORE", "REVIEWER_DECISION", "OVERRIDE_REASON"]
-FEATURES = ("classification", "team", "similar_wo", "similar_sr")
+FEATURES = ("classification", "team", "similar_wo", "nearby_wo", "similar_sr")
+# Both list other work orders for the SR's work order, and are scored the same way.
+WO_LISTS = {"similar_wo": "Similar work orders", "nearby_wo": "Nearby work orders (within about 150 m)"}
 DECISIONS = ("", "accept", "override", "skip")
 NOT_TRIED, NOT_SHOWN, NOTHING = "", "N/A", "NONE"
 CONTROL = "Control (no issue)"
@@ -95,8 +98,8 @@ def template(answers, wos, srs=()):
     - every SR is classified;
     - the team where the answer key names one, except on a duplicate, which joins its cluster's
       work order instead of getting its own;
-    - similar work orders where the answer key expects some, except on a duplicate, and on control
-      SRs, where any match is noise;
+    - similar and nearby work orders where the answer key expects some, except on a duplicate, and
+      on control SRs, where any match is noise;
     - similar service requests on every open SR in a duplicate cluster, every look-alike and every
       open control: the first should find their cluster, the others nothing.
     Team and similar work orders show on a work order; the drafts give most open SRs one. Similar
@@ -111,7 +114,7 @@ def template(answers, wos, srs=()):
         if a["EXPECTED_PERSONGROUP"] and not duplicate:
             rows.append({"TICKETID": t, "FEATURE": "team"})
         if (expected_wos(a, own) and not duplicate) or a["USE_CASE"] == CONTROL:
-            rows.append({"TICKETID": t, "FEATURE": "similar_wo"})
+            rows += [{"TICKETID": t, "FEATURE": f} for f in WO_LISTS]
         if status.get(a["QALERT_REQUEST_ID"]) in OPEN and (t in group or a["SCENARIO"].startswith(LOOK_ALIKE) or a["USE_CASE"] == CONTROL):
             rows.append({"TICKETID": t, "FEATURE": "similar_sr"})
     return rows
@@ -177,9 +180,11 @@ def score(results, answers, wos=()):
                 f"  recommendation given   {pct(len(answered), len(team))}",
                 f"  matches the answer key {pct(len(hits), len(team))}"]
 
-    sim, note = tried(rows["similar_wo"])
-    if rows["similar_wo"]:
-        own = own_wos(wos)
+    own = own_wos(wos)
+    for feature, title in WO_LISTS.items():
+        if not rows[feature]:
+            continue
+        sim, note = tried(rows[feature])
         listed = {r["TICKETID"]: {v.strip() for v in r["AI_VALUE"].split(";") if v.strip() and v.strip().upper() != NOTHING}
                   - own.get(r["TICKETID"], set()) for r in sim}
         wanted = {t: expected_wos(by_id[t], own) for t in listed}
@@ -187,7 +192,7 @@ def score(results, answers, wos=()):
         found = sum(len(listed[t] & wanted[t]) for t in with_expected)
         total = sum(len(wanted[t]) for t in with_expected)
         controls = [t for t in listed if by_id[t]["USE_CASE"] == CONTROL]
-        out += ["Similar work orders", note,
+        out += [title, note,
                 f"  related WOs surfaced    {pct(found, total)} across {len(with_expected)} SRs",
                 f"  SRs with every related WO {pct(sum(wanted[t] <= listed[t] for t in with_expected), len(with_expected))}",
                 f"  control SRs with any match {pct(sum(bool(listed[t]) for t in controls), len(controls))}"]

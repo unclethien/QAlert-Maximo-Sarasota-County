@@ -138,3 +138,20 @@ def test_template_gives_duplicates_no_team_or_work_order_rows_and_open_srs_simil
     assert "similar_sr" in features["SR810044"] and "team" in features["SR810044"]  # cluster B's first report
     assert "similar_sr" not in features["SR810030"]  # resolved, so not in the inference filter
     assert "similar_sr" in features["SR810042"]  # look-alike
+
+
+def test_nearby_work_orders_are_scored_like_similar_ones_under_their_own_heading():
+    wanted = sorted(score.expected_wos(WITH_WOS, score.own_wos(WOS)))
+    report = _report([_row(WITH_WOS["TICKETID"], "similar_wo", "none"),
+                      _row(WITH_WOS["TICKETID"], "nearby_wo", ";".join(wanted)),
+                      _row(CONTROL["TICKETID"], "nearby_wo", "none")])
+    similar, nearby = report.split("Nearby work orders (within about 150 m)")
+    assert f"related WOs surfaced    0/{len(wanted)}" in similar
+    assert f"related WOs surfaced    {len(wanted)}/{len(wanted)}" in nearby
+    assert "SRs with every related WO 1/1" in nearby and "control SRs with any match 0/1" in nearby
+
+
+def test_template_gives_nearby_work_orders_wherever_it_gives_similar_ones():
+    rows = score.template(ANSWERS, WOS + DRAFTS, SRS)
+    by_feature = {f: {r["TICKETID"] for r in rows if r["FEATURE"] == f} for f in ("similar_wo", "nearby_wo")}
+    assert by_feature["similar_wo"] == by_feature["nearby_wo"] and by_feature["nearby_wo"]

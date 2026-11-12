@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 from conftest import BASE, API_KEY, FakeResponse, FakeSession
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -161,3 +162,46 @@ def test_main_writes_only_with_write_and_exits_1_on_a_failure(tmp_path, monkeypa
     lines = sheet.read_text(encoding="utf-8").split("\n")
     assert lines[0] == "TICKETID,FEATURE,AI_VALUE,AI_SCORE,REVIEWER_DECISION,OVERRIDE_REASON"
     assert lines[1] == "SR810036,similar_wo,WO2910007,91,," and lines[2] == "SR810099,similar_wo,old,90,accept,"
+
+
+def test_nearby_rows_keep_the_given_order_and_have_no_score():
+    out = hv.as_row(row("SR810036", feature="nearby_wo"), "WO2915021",
+                    {"WO2910012": "2026-07-17", "WO2915021": None, "WO2910007": "2026-02-16"}, by_score=False)
+    assert (out["AI_VALUE"], out["AI_SCORE"]) == ("WO2910012;WO2910007", "")
+    assert hv.as_row(row("SR1", feature="nearby_wo"), "WO1", {}, by_score=False)["AI_VALUE"] == "none"
+
+
+class FakeNearby:
+    """The NEARBYWO relationship on one WO, answered from `near` (workorderid -> [(wonum, reportdate)])."""
+
+    def __init__(self, near):
+        self.near = near
+        self.session = FakeSession(self.handle)
+
+    def handle(self, method, url, params, headers, payload):
+        assert method == "GET" and params["oslc.select"] == "workorderid,rel.nearbywo{wonum,reportdate}"
+        wid = int(params["oslc.where"].split("=")[1])
+        if wid not in self.near:
+            return FakeResponse(body={"member": []}, url=url)
+        return FakeResponse(body={"member": [{"workorderid": wid, "nearbywo": [
+            {"wonum": w, "reportdate": d} for w, d in self.near[wid]]}]}, url=url)
+
+
+def test_nearby_harvest_fills_only_nearby_rows_newest_first_and_cannot_refresh():
+    fake = FakeNearby({CHECKED: [("WO2910007", "2026-02-16T15:44:00-05:00"), ("WO2910012", "2026-07-17T14:23:00-05:00")],
+                       777: []})
+    maximo = hv.NearbyWorkOrders(MaximoClient(BASE, API_KEY, session=fake.session))
+    rows = [row("SR810036"), row("SR810036", feature="nearby_wo"), row("SR810099", feature="nearby_wo")]
+    lookup = {"WO2915021": (CHECKED, "h", "WO2915021"), "WO2915099": (777, "h2", "WO2915099")}
+    out, failed = hv.harvest(rows, {"SR810036": "WO2915021", "SR810099": "WO2915099"}, lookup, maximo)
+    assert failed == 0 and out[0] == rows[0]
+    assert out[1]["AI_VALUE"] == "WO2910012;WO2910007" and out[2]["AI_VALUE"] == "none"
+    errors = []
+    out, failed = hv.harvest(rows, {"SR810036": "WO2915021"}, lookup, maximo, refresh=True, report=errors.append)
+    assert failed == 1 and out[1] == rows[1] and "nothing to refresh" in errors[0]
+
+
+def test_main_refuses_refresh_for_nearby_work(capsys):
+    with pytest.raises(SystemExit):
+        hv.main(["--feature", "nearby_wo", "--refresh"])
+    assert "--refresh applies to similar_wo only" in capsys.readouterr().err
