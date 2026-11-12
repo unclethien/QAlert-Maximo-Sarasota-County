@@ -1,7 +1,7 @@
 # Maximo automation script SRQDUPSCORE (language: python / Jython 2.7).
 #
-# Gives each AI similarity pair of service requests a duplicate score that also counts place and
-# time. The AI's `similarity` template compares text only, and pilot SRs all read "<type>, <address>"
+# Gives each AI similarity pair of service requests, and of work orders, a duplicate score that
+# also counts place and time. The AI's `similarity` template compares text only, and pilot SRs all read "<type>, <address>"
 # plus the same Customer/Address/Map layout, so two sewer odor reports kilometres apart score 93
 # while the true duplicate scores 97. The duplicate score is
 #
@@ -11,12 +11,18 @@
 # later keeps its AI score. The AISIMSR dialog sorts on it (relationship AISIMSRPAIR) and shows the
 # points each factor took off (DUPDISTPTS, DUPTIMEPTS), which add up with it to the AI score.
 #
-# Location comes from the SR's service address (TKSERVICEADDRESS LATITUDEY and LONGITUDEX). An SR
-# whose service address has no coordinates, such as one from the text-only history, falls back to
-# the Maps link QAlert writes into the long description (".../maps/search/<lat>,<lon>").
+# Work order pairs (WOSIMILARITY) get the same score: the AI compares their text only too, so a
+# leak on another street scores 90 or more. The AISIMWO dialog in Work Order Tracking sorts on it
+# (relationship AISIMWOPAIR). Related past work at the same place loses points for age; that was
+# the user's choice, so the time factor is the same for both.
+#
+# Location comes from the record's service address (TKSERVICEADDRESS or WOSERVICEADDRESS, LATITUDEY
+# and LONGITUDEX). A record whose service address has no coordinates, such as one from the
+# text-only history, falls back to the Maps link QAlert writes into the long description
+# (".../maps/search/<lat>,<lon>"); a draft WO carries its SR's.
 #
 # Runs from an action launch point (action SRQDUPSCORE), called by an escalation on MAXAISIMILAROBJ
-# with condition aicfgname='SRSIMILARITY' and (dupscore is null or duptimepts is null). The results
+# with condition aicfgname in ('SRSIMILARITY','WOSIMILARITY') and (dupscore is null or duptimepts is null). The results
 # go into DUPSCORE, DUPDISTPTS and DUPTIMEPTS, custom INTEGER attributes added to MAXAISIMILAROBJ in
 # Database Configuration.
 #
@@ -30,6 +36,14 @@ except ImportError:
     import math as _trig  # tests
 
 CONFIG = "SRSIMILARITY"
+# What each pair's OBJECTNAME scores: its AI configuration, how OBJECTID and SIMILARTOOBJECTID find
+# the record, and how the record's one service address row is read. The row is read through a set
+# scoped to the record, never through ORGID: on TechZone an SR's address row has another org's or
+# a blank ORGID.
+KINDS = {
+    "SR": (CONFIG, "ticketuid", "TKSERVICEADDRESS", "ticketid=:ticketid and class=:class"),
+    "WORKORDER": ("WOSIMILARITY", "workorderid", "WOSERVICEADDRESS", "wonum=:wonum and siteid=:siteid"),
+}
 MAP_MARKER = "maps/search/"
 EARTH_RADIUS_M = 6371000.0
 DEGREE = 3.141592653589793 / 180.0
@@ -124,17 +138,19 @@ def deductions(ai_score, meters, days):
 
 # ---- Maximo side -----------------------------------------------------------------------------
 
-def _sr(pair, attribute):
-    """The SR a pair column points to (OBJECTID and SIMILARTOOBJECTID hold its TICKETUID)."""
-    srs = pair.getMboSet("$SRQDUP" + attribute, "SR", "ticketuid=" + str(pair.getLong(attribute)))
-    return srs.getMbo(0)
+def _record(pair, attribute, kind):
+    """The SR or WO a pair column points to (OBJECTID and SIMILARTOOBJECTID hold its TICKETUID or
+    WORKORDERID)."""
+    key = KINDS[kind][1]
+    records = pair.getMboSet("$SRQDUP" + kind + attribute, kind, key + "=" + str(pair.getLong(attribute)))
+    return records.getMbo(0)
 
 
-def _service_point(sr):
-    """(lat, lon) from the SR's service address, or (None, None). The row is read through a set
-    scoped to the SR by ticket and class: its ORGID is another org's or blank on TechZone."""
+def _service_point(record, kind):
+    """(lat, lon) from the record's service address, or (None, None)."""
+    _, _, address, scope = KINDS[kind]
     try:
-        rows = sr.getMboSet("$SRQDUPADDR", "TKSERVICEADDRESS", "ticketid=:ticketid and class=:class")
+        rows = record.getMboSet("$SRQDUPADDR" + kind, address, scope)
         row = rows.getMbo(0)
         if row is None or row.isNull("LATITUDEY") or row.isNull("LONGITUDEX"):
             return None, None
@@ -143,9 +159,9 @@ def _service_point(sr):
         return None, None
 
 
-def _point(sr):
-    lat, lon = _service_point(sr)
-    return coordinates(sr.getString("DESCRIPTION_LONGDESCRIPTION"), lat, lon)
+def _point(record, kind):
+    lat, lon = _service_point(record, kind)
+    return coordinates(record.getString("DESCRIPTION_LONGDESCRIPTION"), lat, lon)
 
 
 def _days_between(a, b):
@@ -160,12 +176,13 @@ def score_pair(pair):
 
     Returns the score, or None if the row was skipped.
     """
-    if pair.getString("OBJECTNAME") != "SR" or pair.getString("AICFGNAME") != CONFIG:
+    kind = pair.getString("OBJECTNAME")
+    if kind not in KINDS or pair.getString("AICFGNAME") != KINDS[kind][0]:
         return None
-    a, b = _sr(pair, "OBJECTID"), _sr(pair, "SIMILARTOOBJECTID")
+    a, b = _record(pair, "OBJECTID", kind), _record(pair, "SIMILARTOOBJECTID", kind)
     if a is None or b is None:
         return None
-    meters = distance_m(_point(a), _point(b))
+    meters = distance_m(_point(a, kind), _point(b, kind))
     score, distance_pts, time_pts = deductions(pair.getInt("SCORE"), meters, _days_between(a, b))
     pair.setValue("DUPSCORE", score)
     pair.setValue("DUPDISTPTS", distance_pts)

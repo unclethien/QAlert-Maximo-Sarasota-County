@@ -131,3 +131,111 @@ def test_deductions_for_the_willowmarsh_match_and_the_true_duplicate():
 def test_an_sr_without_a_map_link_ranks_below_located_matches():
     assert duplicate_score(97, None, 0) < SHOW_AT
     assert duplicate_score(97, None, 0) > duplicate_score(97, 5000, 0)
+
+
+# ---- Work order pairs (WOSIMILARITY) ----------------------------------------------------------
+
+WOS = {r["WONUM"]: r for r in _rows("data/maximo/wo.csv") + _rows("data/maximo/drafts/wo.csv")}
+# The AI scored the related WOs 88 to 95 and the unrelated ones 83 to 95 on TechZone (2026-11-12).
+WO_AI_LOW, WO_AI_HIGH = 88, 95
+
+
+def _wo_meters_days(a, b):
+    wa, wb = WOS[a], WOS[b]
+    meters = distance_m(coordinates(wa["DESCRIPTION_LONGDESCRIPTION"], *_field_point(wa)),
+                        coordinates(wb["DESCRIPTION_LONGDESCRIPTION"], *_field_point(wb)))
+    days = abs((datetime.fromisoformat(wa["REPORTDATE"]) - datetime.fromisoformat(wb["REPORTDATE"])).total_seconds()) / 86400
+    return meters, days
+
+
+def _checked_wo(ticket):
+    """The WO a planner opens for the SR: its draft, else its open follow-up, else a closed one."""
+    own = sorted((w["WONUM"][:6] != "WO2915", w["STATUS"] in ("CLOSE", "CAN"), w["WONUM"])
+                 for w in WOS.values() if w["ORIGRECORDID"] == ticket and w["STATUS"] != "CAN")
+    return own[0][2] if own else None
+
+
+RELATED_WO_PAIRS = [(_checked_wo(t), r) for t, row in KEY.items() if _checked_wo(t)
+                    for r in row["RELATED_RECORDS"].split(";") if r.startswith("WO") and r in WOS
+                    and WOS[r]["ORIGRECORDID"] != t]
+
+
+def test_the_pilot_has_twelve_related_work_order_pairs():
+    assert len(RELATED_WO_PAIRS) == 12
+
+
+def test_every_related_work_order_beats_every_same_type_work_order_a_kilometre_away():
+    related = [duplicate_score(WO_AI_LOW, *_wo_meters_days(a, b)) for a, b in RELATED_WO_PAIRS]
+    far = []
+    for a, b in combinations(sorted(WOS), 2):
+        same_type = WOS[a]["CLASSSTRUCTUREID"] == WOS[b]["CLASSSTRUCTUREID"] != ""
+        meters, days = _wo_meters_days(a, b)
+        if same_type and meters is not None and meters >= 1000:
+            far.append(duplicate_score(WO_AI_HIGH, meters, days))
+    assert far and min(related) > max(far)
+    assert max(far) <= WO_AI_HIGH // 2 + 1  # half the AI score at most
+
+
+class FakeMbo:
+    """Just enough of a Maximo record for score_pair: attributes, and sets found by (name, object, where)."""
+
+    def __init__(self, values=None, sets=None):
+        self.values, self.sets, self.asked, self.set_values = values or {}, sets or {}, [], {}
+
+    def getString(self, a):
+        return str(self.values.get(a, ""))
+
+    def getLong(self, a):
+        return int(self.values[a])
+
+    getInt = getLong
+
+    def getDouble(self, a):
+        return float(self.values[a])
+
+    def isNull(self, a):
+        return self.values.get(a) in (None, "")
+
+    def getDate(self, a):
+        d = self.values.get(a)
+        return None if d is None else type("D", (), {"getTime": lambda _s: d.timestamp() * 1000})()
+
+    def getMboSet(self, name, obj, where):
+        self.asked.append((name, obj, where))
+        found = self.sets.get((obj, where))
+        return type("S", (), {"getMbo": lambda _s, i: found})()
+
+    def setValue(self, a, v):
+        self.set_values[a] = v
+
+
+def _fake_record(lat, lon, date, address, scope):
+    row = FakeMbo({"LATITUDEY": lat, "LONGITUDEX": lon})
+    return FakeMbo({"DESCRIPTION_LONGDESCRIPTION": "", "REPORTDATE": date}, {(address, scope): row})
+
+
+def test_score_pair_scores_a_work_order_pair_from_its_service_addresses():
+    score_pair = ns["score_pair"]
+    scope = "wonum=:wonum and siteid=:siteid"
+    a = _fake_record(27.0, -82.0, datetime(2026, 1, 1), "WOSERVICEADDRESS", scope)
+    b = _fake_record(27.0, -82.0 + 0.0202, datetime(2026, 1, 2), "WOSERVICEADDRESS", scope)  # about 2 km
+    pair = FakeMbo({"OBJECTNAME": "WORKORDER", "AICFGNAME": "WOSIMILARITY", "OBJECTID": 1,
+                    "SIMILARTOOBJECTID": 2, "SCORE": 92},
+                   {("WORKORDER", "workorderid=1"): a, ("WORKORDER", "workorderid=2"): b})
+    assert score_pair(pair) == 46
+    assert pair.set_values == {"DUPSCORE": 46, "DUPDISTPTS": 46, "DUPTIMEPTS": 0}
+    assert ("$SRQDUPADDRWORKORDER", "WOSERVICEADDRESS", scope) in a.asked
+
+
+def test_score_pair_still_scores_sr_pairs_and_skips_a_mismatched_configuration():
+    score_pair = ns["score_pair"]
+    scope = "ticketid=:ticketid and class=:class"
+    a = _fake_record(27.0, -82.0, datetime(2026, 1, 1), "TKSERVICEADDRESS", scope)
+    b = _fake_record(27.0, -82.0, datetime(2026, 1, 1, 6), "TKSERVICEADDRESS", scope)
+    sr_pair = FakeMbo({"OBJECTNAME": "SR", "AICFGNAME": "SRSIMILARITY", "OBJECTID": 1,
+                       "SIMILARTOOBJECTID": 2, "SCORE": 97},
+                      {("SR", "ticketuid=1"): a, ("SR", "ticketuid=2"): b})
+    assert score_pair(sr_pair) == 97 and sr_pair.set_values["DUPDISTPTS"] == 0
+    for name, cfg in (("SR", "WOSIMILARITY"), ("WORKORDER", "SRSIMILARITY"), ("ASSET", "ASSETSIMILARITY")):
+        other = FakeMbo({"OBJECTNAME": name, "AICFGNAME": cfg})
+        assert score_pair(other) is None and other.set_values == {}
