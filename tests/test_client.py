@@ -123,3 +123,14 @@ def test_unsafe_where_literals_are_refused():
     for bad in ('a"b', "50%", "caf\u00e9"):
         with pytest.raises(ValueError):
             oslc_str(bad)
+
+
+def test_script_posts_the_payload_and_returns_the_reply_and_delete_sends_delete():
+    session = FakeSession(lambda m, u, p, h, payload: FakeResponse(body={"WO1": "filled"}) if m == "POST"
+                          else FakeResponse(204, text=""))
+    client = MaximoClient(BASE, API_KEY, session=session)
+    assert client.script("SRQFILLWOADDR", {"apply": True}) == {"WO1": "filled"}
+    client.delete(f"{BASE}/api/os/mxapiautoscript/_abc")
+    (m1, u1, _, _, p1), (m2, u2, _, _, p2) = session.calls
+    assert (m1, u1, p1) == ("POST", f"{BASE}/api/script/SRQFILLWOADDR", {"apply": True})
+    assert (m2, u2, p2) == ("DELETE", f"{BASE}/api/os/mxapiautoscript/_abc", None)

@@ -239,3 +239,11 @@ class MaximoClient:
         resp = self._send("POST", href, params={"action": f"wsmethod:{wsmethod}"}, payload=payload,
                           headers={"x-method-override": "PATCH"})
         return self._body(resp)
+
+    def delete(self, href: str) -> None:
+        """Delete a record."""
+        self._send("DELETE", href)
+
+    def script(self, name: str, payload: JsonDict) -> JsonDict:
+        """Run an automation script directly, with `payload` as its `requestBody`; returns its `responseBody`."""
+        return self._body(self._send("POST", f"{self.base_url}/{self.api_path}/script/{name}", payload=payload))
