@@ -19,8 +19,8 @@ import csv
 from datetime import datetime, timedelta
 
 import pilot_catalog as cat
-from generate_pilot_dataset import (AS_OF, DATA, MAXIMO_WO_COLUMNS, MAXIMO_WORKLOG_COLUMNS, STRUCTURED_SR_COLUMNS,
-                                    crew_for, maximo_date, write_csv)
+from generate_pilot_dataset import (AS_OF, DATA, MAXIMO_WORKLOG_COLUMNS, STRUCTURED_SR_COLUMNS, STRUCTURED_WO_COLUMNS,
+                                    WO_ADDRESS_COLUMNS, crew_for, maximo_date, write_csv)
 
 OUT = DATA / "maximo" / "drafts"
 WO_START = cat.DRAFT_WO_START  # after the pilot's WO2910001-WO2910041, below nothing else
@@ -65,7 +65,10 @@ def build():
             # The classification the request arrived with; the team is what the AI should recommend.
             "CLASSSTRUCTUREID": sr["CLASSSTRUCTUREID"], "JPNUM": "", "PERSONGROUP": "", "OWNERGROUP": "",
             "SUPERVISOR": "", "LEAD": "", "FAILURECODE": "", "PROBLEMCODE": "", "SCHEDSTART": "", "SCHEDFINISH": "",
-            "ACTSTART": "", "ACTFINISH": "", "SITEID": cat.SITEID, "ORGID": cat.ORGID,
+            "ACTSTART": "", "ACTFINISH": "",
+            # The draft is for the place the request names, so it takes the SR's service address.
+            **{c: sr[c] for c in WO_ADDRESS_COLUMNS},
+            "SITEID": cat.SITEID, "ORGID": cat.ORGID,
         })
     return drafts
 
@@ -73,7 +76,7 @@ def build():
 def main():
     drafts = build()
     OUT.mkdir(parents=True, exist_ok=True)
-    write_csv(OUT / "wo.csv", MAXIMO_WO_COLUMNS, drafts)
+    write_csv(OUT / "wo.csv", STRUCTURED_WO_COLUMNS, drafts)
     # Header-only, so the loader reads every dataset the same way.
     write_csv(OUT / "sr.csv", STRUCTURED_SR_COLUMNS, [])
     write_csv(OUT / "worklog.csv", MAXIMO_WORKLOG_COLUMNS, [])

@@ -110,7 +110,8 @@ These steps run in order:
 - **Classification.** Maximo numbers classifications itself. The loader finds each classification by name, for example `WATER-LEAK`, and sends Maximo's number.
 - **Structured SR fields.** The pilot SRs send `SOURCE`, `REPORTEDPRIORITY` (a number), the reporter (`REPORTEDBY`, `REPORTEDPHONE`, `REPORTEDEMAIL`) and the affected contact (`AFFECTEDPERSON`, `AFFECTEDPHONE`, `AFFECTEDEMAIL`). A blank field is left out, so a resident's request has no `REPORTEDBY`.
 - **Service address.** The address columns (`SADDRESSCODE`, `STADDRNUMBER`, `STADDRSTREET`, `STREETADDRESS`, `CITY`, `STATEPROVINCE`, `POSTALCODE`, `COUNTRY`, `LATITUDEY`, `LONGITUDEX`) go into one `tkserviceaddress` child row, not onto the SR. A matched address sends its code and every field. Any other address sends what was written, with no code. `verify` reads the row back and compares it without case.
-- **Training history.** The history keeps the text-only SR shape of today's feed (no structured fields, `REPORTEDBY` = `MWQSCINT`), so its SRs are sent without an address row.
+- **WO service address.** The pilot and draft WOs send the same address columns without `SADDRESSCODE` as one `woserviceaddress` child row. `verify` reads it back the same way. Only a merge on an existing WO has been tried on TechZone (it replaced the empty row Maximo adds); a fresh create relies on the SR behaviour above, and `verify` reports a second row if Maximo adds one.
+- **Training history.** The history keeps the text-only SR and WO shape of today's feed (no structured fields, `REPORTEDBY` = `MWQSCINT`), so its records are sent without an address row.
 
 The run report starts with the full list of columns it didn't send, with the reason for each.
 

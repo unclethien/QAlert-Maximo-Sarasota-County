@@ -13,7 +13,7 @@ from datetime import datetime
 import generate_draft_work_orders as drafts_gen
 import id_map
 import pilot_catalog as cat
-from generate_pilot_dataset import AS_OF, DATA
+from generate_pilot_dataset import AS_OF, DATA, WO_ADDRESS_COLUMNS
 
 errors = []
 
@@ -76,6 +76,7 @@ def main():
             check(datetime.fromisoformat(sr["REPORTDATE"]) <= created <= AS_OF,
                   f"{tag}: created before its SR or after the as-of time")
             check((sr["SITEID"], sr["ORGID"]) == (d["SITEID"], d["ORGID"]), f"{tag}: site or org differs from its SR")
+            check(all(d[c] == sr[c] for c in WO_ADDRESS_COLUMNS), f"{tag}: service address differs from its SR's")
 
     # Every related-work SR has a work order to look from. A duplicate has none of its own: its
     # cluster's first report has the one work order the whole cluster is grouped onto.

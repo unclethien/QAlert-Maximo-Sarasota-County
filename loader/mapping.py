@@ -17,6 +17,11 @@ SR_COLUMNS = ("TICKETID", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "SOURCE"
 SR_ADDRESS_COLUMNS = ("SADDRESSCODE", "STADDRNUMBER", "STADDRSTREET", "STREETADDRESS", "CITY", "STATEPROVINCE",
                       "POSTALCODE", "COUNTRY", "LATITUDEY", "LONGITUDEX")
 SR_ADDRESS_CHILD = "tkserviceaddress"
+# The WO's service address, sent as its one WOSERVICEADDRESS child row: the SR's fields without the
+# address code, because past and planned work need not sit on an address Maximo has a record of.
+WO_ADDRESS_COLUMNS = SR_ADDRESS_COLUMNS[1:]
+WO_ADDRESS_CHILD = "woserviceaddress"
+ADDRESS_CHILD = {"sr": SR_ADDRESS_CHILD, "wo": WO_ADDRESS_CHILD}
 WO_COLUMNS = ("WONUM", "PARENT", "WORKTYPE", "DESCRIPTION", "DESCRIPTION_LONGDESCRIPTION", "ORIGRECORDID",
               "ORIGRECORDCLASS", "REPORTEDBY", "REPORTDATE", "CLASSSTRUCTUREID", "JPNUM", "PERSONGROUP",
               "OWNERGROUP", "SUPERVISOR", "LEAD", "FAILURECODE", "PROBLEMCODE", "SCHEDSTART", "SCHEDFINISH",
@@ -98,6 +103,9 @@ def wo_payload(row: dict, remap: Remap, drop: set[str] = frozenset()) -> dict:
     for team in ("persongroup", "ownergroup"):
         if team in payload:
             payload[team] = maximo_team(payload[team])
+    address = _payload(row, WO_ADDRESS_COLUMNS, drop)
+    if address:  # the history WOs have none
+        payload[WO_ADDRESS_CHILD] = [address]
     return payload
 
 
@@ -118,7 +126,7 @@ def worklog_payload(row: dict) -> dict:
 
 def dropped_columns(kind: str, header, drop: set[str]) -> dict[str, str]:
     """Every CSV column not sent on create, with the reason."""
-    columns = {"sr": SR_COLUMNS + SR_ADDRESS_COLUMNS, "wo": WO_COLUMNS, "worklog": WORKLOG_COLUMNS}[kind]
+    columns = {"sr": SR_COLUMNS + SR_ADDRESS_COLUMNS, "wo": WO_COLUMNS + WO_ADDRESS_COLUMNS, "worklog": WORKLOG_COLUMNS}[kind]
     out = {}
     for c in header:
         if c in DERIVED[kind]:

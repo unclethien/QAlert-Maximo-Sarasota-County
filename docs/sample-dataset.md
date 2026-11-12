@@ -191,6 +191,18 @@ Backflow Device Issue, a County request type, has no job plan or team: backflow 
 
 `scripts/pilot_catalog.py` holds these tables, the failure and problem codes, and the classifications. Each entry is marked as a real County code or our own illustrative value.
 
+### Service address
+
+The pilot and draft WOs carry the SR's address columns without `SADDRESSCODE`: `STADDRNUMBER`, `STADDRSTREET`, `STREETADDRESS`, `CITY`, `STATEPROVINCE`, `POSTALCODE`, `COUNTRY`, `LATITUDEY` and `LONGITUDEX`. Maximo keeps them on the WO's service address, which is how a reviewer finds other work at the same place.
+
+| WO | Address |
+|---|---|
+| Follow-up or draft | Its SR's address, as written. An SR with no usable address gives its WO only the city and no coordinates (drafts WO2915005 and WO2915014). |
+| Past work | Its address point: number, street, city, ZIP and coordinates |
+| Planned or street-wide work | The street's centroid, with no house number or ZIP |
+
+The validators check each rule. The training history keeps the text-only WO shape, with no address columns.
+
 ## Mock QAlert data
 
 `requests.json` is a top-level array, matching the documented `requests/get` response. Field names follow the public QAlert v1 evidence: the City of Haverhill and City of Somerville QAlert client code and test fixtures.

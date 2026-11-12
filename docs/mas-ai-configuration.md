@@ -7,9 +7,9 @@ This guide sets up use case 1 from the Workshop Playback on the TechZone Maximo 
 | The right classification for a new request | Field value recommendation on the SR's `CLASSSTRUCTUREID` | A recommendation option on the Classification field of a service request |
 | The right team | Field value recommendation on the WO's `PERSONGROUP` | A recommendation option on the Person Group field of a work order |
 | Several residents reporting one problem (duplicates) | Similar service requests (`similarity` template on `MXAPISR`), then a Global Issue groups them onto one work order | **Select Action > Similar service requests from AI** on a service request. We build this dialog; see configuration 4 |
-| Related past or planned work | Similar work orders (`WOSIMILARITY`) | **Actions > View similar work orders** on a work order |
+| Related past or planned work | Similar work orders (`WOSIMILARITY`), and an address match that is not AI | **Actions > View similar work orders** on a work order, and **Select Action > Nearby work** in classic Work Order Tracking. We build the second; see "Nearby work orders" |
 | Questions in plain language during reviews | Maximo Assistant | The AI icon in Service Requests and Work Order Tracking |
-| Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. The AI part is being tested. See "Missing information" below |
+| Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. A watsonx.ai check outside Maximo reads the request for the rest and drafts the question to the resident. See "Missing information" below |
 
 The AI only recommends. A person accepts or ignores each recommendation, and no configuration here changes a record by itself. That is the pilot guardrail from the Playback.
 
@@ -36,10 +36,12 @@ Do this first. If AI Service is not there, nothing else in this guide works.
 | Configurations already listed (look for the `mcc`, `pcc`, `similarity`, `nl2oslc` templates, and on 9.2 the agentic tools) | AI configuration list | Active and Ready: `ASSISTANT` (`nl2oslc`), `WOSIMILARITY`, `IBMDOCS` (`docsearch`). Inactive: `WOPROBLEMCODE` (`pcc`), **`TICKETSIMILARITY`** (`similarity` on `MXAPITKSRVAD`, IBM-shipped), `MREF_LEASE_ABSTRACT` (`fieldextractor`), and our own tests `SR-MISSING-INFO` (`insightsgenerator`) and `SR-MISSINGINFO-TEST` (`almwatsonx`). No `mcc` configuration yet; check that the template is offered under **Create**. |
 | `WOSIMILARITY` is listed | AI configuration list | Yes, active, model Ready |
 | The AITRAINJOB and AIINFJOB cron tasks exist | **Cron Task Setup** | _pending_ |
-| The invocation channels `AIWOSIMILARITYCFG` and `AIWOSIMILARITYINF` exist (configuration 4 copies them) | **Invocation Channels** | _pending_ |
+| The invocation channels `AIWOSIMILARITYCFG` and `AIWOSIMILARITYINF` exist (configuration 4 copies them) | **Invocation Channels** | Yes (2026-11-12, read through `MXIFACEINVOKE`) |
 | A service request shows the **Global Issue** check box and a **Related to Global ID** field on its main tab | Open any SR in **Service Requests** | _pending_ |
-| We have cluster-admin on the OpenShift cluster (only needed to install AI Service ourselves) | `oc auth can-i '*' '*' --all-namespaces` | _pending_ |
-| AI Service is installed, and which catalog the cluster runs | `oc get aiserviceapp -A`, or `mas must-gather --collectors mas,aiservice --no-logs` for a full version summary | _pending_ |
+| We have cluster-admin on the OpenShift cluster (only needed to install AI Service ourselves) | `oc auth can-i '*' '*' --all-namespaces` | Yes, for the reservation's IBMid (2026-11-12). The cluster is Red Hat OpenShift on IBM Cloud in `us-south`. Sign in with an IBM Cloud one-time passcode, as `oc login -s <cluster service endpoint> -u passcode -p <passcode>`. |
+| AI Service is installed, and which catalog the cluster runs | `oc get aiserviceapp -A`, or `mas must-gather --collectors mas,aiservice --no-logs` for a full version summary | Installed: `aiserviceapp` `inst1` in namespace `aiservice-inst1`, tenant `aiservice-inst1-user`, licensed 2026-09-25 to 2027-09-25 (2026-11-12). Catalog not checked. |
+| Which watsonx.ai AI Service uses | `oc get aiservicetenant -n aiservice-inst1-user -o yaml`, under `settings.watsonxai` | watsonx.ai on IBM Cloud, `https://us-south.ml.cloud.ibm.com`, project `16f0743c-0dfc-4223-8047-047c0a3b7232`. The key is in secret `aiservice-inst1-user----wx-secret` (`wx_apikey`). No watsonx.ai runs on the cluster itself. |
+| Which tools the Assistant can call | **AI configuration** > `ASSISTANT` > **Tools** | None. All 14 tools, our `SRQ-SR-CLASS` and `SRSIMILARITY` included, show **Available in assistant: Not supported yet** (2026-11-12). Tool use needs the agentic Assistant, which the instance owner turns on. |
 | A RESOLVED SR can be made a Global Issue, and a QUEUED SR can be linked to it | Try SR810030 and SR810031 | _pending_ |
 
 - **If AI Service is missing or not licensed:** stop. Escalate to the instance owner, Joseph Haney, or the IBM MAS AI contact, Divya. AI Service costs AppPoints, so ask before anyone installs it.
@@ -218,35 +220,153 @@ Observed on TechZone: _pending_
 
 `WOSIMILARITY` needs no training. In the pilot it answers "has a crew worked on this before, or is work already planned?" Run it from the draft WO of a related-work SR, for example SR810036's draft, which should list WO2910007 and WO2910012. Duplicate reports are found with similar service requests instead (configuration 4).
 
-1. Open the `WOSIMILARITY` configuration and click **Actions > Edit**.
-   - Set **Related Records** to `siteid='SRQSITE' and externalrefid like 'WO291%'`, so only pilot WOs are compared.
-     - Leaving it empty brings in the earlier demo data on the instance.
-     - It would also bring in the 990 closed history WOs, which are worded like the pilot's and would crowd the top 10.
-   - Pick the latest template version.
-   - Save.
-2. **Actions > Set arguments:**
+1. **Limit and widen what is compared.** The two filters live in **Object Structures** > `MXAPIWODETAIL` > **Query definition**. They are read-only over the REST API. On TechZone, the configuration has no separate Related Records value (2026-11-12), so the comparison filter sets the scope.
+
+   | Clause | IBM's value | Pilot value |
+   |---|---|---|
+   | `WOSIMILARITYCFGFILTER` (the WOs compared against) | `status in (select value from synonymdomain where domainid ='WOSTATUS' and maxvalue not in ('CAN','CLOSE')) and historyflag = :no` | `siteid='SRQSITE' and externalrefid like 'WO291%' and status not in (select value from synonymdomain where domainid='WOSTATUS' and maxvalue='CAN')` |
+   | `WOSIMILARITYINFFILTER` (the WOs that get suggestions) | `status not in (select value from synonymdomain where domainid ='WOSTATUS' and maxvalue in ('CAN','CLOSE')) and worktype != 'PM'` | `siteid='SRQSITE' and externalrefid like 'WO291%' and status not in (select value from synonymdomain where domainid='WOSTATUS' and maxvalue in ('CAN','CLOSE')) and worktype != 'PM'` |
+
+   - **IBM's comparison filter drops closed work twice:** by status, and by `historyflag = :no`, because a closed WO has `historyflag` set. All 7 related past-work WOs in the pilot are closed, so the pilot value removes both conditions. Allowing `CLOSE` alone is not enough.
+   - **The pilot value keeps out:**
+     - the earlier demo data on the instance
+     - the retired 2900xxx and 2950xxx copies
+     - the 990 closed history WOs, which are worded like the pilot's and would crowd the top 10.
+   - **The inference filter only narrows IBM's value to the pilot.** Closed WOs need to be found, not to get suggestions of their own.
+   - Read both back through `GET /api/os/mxapiwodetail?savedQuery=<clause name>`. The comparison filter should return 75 WOs.
+2. **Actions > Set arguments.** You can also patch them through `MXAPIMAXAICONFIG` in the REST API, with a merge on `maxaiconfigarg` by `maxaiconfigargid`.
 
    | Argument | Default | Pilot value | Why |
    |---|---|---|---|
    | `date_field` | `changedate` | `reportdate` | Maximo stamps `changedate` at load time, so every loaded record would look new. |
    | `history_days` | 30 | 1000 | The related past work in the pilot goes back to July 2025. |
    | `features` | `description, description_longdescription` | keep | |
-   | `similarity_threshold` | 70 | 70; try 60 if nothing comes back | |
-   | `max_similarity_records` | 10 | keep | |
+   | `similarity_threshold` | 70 | keep 70 | Every pilot pair scores 83 or more, so nothing is cut here. A higher value cuts real matches before it cuts noise (see Observed). |
+   | `max_similarity_records` | 10 | keep | 10 is AI Service's maximum. On 2026-11-12, 20 made **Create model** fail with `400 ... invalid argument max_similarity_records value must be less than or equal to 10`, and the model was unusable until it was created again with 10. |
    | `retention_days` | 90 | 1000 (IBM's limit) | It counts back from today, so at 90 the past work from 2025 and early 2026 is left out and can never be listed. |
 
-3. **Include finished work.**
-   - By default only WOs that are not closed or cancelled, and not PM work, are compared.
-   - Our related past work is closed, so edit the similarity inference query definition for `MXAPIWODETAIL` to include `CLOSE` and `COMP`.
-   - If `date_field` or `features` change, the similarity query templates in `MXAPIWODETAIL` need the same change.
-4. **Actions > Activate**, wait a few minutes, then **Actions > Create model**. **Actions > Check model status** shows Ready when it is done.
+3. **Match the query templates.**
+   - The `WOSIMILARITYCFG` and `WOSIMILARITYINF` query templates on `MXAPIWODETAIL` must select the `date_field` attribute and every attribute in `features`.
+   - IBM's templates select `changedate`, `description`, `description_longdescription` and `workorderid`.
+   - For `date_field=reportdate`, add `reportdate` to both. A merge through `MXAPIQUERYTEMPLATE` (`querytemplateattr: [{selectattrname: reportdate}]`) works.
+4. **Actions > Create model**. Maximo marks the configuration for training, and the training job picks it up within a few minutes. A new model ID appears first.
+   - While it trains, a similarity request fails with BMXAA10138E ("The target AI Model is not ready").
+   - On 2026-11-12 the job took 7 minutes from the click (11:58) to a model that answers (12:05 new ID, 12:08 answering).
+   - **Actions > Check model status** shows Ready when it is done.
+   - A rebuild is needed after a filter change. Until then, the old model keeps listing WOs the new filter leaves out.
 5. **Grant access:**
    - In **Security Groups**, open your group, then **Object Structures** > `MXAPIWODETAIL`.
    - Under **Options**, tick **View similar work order**.
    - Repeat this for each reviewer group.
 6. **Check it:** open a pilot WO and click **Actions > View similar work orders**.
+7. **Collect the results** for every `similar_wo` row of the results sheet:
 
-Observed on TechZone: _pending_
+   ```bash
+   uv run --no-project python scripts/harvest_similar_work_orders.py                     # preview, reads only
+   uv run --no-project python scripts/harvest_similar_work_orders.py --refresh --write   # re-run each WO, save
+   ```
+
+   - **Which WO it asks about for each SR:** the SR's draft, otherwise an open follow-up WO, otherwise a closed one.
+   - **Re-running a WO:** `--refresh` calls `POST /api/aicfg_wosimilarity` with `{"href": <the WO>, "usecache": false}`.
+   - **Reading the list:** it uses the saved query the dialog uses, `GET /api/os/mxapiwodetail?savedQuery=similarObjects&sqp:objectId=<workorderid>`.
+   - **Reading the scores:** they come from IBM's `MAXAISIMILARWO` relationship. That relationship is keyed by the WO that was found, so the script reads it on each listed WO and keeps the row for the WO it asked about.
+   - It never changes the reviewer columns.
+
+Observed on TechZone (2026-11-12, model `s3-a1658510dec311f`, the 22 `similar_wo` rows):
+
+- **Before the change, closed past work could never be listed.** The model also still listed the retired 2900xxx and 2950xxx copies, and each draft's own old copy came first at 100.
+- **Related past work: 4 of the 5 SRs** were shown every related WO, at ranks 1 to 4.
+  - SR810009 (WO2910011, rank 1), SR810034 (WO2910002, rank 2), SR810036 (WO2910007 and WO2910012, ranks 3 and 4) and SR810045 (WO2910010, rank 1).
+  - These matched because the old WO repeats the address and the problem words. For example, "1382 Larkspur Bay Dr: WATER LINE LEAK" matched "1382 Larkspur Bay Dr: SERVICE LINE LEAK".
+- **The miss:** SR810056 ("slow to drain and gurgle") is not shown WO2910015 ("MAIN LINE STOPPAGE") or WO2910022 ("CCTV INSPECTION") on the same street. Other "SEWER ISSUE" WOs elsewhere rank higher.
+- **Related planned work: 0 of 4.**
+  - Capital projects are written differently from a resident's report. For example, "Starling Cove Dr water main replacement" against "LOW WATER PRESSURE", or "Willowmarsh Rd sanitary sewer main lining" against "SEWER ODOR".
+  - Every top 10 fills with same-problem reports from other streets.
+- **The look-alike:** SR810065 is shown WO2910040 first, which is the expected related WO.
+- **Scorer:** related WOs surfaced 6/12 (50%) across 10 SRs, and 5/10 SRs got every related WO.
+- **The controls are always matched.** Every list holds 10 WOs, so all 12 control SRs get matches. Scores do not separate real from unrelated:
+  - the 6 expected WOs score 88 to 95
+  - the 94 other WOs listed on related-work SRs score 83 to 95
+  - the 120 WOs listed on controls score 83 to 93.
+- **No threshold helps.** A higher threshold cuts real matches before it quiets the controls.
+- **Re-ranking can't recover the misses.** The 6 missed WOs are not among the 10 that Maximo stores for each WO, and 10 is the most it allows. So a same-street score on the stored results, like the SR duplicate score, could not bring them up. Finding work on the same street would need an address match outside the AI.
+- **What this means:** similar work orders find repeat work when the wording repeats. They do not find work at the same place described in different words. A reviewer reads the list for the street name, not for the score.
+
+## Nearby work orders (address match)
+
+Similar work orders miss work at the same place written in different words (configuration 3). This adds what a reviewer would look for by hand: other work orders within about 150 m. It is not AI. It is a relationship on `WORKORDER` and a read-only dialog in classic **Work Order Tracking**, with no script or escalation once the data is in place.
+
+1. **Give the WOs a service address.** The pilot and draft WOs carry the SR's address columns without `SADDRESSCODE` ([sample-dataset.md](sample-dataset.md#service-address)), and the loader sends them as the WO's `woserviceaddress` row. The WOs loaded before that were filled once with [scripts/fill_wo_service_addresses.py](../scripts/fill_wo_service_addresses.py). It previews unless given `--apply`, backs up each WO's address row to `logs/` first, skips a WO that already matches, and reads each written WO back.
+   - **Closed and cancelled WOs refuse it through the API.** Setting the coordinates adds a `GEOMETRY` row, and a WO in history takes no new child rows: "BMXAA0024E - The action ADD is not allowed on object GEOMETRY". **Edit History Work Order** does not unlock the service address either.
+   - `--history` fills them through a one-off automation script, [srqfillwoaddr.py](../scripts/autoscript/srqfillwoaddr.py). The run creates it as `SRQFILLWOADDR` through `MXAPIAUTOSCRIPT`, POSTs to `/maximo/api/script/SRQFILLWOADDR`, and deletes it afterwards, even on failure. The script sets the address fields with access checks off and without field actions, so no `GEOMETRY` row is added. A preview runs it too and rolls back. This goes around Maximo's history lock, so it is for the synthetic pilot data only; a real WO gets its address when it is created, long before it closes.
+   - Those WOs show no pin on the **Map** tab. The relationship reads the coordinates, so the match is not affected.
+
+   ```bash
+   uv run --no-project --with-requirements requirements.txt python scripts/fill_wo_service_addresses.py                      # preview
+   uv run --no-project --with-requirements requirements.txt python scripts/fill_wo_service_addresses.py --apply              # open WOs
+   uv run --no-project --with-requirements requirements.txt python scripts/fill_wo_service_addresses.py --history --apply    # closed and cancelled WOs too
+   ```
+
+2. **The relationship.** In **Database Configuration**, open `WORKORDER`, and on **Relationships** add `NEARBYWO`, child object `WORKORDER`:
+
+   ```sql
+   siteid = :siteid and wonum != :wonum
+   and status not in (select value from synonymdomain where domainid = 'WOSTATUS' and maxvalue = 'CAN')
+   and exists (select 1 from woserviceaddress n, woserviceaddress m
+               where n.wonum = workorder.wonum and n.siteid = workorder.siteid
+                 and m.wonum = :wonum and m.siteid = :siteid
+                 and abs(n.latitudey - m.latitudey) <= 0.00135
+                 and abs(n.longitudex - m.longitudex) <= 0.00152)
+   ```
+
+   - 0.00135° of latitude and 0.00152° of longitude are each about 150 m at 27° N, the "near" distance of the SR duplicate score. The match is a square, so its corners reach about 210 m.
+   - A WO without coordinates matches nothing, and cancelled WOs are never listed. Closed past work is.
+   - Check it over REST before the dialog: `rel.nearbywo{wonum}` on `MXAPIWODETAIL`.
+   - The WO's own address relationship is `SERVICEADDRESS`, as on SR; there is no relationship named `WOSERVICEADDRESS`.
+   - `WOSERVICEADDRESS` has no index on the coordinates. That is fine for the pilot; a County rollout would need one.
+3. **The dialog.** In **Application Designer**, open `WOTRACK` and export it first. The TechZone exports are in [maximo/app-designer](../maximo/app-designer): `wotrack-original.xml` is the application before any change, and `wotrack-nearbywo-v1.xml` adds this dialog before `</presentation>`. Import it with **Import Application Definition**. `wotrack-nearbywo-current.xml` is the definition exported back after the import: the same dialog, with Maximo's attribute order and two trimmed labels. The export does not hold the signature option or the menu entry, so after importing any of these files, check step 4 again.
+
+   ```xml
+   <dialog id="NEARBYWO" label="Nearby work (within about 150 m)" datasrc="MAINRECORD">
+     <section id="nearbywo_head">
+       <textbox id="nearbywo_wonum" dataattribute="wonum" inputmode="readonly"/>
+       <textbox id="nearbywo_desc" dataattribute="description" inputmode="readonly"/>
+     </section>
+     <table id="nearbywo_tbl" relationship="NEARBYWO" orderby="reportdate desc" label="Other work orders within about 150 m, newest first" inputmode="readonly">
+       <tablebody id="nearbywo_tbl_body" displayrowsperpage="10">
+         <tablecol id="nearbywo_c1" dataattribute="wonum" label="Work Order"/>
+         <tablecol id="nearbywo_c2" dataattribute="description" label="Description"/>
+         <tablecol id="nearbywo_c3" dataattribute="status" label="Status"/>
+         <tablecol id="nearbywo_c4" dataattribute="worktype" label="Work Type"/>
+         <tablecol id="nearbywo_c5" dataattribute="origrecordid" label="Originating Record"/>
+         <tablecol id="nearbywo_c6" dataattribute="reportdate" label="Reported Date"/>
+         <tablecol id="nearbywo_c7" dataattribute="schedstart" label="Scheduled Start"/>
+         <tablecol id="nearbywo_c8" dataattribute="SERVICEADDRESS.streetaddress" label="Street Address"/>
+       </tablebody>
+     </table>
+     <buttongroup id="nearbywo_buttons">
+       <pushbutton id="nearbywo_ok" label="OK" default="true" mxevent="dialogok"/>
+     </buttongroup>
+   </dialog>
+   ```
+
+4. **The menu entry and access.** Still in Application Designer, add signature option `NEARBYWO` ("Nearby work") with **Add/Modify Signature Options**, then a Select Action menu row with element type `OPTION`, key value `NEARBYWO`, position `999` and subposition `0`. In **Security Groups**, grant **Nearby work** under **Applications > Work Order Tracking** to the reviewer groups and `MAXADMIN`. Sign out and back in.
+5. **Collect the results** for every `nearby_wo` row of the results sheet. Nothing needs refreshing; the relationship is live.
+
+   ```bash
+   uv run --no-project python scripts/harvest_similar_work_orders.py --feature nearby_wo           # preview
+   uv run --no-project python scripts/harvest_similar_work_orders.py --feature nearby_wo --write   # save
+   ```
+
+**Check it:** open WO2915021 (SR810036) and click **Select Action > Nearby work**. It lists WO2910012 and WO2910007, both closed service line leaks at 1382 Larkspur Bay Dr. WO2915004 (SR810004) lists the planned Starling Cove Dr water main replacement, WO2910037. WO2915003 (control SR810003) lists nothing.
+
+Observed on TechZone (2026-11-12, the 22 rows that also score similar work orders):
+
+- **All 76 pilot WOs** list exactly the WOs the dataset puts within the box. 25 have neighbours.
+- **Related WOs surfaced 12/12** across 10 SRs, and **10/10 SRs got every related WO**, including all 4 planned projects and SR810056's two sewer WOs, which text similarity missed.
+- **Control SRs with any match: 0/12.** Text similarity listed 10 WOs for every control.
+- **One extra:** SR810065's WO also lists WO2915034, a draft for a different request 78 m away. The scorer does not count extras, so read the list as "work nearby", not "the same problem".
+- **What this means:** the address match finds work at the same place whatever its wording, and similarity finds the same problem worded the same way elsewhere. A reviewer gets both on the work order: **Nearby work** for the place, **View similar work orders** for the problem.
 
 ## Configuration 4: Similar service requests (duplicate reports)
 
@@ -490,7 +610,7 @@ Observed on TechZone (2026-11-08, cluster B, before the reload):
 
 No Maximo version has a built-in AI check for missing details, on service requests or work orders. The pilot splits the check by what it takes to decide a gap:
 - **Rules that plain text can decide:** an automation script, [scripts/autoscript/srqmissinfo.py](../scripts/autoscript/srqmissinfo.py), runs when an SR is saved. It never blocks the save, so a report from QAlert is never lost. Each gap becomes a work log entry of type `MISSINFO` on the SR, and a Work Queue lists the open SRs that have one.
-- **Rules that need the request to be read and understood:** for example, what the meter problem is, or two problems in one request. These stay with the reviewer and the AI. See "AI test" below.
+- **Rules that need the request to be read and understood:** for example, what the meter problem is, or two problems in one request. A script outside Maximo asks watsonx.ai, and the reviewer decides. See "AI check with watsonx.ai" below.
 
 What the script checks, from [required-information.csv](../data/reference/required-information.csv):
 
@@ -577,6 +697,45 @@ Observed on TechZone (2026-11-09, before the reload):
   - The script now uses a relationship scoped to the SR (`recordkey=:ticketid and class=:class and siteid=:siteid`).
 - While those were being fixed, a version with `import re` blocked SR saves for about two minutes (15:44 to 15:46 UTC), until its launch point was switched off.
 
+### AI check with watsonx.ai
+
+[scripts/ai_missing_info.py](../scripts/ai_missing_info.py) runs outside Maximo. It reads the open pilot SRs through the REST API and handles each one in three steps:
+1. **The rules above** find the gaps the record shows.
+2. **An address lookup** in the County address file runs for an address the file does not have. It finds the resident's own house number on a similarly spelled street, as with SR810002's "Glenn" for Glen, or it says which house numbers the street has, as with SR810033. It never proposes a house number the resident did not give.
+3. **One watsonx.ai chat call** checks the rules that need the text read: one problem per request, and the rule for the request type. It also drafts one question to the resident covering every gap.
+
+Guardrails:
+- **What is sent.** The resident's name, phone and email line is removed before the text is sent.
+- **What the reply must show.** A gap must quote its evidence word for word from the request, or it is dropped.
+- **Only gaps that block dispatch count.** The model marks each gap as blocking or not, and gaps that only lack a second detail are set aside.
+- **No invented values.** A question with a number that is not in the request or the address lookup is reported, and never written.
+- **Nothing changes without `--apply`.** Without it, the script writes only `evaluation/ai-missing-info-<model>.csv` and prints the score. With `--apply`, each open SR with a gap gets one internal `MISSINFO` work log, "AI check: missing information", holding the gaps, the evidence and the question. A reviewer decides what to send.
+- **Credentials.** The script uses AI Service's own watsonx.ai connection (Step 0). The URL, project ID and key go in `WATSONX_URL`, `WATSONX_PROJECT_ID` and `WATSONX_API_KEY` in `.env`.
+
+```bash
+uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py   # preview
+uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py --model ibm/granite-4-h-small
+```
+
+Observed on TechZone (2026-11-12, all 65 pilot SRs, scored against the answer key):
+
+| Prompt version | `openai/gpt-oss-120b`: gaps found | Complete SRs flagged | `ibm/granite-4-h-small`: gaps found | Complete SRs flagged |
+|---|---|---|---|---|
+| The rules alone | 8 of 18 | 0 of 48 | 8 of 18 | 0 of 48 |
+| Flag a rule the request clearly fails | 18 of 18 | 22 of 48 | 13 of 18 | 40 of 48 |
+| Plus: do not flag a missing second detail | 18 of 18 | 23 of 48 | 13 of 18 | 20 of 48 |
+| Grade each gap as blocking dispatch or not (kept) | **18 of 18** | **12 of 48** | 17 of 18 | 27 of 48 |
+
+- **Use `openai/gpt-oss-120b`.** It finds every gap, including all 10 the rules cannot see. No drafted question had an invented number in any run, and in the kept version every street named in a question comes from the request or the address file. It used about 940 tokens per SR, or 61,000 for the 65.
+- **Granite is not reliable enough.** It flags far more complete SRs, and its results swing between prompt versions.
+- **The 12 complete SRs gpt-oss flags:**
+  - 3 are fair to raise on reading. SR810004 reports low pressure and brown water. SR810029 describes a leak under a kitchen sink, which is the owner's side. SR810018, clear water bubbling up near the meter, is filed as a sewer issue.
+  - 8 ask for the second half of a two-part rule, such as a meter lock (`NOWATER-SCOPE`, three SRs), the exact source of an odor (`ODOR-SOURCE`, two SRs), or how much water is flowing (`MAIN-WHERE`). Whether those halves are required is the County's call. If they are not, shorter rule wording in `required-information.csv` would remove these flags.
+  - 1 is a plain misreading: SR810051 says the meter spins with every fixture off, which names the problem.
+- On SRs that do have a gap, it adds a second gap to two: SR810005 (the odor's source) and SR810027 (which meter problem).
+- The model only reads the description text, so it misses nothing the service address shows. The rules and the address lookup cover that.
+- The prompt was changed twice, both times with general wording and never for a particular SR. The third version is the one in the script.
+
 ### AI test: can the 9.2 Assistant judge the gaps that need reading?
 
 Ask the Maximo Assistant (the AI icon in Service Requests) about three SRs whose gaps the script cannot see. Compare its answer with the answer key:
@@ -589,6 +748,7 @@ Ask the Maximo Assistant (the AI icon in Service Requests) about three SRs whose
 
 - If it names the gap in at least two of the three, the 9.2 route (an agent that calls this script and explains the rest) is worth building.
 - If it only restates the request, the reviewer judges these gaps until IBM says how to call the `almwatsonx` template.
+- On TechZone the agent route is blocked for now: the Assistant can call no tools (Step 0). The watsonx.ai check above covers these gaps without it.
 
 Observed on TechZone: _pending_
 
@@ -612,12 +772,13 @@ python3 scripts/score_ai_results.py evaluation/ai-results.csv
 
 - **Classification:** record the classification **name** Maximo shows, for example `WATER-LEAK`. Maximo numbers classifications itself, so a numeric ID is refused with a hint.
 - **Team:** `SANCLINS` and `SANCLINSP` both count.
-- **Similar work orders:** list the WO numbers Maximo showed, separated by `;`.
+- **Similar work orders:** list the WO numbers Maximo showed, separated by `;`. `scripts/harvest_similar_work_orders.py` fills these rows from Maximo (configuration 3, step 7).
+- **Nearby work orders:** the WO numbers the **Nearby work** dialog showed, separated by `;`. `scripts/harvest_similar_work_orders.py --feature nearby_wo` fills these rows.
 - **Similar service requests:** list the SR numbers the dialog showed, separated by `;`. Use `accept` when the reviewer grouped them under the Global Issue, and `override` when the reviewer kept them apart.
 - **Which rows the template asks for:**
   - classification on all 65 SRs
   - team on the 53 SRs that name a team and are not duplicates
-  - similar work orders where related WOs are expected, and on controls
+  - similar and nearby work orders where related WOs are expected, and on controls
   - similar service requests on the 18 open SRs that are in a duplicate cluster, are look-alikes, or are controls
 - **Special values for `AI_VALUE`:**
   - leave it blank: not tried yet, left out of the score
@@ -654,7 +815,14 @@ Deactivate the four configurations (**Actions > Deactivate**). This stops the tr
 | No recommendation option on a record | The record is not in the inference filter, the record is not editable, or inference has not run yet (AIINFJOB). |
 | Training never starts | AITRAINJOB is inactive, or its `WOAI` instance schedule is long. |
 | **View similar work orders** is missing from Actions | The security group lacks the **View similar work order** option on `MXAPIWODETAIL`. Sign out and back in after granting it. |
-| Similar work orders list nothing for a related-work SR | Closed work is still excluded (step 3), `history_days` is too small, or the threshold is too high. |
+| Similar work orders list nothing for a related-work SR | Closed work is still excluded (configuration 3, step 1), `history_days` is too small, or the threshold is too high. |
+| Closed related WOs are never listed, even with `CLOSE` allowed | IBM's comparison filter also has `historyflag = :no`, and closed WOs are history. Remove it (configuration 3, step 1), then **Create model** again. |
+| Similar work orders list retired or cancelled copies | The model was built before the filter changed. Run **Create model** again. |
+| BMXAA10138E, "The target AI Model is not ready" | The model is still training after **Create model**. Wait a few minutes and try again. If **Check model status** shows "BMXAA1482E ... Not Found", the model creation failed: read the configuration's **Log** for the reason. |
+| The log shows "invalid argument max_similarity_records value must be less than or equal to 10" | Set `max_similarity_records` back to 10 or less, then **Create model** again. |
+| **Nearby work** is missing from Select Action | The `NEARBYWO` option is not granted to your group, or you have not signed out and back in. |
+| The Nearby work dialog is empty for a WO that should have neighbours | The WO, or the other WO, has no coordinates on its service address. Run `scripts/fill_wo_service_addresses.py` to see which WOs differ from the dataset. A cancelled WO is never listed. |
+| BMXAA0024E, "The action ADD is not allowed on object GEOMETRY", when filling a WO's address | The WO is closed or cancelled. Use `--history` ("Nearby work orders", step 1). |
 | **Similar service requests from AI** is missing from Select Action | The `AISIMSR` option is not granted to your group, or you have not signed out and back in. |
 | The similar SR dialog is empty | The SR is not open, so it is not in `SRSIMILARITYINFFILTER`. Or AIINFJOB has not run since activation. Or the AI configuration is not named `SRSIMILARITY`, which the `AISIMSRPAIR` relationship expects. |
 | A duplicate is missing from the dialog | It is not among the 10 closest stored for that SR (`max_similarity_records`), or its report date is outside `history_days`. If you added a `dupscore` cut to `AISIMSRPAIR`, it may score below it. |

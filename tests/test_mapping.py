@@ -161,3 +161,22 @@ def test_every_pilot_sr_sends_one_address_row_and_no_history_sr_sends_one():
     for row in Dataset(name="history").srs:
         payload = mapping.sr_payload(row, mapping.Remap())
         assert mapping.SR_ADDRESS_CHILD not in payload and payload["reportedby"] == "MWQSCINT", row["TICKETID"]
+
+
+def test_a_wo_sends_its_service_address_as_one_child_row_without_a_code():
+    for row in DATA.wos + Dataset(name="drafts").wos:
+        payload = mapping.wo_payload(row, mapping.Remap())
+        assert not {c.lower() for c in mapping.WO_ADDRESS_COLUMNS} & set(payload), row["WONUM"]  # only in the child
+        [child] = payload[mapping.WO_ADDRESS_CHILD]  # every pilot WO and draft names at least a city
+        assert child == {c.lower(): mapping._value(c, row[c]) for c in mapping.WO_ADDRESS_COLUMNS if row[c]}, row["WONUM"]
+        assert "saddresscode" not in child and isinstance(child.get("latitudey", 0.0), float), row["WONUM"]
+    followup = _followup()
+    sr = _sr(followup["ORIGRECORDID"])
+    child = mapping.wo_payload(followup, mapping.Remap())[mapping.WO_ADDRESS_CHILD][0]
+    assert child == {k: v for k, v in mapping.sr_payload(sr, mapping.Remap())[mapping.SR_ADDRESS_CHILD][0].items()
+                     if k != "saddresscode"}
+
+
+def test_a_history_wo_sends_no_service_address():
+    for row in Dataset(name="history").wos:
+        assert mapping.WO_ADDRESS_CHILD not in mapping.wo_payload(row, mapping.Remap()), row["WONUM"]
