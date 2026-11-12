@@ -7,7 +7,7 @@ This guide sets up use case 1 from the Workshop Playback on the TechZone Maximo 
 | The right classification for a new request | Field value recommendation on the SR's `CLASSSTRUCTUREID` | A recommendation option on the Classification field of a service request |
 | The right team | Field value recommendation on the WO's `PERSONGROUP` | A recommendation option on the Person Group field of a work order |
 | Several residents reporting one problem (duplicates) | Similar service requests (`similarity` template on `MXAPISR`), then a Global Issue groups them onto one work order | **Select Action > Similar service requests from AI** on a service request. We build this dialog; see configuration 4 |
-| Related past or planned work | Similar work orders (`WOSIMILARITY`), and an address match that is not AI | **Actions > View similar work orders** on a work order, and **Select Action > Nearby work** in classic Work Order Tracking. We build the second; see "Nearby work orders" |
+| Related past or planned work | Similar work orders (`WOSIMILARITY`), and an address match that is not AI | **Actions > View similar work orders** on a work order, with IBM's text-only score. In classic Work Order Tracking, **Select Action > Similar work orders from AI** lists the same results sorted by a match score that adds place and time, and **Select Action > Nearby work** lists work within about 150 m. We build the last two; see configuration 3 and "Nearby work orders" |
 | Questions in plain language during reviews | Maximo Assistant | The AI icon in Service Requests and Work Order Tracking |
 | Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. A watsonx.ai check outside Maximo reads the request for the rest and drafts the question to the resident. See "Missing information" below |
 
@@ -284,13 +284,48 @@ Observed on TechZone (2026-11-12, model `s3-a1658510dec311f`, the 22 `similar_wo
   - Every top 10 fills with same-problem reports from other streets.
 - **The look-alike:** SR810065 is shown WO2910040 first, which is the expected related WO.
 - **Scorer:** related WOs surfaced 6/12 (50%) across 10 SRs, and 5/10 SRs got every related WO.
-- **The controls are always matched.** Every list holds 10 WOs, so all 12 control SRs get matches. Scores do not separate real from unrelated:
+- **The controls are always matched.** Every list holds 10 WOs, so all 12 control SRs get matches. AI scores do not separate real from unrelated:
   - the 6 expected WOs score 88 to 95
   - the 94 other WOs listed on related-work SRs score 83 to 95
   - the 120 WOs listed on controls score 83 to 93.
 - **No threshold helps.** A higher threshold cuts real matches before it quiets the controls.
-- **Re-ranking can't recover the misses.** The 6 missed WOs are not among the 10 that Maximo stores for each WO, and 10 is the most it allows. So a same-street score on the stored results, like the SR duplicate score, could not bring them up. Finding work on the same street would need an address match outside the AI.
-- **What this means:** similar work orders find repeat work when the wording repeats. They do not find work at the same place described in different words. A reviewer reads the list for the street name, not for the score.
+- **Re-ranking can't recover the misses.** The 6 missed WOs are not among the 10 that Maximo stores for each WO, and 10 is the most it allows. A same-place score on the stored results can only sort them ("Match score" below). Finding work on the same street needs an address match outside the AI ("Nearby work orders").
+- **What this means:** similar work orders find repeat work when the wording repeats. They do not find work at the same place described in different words. Read IBM's list for the street name, not for the AI score; the match score below does that reading.
+
+### Match score (place and time)
+
+The AI compares text only, so a leak on another street scores 90 or more. The `SRQDUPSCORE` script from configuration 4, step 6, scores the work order pairs too, with the same factors:
+
+`match score = AI score × location factor × time factor`
+
+- The location comes from each WO's service address ("Nearby work orders", step 1). A WO without coordinates there falls back to the Maps link in its long description; if either WO of a pair still has none, the pair takes 0.75.
+- Related past work loses points for age: from 3 to 14 days apart the time factor takes off 15%, and after 14 days 30%. This keeps the factors the same as for SRs.
+- IBM's **View similar work orders** screen keeps the AI score; this score shows in our own dialog.
+
+1. **Score the pairs.** Set up the columns, the script and the escalation as in configuration 4, step 6. The escalation condition must take in work order pairs: `aicfgname in ('SRSIMILARITY','WOSIMILARITY') and (dupscore is null or duptimepts is null)`. The script skips any other pair. On an instance that already scores SRs, also paste the current source of `scripts/autoscript/srqdupscore.py` into the `SRQDUPSCORE` script; the SR-only source leaves every work order pair unscored, with no error.
+2. **The relationships.** In **Database Configuration**:
+   - On `WORKORDER`, add `AISIMWOPAIR`, child object `MAXAISIMILAROBJ`, where clause `objectname='WORKORDER' and objectid=:workorderid and aicfgname='WOSIMILARITY' and skipinf=0`. It lists the WO's own results. IBM's `MAXAISIMILARWO` is keyed by the WO that was found, so it can't.
+   - On `MAXAISIMILAROBJ`, add `AISIMWOTARGET`, child object `WORKORDER`, where clause `workorderid=:similartoobjectid`.
+   - Check them over REST before the dialog: `rel.aisimwopair{score,dupscore,rel.aisimwotarget{wonum}}` on `MXAPIWODETAIL`.
+3. **The dialog.** In **Application Designer**, open `WOTRACK` and import [wotrack-aisimwo-v2.xml](../maximo/app-designer/wotrack-aisimwo-v2.xml). It is `wotrack-nearbywo-current.xml` plus dialog `AISIMWO`, so Nearby work stays. `wotrack-aisimwo-current.xml` is the definition exported back after the import.
+   - The table reads `AISIMWOPAIR`, sorted by `dupscore desc`.
+   - Its columns are the work order, description, status, reported date and street address (through `AISIMWOTARGET`), then the match score, the AI score, the distance deduction and the time deduction.
+4. **The menu entry and access.** Add signature option `AISIMWO` ("Similar work orders from AI"), then a Select Action row with element type `OPTION`, key value `AISIMWO`, position `998` and subposition `0`. In **Security Groups**, grant **Similar work orders from AI** under **Applications > Work Order Tracking** to the reviewer groups and `MAXADMIN`. Sign out and back in.
+
+**Check it:** open WO2915021 (SR810036) and click **Select Action > Similar work orders from AI**. WO2910007 and WO2910012, the closed service line leaks at the same address, come first at 64: AI 92, less 0 for distance and 28 for time. The other WOs are on other streets and score 31 to 33; for example WO2915028 has AI 95, less 47 and 15.
+
+Observed on TechZone (2026-11-12): the first run scored all 336 `WOSIMILARITY` pairs on the pilot WOs. On the 22 `similar_wo` rows:
+
+| WOs listed | AI score | Match score | At 60 or more |
+|---|---|---|---|
+| The 6 related WOs the AI found | 88–95 | 62–80 | 6 of 6 |
+| Other WOs on related-work SRs (94) | 83–95 | 29–92 | 1 |
+| WOs on control SRs (120) | 83–93 | 29–56 | 0 |
+
+- **A match score of 60 or more marks likely related work.**
+- **Related WOs now rank first** on every SR but SR810065. On SR810036 they move from ranks 3 and 4 to 1 and 2, and on SR810034 from 2 to 1.
+- **The one above 60:** SR810065's list has WO2915034 at 92, above the related WO2910040 at 80. WO2915034 is a draft for a different request 78 m away in the same week, so place and time can't tell them apart. Read the description.
+- **It still can't list the 6 related WOs the AI never stored.** Nearby work finds them.
 
 ## Nearby work orders (address match)
 
@@ -479,8 +514,8 @@ Keep IBM's name `SRSIMILARITY` for the AI configuration. The relationship in ste
       - Every admin mode and structural step asks for an electronic signature. The password is your Manage **e-signature key**, not your sign-in password. Set it first from your profile menu (**Set or Modify E-signature**). Your sign-in password fails with BMXAA3840E and counts as a failed login.
       - With admin mode on, use **Apply Configuration Changes**, tick the backup box and click **Start Configuring the Database**. Use **Refresh Status** until it reads "ConfigDB completed without errors". Then turn admin mode off; escalations do not run while it is on.
    3. **The script.** In **Automation Scripts**, click **More Actions > Create > Script with Action Launch Point**. Launch point `SRQDUPSCORE` on object `MAXAISIMILAROBJ`, active; the action `SRQDUPSCORE` fills in. Script `SRQDUPSCORE`, language `python`, log level `ERROR`, no variables. Paste the source of `scripts/autoscript/srqdupscore.py` and click **Create**.
-   4. **The escalation.** In **Escalations**, create `SRQDUPSCORE`, applies to `MAXAISIMILAROBJ`, condition `aicfgname='SRSIMILARITY' and (dupscore is null or duptimepts is null)`, schedule every 5 minutes. Add one escalation point with no elapsed time and no condition, tick its **Repeat?** box, and add action `SRQDUPSCORE` on its **Actions** tab. Without **Repeat?**, Maximo acts on each row only once, so rows scored before a change to the script or condition are never scored again; the condition alone stops a filled row from being processed twice. Save, then **More Actions > Activate/Deactivate Escalation**. Maximo creates cron task instance `ESCSRQDUPSCORE` under `ESCALATION`.
-   - Each run scores every pair that has none, so new AI results are scored within 5 minutes. The `duptimepts is null` part also re-scores rows from before the deduction columns were added. On TechZone the first run scored all 450 pairs in one pass.
+   4. **The escalation.** In **Escalations**, create `SRQDUPSCORE`, applies to `MAXAISIMILAROBJ`, condition `aicfgname in ('SRSIMILARITY','WOSIMILARITY') and (dupscore is null or duptimepts is null)`, schedule every 5 minutes. `WOSIMILARITY` scores the work order pairs for configuration 3's match score. Add one escalation point with no elapsed time and no condition, tick its **Repeat?** box, and add action `SRQDUPSCORE` on its **Actions** tab. Without **Repeat?**, Maximo acts on each row only once, so rows scored before a change to the script or condition are never scored again; the condition alone stops a filled row from being processed twice. Save, then **More Actions > Activate/Deactivate Escalation**. Maximo creates cron task instance `ESCSRQDUPSCORE` under `ESCALATION`.
+   - Each run scores every pair that has none, so new AI results are scored within 5 minutes. The `duptimepts is null` part also re-scores rows from before the deduction columns were added. On TechZone the first run scored all 450 pairs in one pass. On 2026-11-12, after the condition took in `WOSIMILARITY`, the next run scored all 336 pilot WO pairs and left the SR scores as they were.
 
 7. **The dialog.** In **Application Designer**, open the **Service Requests** application (`SR`).
    1. Click **Export Application Definition** and keep the file. It is the way back.
@@ -820,6 +855,9 @@ Deactivate the four configurations (**Actions > Deactivate**). This stops the tr
 | Similar work orders list retired or cancelled copies | The model was built before the filter changed. Run **Create model** again. |
 | BMXAA10138E, "The target AI Model is not ready" | The model is still training after **Create model**. Wait a few minutes and try again. If **Check model status** shows "BMXAA1482E ... Not Found", the model creation failed: read the configuration's **Log** for the reason. |
 | The log shows "invalid argument max_similarity_records value must be less than or equal to 10" | Set `max_similarity_records` back to 10 or less, then **Create model** again. |
+| **Similar work orders from AI** is missing from Select Action | The `AISIMWO` option is not granted to your group, or you have not signed out and back in. |
+| The Match score column is empty in the similar work orders dialog | The escalation condition still reads `aicfgname='SRSIMILARITY'`: deactivate it, set the condition from configuration 4, step 6, and activate it again. Or the `SRQDUPSCORE` script still has the SR-only source: paste the current `scripts/autoscript/srqdupscore.py`. The pairs are scored within 5 minutes. |
+| A related WO at the same address scores in the 60s, not the 90s | Expected: it was reported more than 14 days earlier, so the time factor takes off 30%. A distance deduction of 0 means the same place. |
 | **Nearby work** is missing from Select Action | The `NEARBYWO` option is not granted to your group, or you have not signed out and back in. |
 | The Nearby work dialog is empty for a WO that should have neighbours | The WO, or the other WO, has no coordinates on its service address. Run `scripts/fill_wo_service_addresses.py` to see which WOs differ from the dataset. A cancelled WO is never listed. |
 | BMXAA0024E, "The action ADD is not allowed on object GEOMETRY", when filling a WO's address | The WO is closed or cancelled. Use `--history` ("Nearby work orders", step 1). |
