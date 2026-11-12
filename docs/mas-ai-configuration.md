@@ -9,7 +9,7 @@ This guide sets up use case 1 from the Workshop Playback on the TechZone Maximo 
 | Several residents reporting one problem (duplicates) | Similar service requests (`similarity` template on `MXAPISR`), then a Global Issue groups them onto one work order | **Select Action > Similar service requests from AI** on a service request. We build this dialog; see configuration 4 |
 | Related past or planned work | Similar work orders (`WOSIMILARITY`) | **Actions > View similar work orders** on a work order |
 | Questions in plain language during reviews | Maximo Assistant | The AI icon in Service Requests and Work Order Tracking |
-| Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. The AI part is being tested. See "Missing information" below |
+| Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. A watsonx.ai check outside Maximo reads the request for the rest and drafts the question to the resident. See "Missing information" below |
 
 The AI only recommends. A person accepts or ignores each recommendation, and no configuration here changes a record by itself. That is the pilot guardrail from the Playback.
 
@@ -38,8 +38,10 @@ Do this first. If AI Service is not there, nothing else in this guide works.
 | The AITRAINJOB and AIINFJOB cron tasks exist | **Cron Task Setup** | _pending_ |
 | The invocation channels `AIWOSIMILARITYCFG` and `AIWOSIMILARITYINF` exist (configuration 4 copies them) | **Invocation Channels** | _pending_ |
 | A service request shows the **Global Issue** check box and a **Related to Global ID** field on its main tab | Open any SR in **Service Requests** | _pending_ |
-| We have cluster-admin on the OpenShift cluster (only needed to install AI Service ourselves) | `oc auth can-i '*' '*' --all-namespaces` | _pending_ |
-| AI Service is installed, and which catalog the cluster runs | `oc get aiserviceapp -A`, or `mas must-gather --collectors mas,aiservice --no-logs` for a full version summary | _pending_ |
+| We have cluster-admin on the OpenShift cluster (only needed to install AI Service ourselves) | `oc auth can-i '*' '*' --all-namespaces` | Yes, for the reservation's IBMid (2026-11-12). The cluster is Red Hat OpenShift on IBM Cloud in `us-south`. Sign in with an IBM Cloud one-time passcode, as `oc login -s <cluster service endpoint> -u passcode -p <passcode>`. |
+| AI Service is installed, and which catalog the cluster runs | `oc get aiserviceapp -A`, or `mas must-gather --collectors mas,aiservice --no-logs` for a full version summary | Installed: `aiserviceapp` `inst1` in namespace `aiservice-inst1`, tenant `aiservice-inst1-user`, licensed 2026-09-25 to 2027-09-25 (2026-11-12). Catalog not checked. |
+| Which watsonx.ai AI Service uses | `oc get aiservicetenant -n aiservice-inst1-user -o yaml`, under `settings.watsonxai` | watsonx.ai on IBM Cloud, `https://us-south.ml.cloud.ibm.com`, project `16f0743c-0dfc-4223-8047-047c0a3b7232`. The key is in secret `aiservice-inst1-user----wx-secret` (`wx_apikey`). No watsonx.ai runs on the cluster itself. |
+| Which tools the Assistant can call | **AI configuration** > `ASSISTANT` > **Tools** | None. All 14 tools, our `SRQ-SR-CLASS` and `SRSIMILARITY` included, show **Available in assistant: Not supported yet** (2026-11-12). Tool use needs the agentic Assistant, which the instance owner turns on. |
 | A RESOLVED SR can be made a Global Issue, and a QUEUED SR can be linked to it | Try SR810030 and SR810031 | _pending_ |
 
 - **If AI Service is missing or not licensed:** stop. Escalate to the instance owner, Joseph Haney, or the IBM MAS AI contact, Divya. AI Service costs AppPoints, so ask before anyone installs it.
@@ -490,7 +492,7 @@ Observed on TechZone (2026-11-08, cluster B, before the reload):
 
 No Maximo version has a built-in AI check for missing details, on service requests or work orders. The pilot splits the check by what it takes to decide a gap:
 - **Rules that plain text can decide:** an automation script, [scripts/autoscript/srqmissinfo.py](../scripts/autoscript/srqmissinfo.py), runs when an SR is saved. It never blocks the save, so a report from QAlert is never lost. Each gap becomes a work log entry of type `MISSINFO` on the SR, and a Work Queue lists the open SRs that have one.
-- **Rules that need the request to be read and understood:** for example, what the meter problem is, or two problems in one request. These stay with the reviewer and the AI. See "AI test" below.
+- **Rules that need the request to be read and understood:** for example, what the meter problem is, or two problems in one request. A script outside Maximo asks watsonx.ai, and the reviewer decides. See "AI check with watsonx.ai" below.
 
 What the script checks, from [required-information.csv](../data/reference/required-information.csv):
 
@@ -577,6 +579,45 @@ Observed on TechZone (2026-11-09, before the reload):
   - The script now uses a relationship scoped to the SR (`recordkey=:ticketid and class=:class and siteid=:siteid`).
 - While those were being fixed, a version with `import re` blocked SR saves for about two minutes (15:44 to 15:46 UTC), until its launch point was switched off.
 
+### AI check with watsonx.ai
+
+[scripts/ai_missing_info.py](../scripts/ai_missing_info.py) runs outside Maximo. It reads the open pilot SRs through the REST API and handles each one in three steps:
+1. **The rules above** find the gaps the record shows.
+2. **An address lookup** in the County address file runs for an address the file does not have. It finds the resident's own house number on a similarly spelled street, as with SR810002's "Glenn" for Glen, or it says which house numbers the street has, as with SR810033. It never proposes a house number the resident did not give.
+3. **One watsonx.ai chat call** checks the rules that need the text read: one problem per request, and the rule for the request type. It also drafts one question to the resident covering every gap.
+
+Guardrails:
+- **What is sent.** The resident's name, phone and email line is removed before the text is sent.
+- **What the reply must show.** A gap must quote its evidence word for word from the request, or it is dropped.
+- **Only gaps that block dispatch count.** The model marks each gap as blocking or not, and gaps that only lack a second detail are set aside.
+- **No invented values.** A question with a number that is not in the request or the address lookup is reported, and never written.
+- **Nothing changes without `--apply`.** Without it, the script writes only `evaluation/ai-missing-info-<model>.csv` and prints the score. With `--apply`, each open SR with a gap gets one internal `MISSINFO` work log, "AI check: missing information", holding the gaps, the evidence and the question. A reviewer decides what to send.
+- **Credentials.** The script uses AI Service's own watsonx.ai connection (Step 0). The URL, project ID and key go in `WATSONX_URL`, `WATSONX_PROJECT_ID` and `WATSONX_API_KEY` in `.env`.
+
+```bash
+uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py   # preview
+uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py --model ibm/granite-4-h-small
+```
+
+Observed on TechZone (2026-11-12, all 65 pilot SRs, scored against the answer key):
+
+| Prompt version | `openai/gpt-oss-120b`: gaps found | Complete SRs flagged | `ibm/granite-4-h-small`: gaps found | Complete SRs flagged |
+|---|---|---|---|---|
+| The rules alone | 8 of 18 | 0 of 48 | 8 of 18 | 0 of 48 |
+| Flag a rule the request clearly fails | 18 of 18 | 22 of 48 | 13 of 18 | 40 of 48 |
+| Plus: do not flag a missing second detail | 18 of 18 | 23 of 48 | 13 of 18 | 20 of 48 |
+| Grade each gap as blocking dispatch or not (kept) | **18 of 18** | **12 of 48** | 17 of 18 | 27 of 48 |
+
+- **Use `openai/gpt-oss-120b`.** It finds every gap, including all 10 the rules cannot see. No drafted question had an invented number in any run, and in the kept version every street named in a question comes from the request or the address file. It used about 940 tokens per SR, or 61,000 for the 65.
+- **Granite is not reliable enough.** It flags far more complete SRs, and its results swing between prompt versions.
+- **The 12 complete SRs gpt-oss flags:**
+  - 3 are fair to raise on reading. SR810004 reports low pressure and brown water. SR810029 describes a leak under a kitchen sink, which is the owner's side. SR810018, clear water bubbling up near the meter, is filed as a sewer issue.
+  - 8 ask for the second half of a two-part rule, such as a meter lock (`NOWATER-SCOPE`, three SRs), the exact source of an odor (`ODOR-SOURCE`, two SRs), or how much water is flowing (`MAIN-WHERE`). Whether those halves are required is the County's call. If they are not, shorter rule wording in `required-information.csv` would remove these flags.
+  - 1 is a plain misreading: SR810051 says the meter spins with every fixture off, which names the problem.
+- On SRs that do have a gap, it adds a second gap to two: SR810005 (the odor's source) and SR810027 (which meter problem).
+- The model only reads the description text, so it misses nothing the service address shows. The rules and the address lookup cover that.
+- The prompt was changed twice, both times with general wording and never for a particular SR. The third version is the one in the script.
+
 ### AI test: can the 9.2 Assistant judge the gaps that need reading?
 
 Ask the Maximo Assistant (the AI icon in Service Requests) about three SRs whose gaps the script cannot see. Compare its answer with the answer key:
@@ -589,6 +630,7 @@ Ask the Maximo Assistant (the AI icon in Service Requests) about three SRs whose
 
 - If it names the gap in at least two of the three, the 9.2 route (an agent that calls this script and explains the rest) is worth building.
 - If it only restates the request, the reviewer judges these gaps until IBM says how to call the `almwatsonx` template.
+- On TechZone the agent route is blocked for now: the Assistant can call no tools (Step 0). The watsonx.ai check above covers these gaps without it.
 
 Observed on TechZone: _pending_
 
