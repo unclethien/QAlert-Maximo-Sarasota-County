@@ -1,0 +1,60 @@
+# The scheduled missing-information check on the TechZone OpenShift cluster.
+# Create the srq-missinfo secret first with create_secret.py, then: kubectl apply -f openshift.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: srq-missinfo
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: missinfo-check
+  namespace: srq-missinfo
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: missinfo-check
+  namespace: srq-missinfo
+spec:
+  source:
+    git:
+      uri: https://github.com/unclethien/QAlert-Maximo-Sarasota-County.git
+      ref: main
+  strategy:
+    dockerStrategy:
+      dockerfilePath: deploy/missinfo-job/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: missinfo-check:latest
+  triggers:
+    - type: ConfigChange
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: missinfo-check
+  namespace: srq-missinfo
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1200
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: check
+              image: image-registry.openshift-image-registry.svc:5000/srq-missinfo/missinfo-check:latest
+              imagePullPolicy: Always
+              envFrom:
+                - secretRef:
+                    name: srq-missinfo
+              resources:
+                requests: {cpu: 50m, memory: 128Mi}
+                limits: {memory: 256Mi}
