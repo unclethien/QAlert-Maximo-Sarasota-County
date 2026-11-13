@@ -1,0 +1,273 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "How Maximo finds missing information in service requests",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-missing-info-check-20261112-234500/missing-info-check.html"
+  },
+  "lanes": [
+    {
+      "id": "resident",
+      "label": "Resident"
+    },
+    {
+      "id": "maximo",
+      "label": "Maximo Manage"
+    },
+    {
+      "id": "cluster",
+      "label": "OpenShift job, every 15 min (with guardrails)"
+    },
+    {
+      "id": "ai",
+      "label": "watsonx.ai"
+    }
+  ],
+  "phases": [
+    {
+      "id": "arrives",
+      "label": "1. Request arrives",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "checked",
+      "label": "2. Checked and noted",
+      "fromCol": 2,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "reviewed",
+      "label": "3. Reviewed",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "report",
+    "sr",
+    "pick",
+    "ask",
+    "check",
+    "notes",
+    "tab",
+    "followup"
+  ],
+  "nodes": [
+    {
+      "id": "report",
+      "lane": "resident",
+      "col": 0,
+      "type": "external",
+      "label": "Reports a problem",
+      "sublabel": "through QAlert",
+      "width": 150
+    },
+    {
+      "id": "followup",
+      "lane": "resident",
+      "col": 5,
+      "type": "external",
+      "label": "Gets one question",
+      "sublabel": "from a reviewer",
+      "width": 150
+    },
+    {
+      "id": "tab",
+      "lane": "maximo",
+      "col": 5,
+      "type": "frontend",
+      "label": "Missing Information tab",
+      "sublabel": "Start Center: counts + lists",
+      "width": 172
+    },
+    {
+      "id": "sr",
+      "lane": "maximo",
+      "col": 1,
+      "type": "backend",
+      "label": "Service request saved",
+      "sublabel": "address + description",
+      "width": 150
+    },
+    {
+      "id": "rules",
+      "lane": "maximo",
+      "col": 2,
+      "type": "backend",
+      "label": "Rule check on save",
+      "sublabel": "house number, county, lift station",
+      "width": 180
+    },
+    {
+      "id": "notes",
+      "lane": "maximo",
+      "col": 4,
+      "type": "database",
+      "label": "Internal notes on the SR",
+      "sublabel": "Log tab: one per gap + summary",
+      "width": 172
+    },
+    {
+      "id": "timer",
+      "lane": "cluster",
+      "col": 1,
+      "type": "messagebus",
+      "label": "Timer",
+      "sublabel": "every 15 minutes",
+      "width": 150
+    },
+    {
+      "id": "pick",
+      "lane": "cluster",
+      "col": 2,
+      "type": "backend",
+      "label": "Pick unchecked SRs",
+      "sublabel": "open, up to 25 a run",
+      "width": 150
+    },
+    {
+      "id": "ask",
+      "lane": "ai",
+      "col": 3,
+      "type": "cloud",
+      "label": "Reads the request",
+      "sublabel": "lists gaps, drafts a question",
+      "width": 180
+    },
+    {
+      "id": "check",
+      "lane": "cluster",
+      "col": 4,
+      "type": "security",
+      "label": "Evidence quoted?",
+      "sublabel": "words must be in the request",
+      "width": 180
+    },
+    {
+      "id": "dropped",
+      "lane": "cluster",
+      "col": 5,
+      "type": "security",
+      "label": "Gap dropped",
+      "sublabel": "never written",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "report-sr",
+      "from": "report",
+      "to": "sr",
+      "label": "new SR"
+    },
+    {
+      "id": "sr-rules",
+      "from": "sr",
+      "to": "rules",
+      "role": "branch"
+    },
+    {
+      "id": "rules-notes",
+      "from": "rules",
+      "to": "notes",
+      "label": "address gaps",
+      "role": "branch"
+    },
+    {
+      "id": "sr-pick",
+      "from": "sr",
+      "to": "pick",
+      "label": "open SR"
+    },
+    {
+      "id": "timer-pick",
+      "from": "timer",
+      "to": "pick",
+      "variant": "dashed"
+    },
+    {
+      "id": "pick-ask",
+      "from": "pick",
+      "to": "ask",
+      "label": "request text",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ask-check",
+      "from": "ask",
+      "to": "check",
+      "label": "gaps"
+    },
+    {
+      "id": "check-notes",
+      "from": "check",
+      "to": "notes",
+      "label": "yes",
+      "variant": "emphasis"
+    },
+    {
+      "id": "check-dropped",
+      "from": "check",
+      "to": "dropped",
+      "label": "no",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "notes-tab",
+      "from": "notes",
+      "to": "tab",
+      "label": "counted"
+    },
+    {
+      "id": "tab-followup",
+      "from": "tab",
+      "to": "followup",
+      "label": "asks"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Where it runs",
+      "items": [
+        "OpenShift project srq-missinfo on the TechZone cluster, CronJob missinfo-check",
+        "Uses the watsonx.ai project AI Service already uses, model gpt-oss-120b",
+        "Keys live in an OpenShift secret, never in the code"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Guardrails",
+      "items": [
+        "Resident name, phone and email are removed before the text is sent",
+        "A gap needs words quoted from the request, or it is dropped",
+        "A question with a made-up number is withheld",
+        "Notes are internal: nothing is sent and no field changes"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Results on the pilot",
+      "items": [
+        "All 46 open SRs checked in two runs, no errors",
+        "Found all 12 expected gaps on open pilot SRs",
+        "Flagged 6 of 34 complete SRs for a second look",
+        "About 950 tokens per SR"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Known limits",
+      "items": [
+        "The county check uses a list of place names, not a map",
+        "A typed address without a County address code is flagged",
+        "Drafted questions can ask for more than the gaps found"
+      ]
+    }
+  ]
+}
