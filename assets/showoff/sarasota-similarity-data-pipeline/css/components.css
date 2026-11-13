@@ -623,50 +623,7 @@ a:focus-visible {
   align-items: start;
 }
 
-/* ---------- 6. Ranges that overlap ---------- */
-
-.ranges {
-  display: grid;
-  gap: var(--s-3);
-}
-.range {
-  display: grid;
-  grid-template-columns: 13rem 1fr 5rem;
-  gap: var(--s-4);
-  align-items: center;
-  font-size: var(--t-s);
-}
-.range .track {
-  position: relative;
-  height: var(--s-4);
-  background: var(--bar-track);
-}
-.range .span {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc((var(--lo) - 80) * 5%);
-  width: calc((var(--hi) - var(--lo)) * 5%);
-  background: var(--bar-kept);
-}
-.range.related .span {
-  background: var(--sewer);
-}
-.range .val {
-  font-weight: 600;
-  text-align: right;
-}
-.range-axis {
-  display: grid;
-  grid-template-columns: 13rem 1fr 5rem;
-  gap: var(--s-4);
-  font-size: var(--t-xs);
-  color: var(--text-muted);
-}
-.range-axis .ends {
-  display: flex;
-  justify-content: space-between;
-}
+/* ---------- 6. Words that do not match ---------- */
 
 .words {
   display: grid;

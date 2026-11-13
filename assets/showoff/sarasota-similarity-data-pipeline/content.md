@@ -1,6 +1,6 @@
 # Finding related work, and the data it depends on
 
-A 13-slide deck and speaker script for the IBM team and Sarasota County staff, 2026-11-13. It runs about 15 minutes, plus two optional live demos of about a minute each. Read the script as written, or use it as talking points.
+A 13-slide deck and speaker script for the IBM team and Sarasota County staff, 2026-11-13. It runs about 14 minutes, plus two optional live demos of about a minute each. Read the script as written, or use it as talking points.
 
 Every record on the slides is the pilot's synthetic data on the TechZone Maximo instance. No real resident details appear. The County workbook was used only for counts and structure.
 
@@ -62,21 +62,15 @@ Every record on the slides is the pilot's synthetic data on the TechZone Maximo 
 >
 > One note: Maximo ships AI for similar work orders, but not for service requests. We set up IBM's documented similarity template on service requests and added a screen for it, **Select Action, Similar service requests from AI**.
 
-## 4. Text alone ranks a break across town second (about 1 minute 15 seconds)
+## 4. Text alone ranks a break across town second (about 30 seconds)
 
-**On screen:** the AI's list for SR810031, ranked by the AI's score alone. SR810030 is first at 95. Second is a main break on Bramblewick Ln, six weeks later, at 93. The real neighbor, SR810032, is fifth at 91. On the right, why the scores bunch together.
+**On screen:** the AI's list for SR810031, ranked by the AI's score alone. SR810030 is first at 95. Second is a main break on Bramblewick Ln, six weeks later, at 93. The real neighbor, SR810032, is fifth at 91. On the right, why the scores bunch together, and what that means for a reviewer: read the address, not the score.
 
 **Say:**
 
-> This is the AI's own list for the middle report, SR810031, sorted by its score.
+> This is the AI's own list for the middle report, SR810031. The first report is first, at 95. But second is a main break across town, six weeks later, at 93, and the real neighbor is fifth.
 >
-> First place is right: the first report, at 95.
->
-> But second is a main break on Bramblewick Lane, across town and six weeks later, at 93. Then a leak on the same street six weeks later, and another main break elsewhere. The real neighbor, SR810032, is fifth.
->
-> Why? The AI compares words. Every request arrives in the same layout: "type, address", then customer, address and a map link. So almost everything scores between 83 and 97, and the address is just more words.
->
-> No cut-off fixes that. At 93, a reviewer keeps half of the true duplicate pairs and gets 20 wrong ones.
+> The AI compares words, and every request arrives in the same layout, so almost everything scores between 83 and 97. For a reviewer, that means: read the address, not the score.
 
 ## 5. Add place and time: duplicates rise, look-alikes fall (about 1 minute 30 seconds)
 
@@ -96,21 +90,15 @@ Every record on the slides is the pilot's synthetic data on the TechZone Maximo 
 
 **Demo (optional, about 1 minute):** in classic Service Requests, open **SR810031** and click **Select Action > Similar service requests from AI**. SR810030 is first at 95 and SR810032 second at 91. Point to the Distance deduction and Time deduction columns on the rows below.
 
-## 6. Similar work orders: text finds repeats, not places (about 1 minute 15 seconds)
+## 6. Similar work orders: text finds repeats, not places (about 30 seconds)
 
-**On screen:** what Maximo's built-in similar work orders found on the 22 pilot requests that have a work order to check: 6 of the 12 related work orders, none of the 4 planned projects, and 10 matches on every one of the 12 control requests. On the right, an example of how a capital project and a resident's report use different words.
+**On screen:** what Maximo's built-in similar work orders found on the work orders of 22 pilot requests: 6 of the 12 related work orders, none of the 4 planned projects, and 10 matches for each of the 12 requests with nothing related. On the right, how a capital project and a resident's report use different words, and what that means for a reviewer: read the street, not the score.
 
 **Say:**
 
-> Now work orders. The question here is: has a crew been here before, or is work already planned?
+> Now work orders: has a crew been here before, or is work already planned? Maximo's built-in similar work orders compares text. It found the 6 related work orders worded the same way, none of the 4 planned projects, and it still gave every request with nothing related 10 matches.
 >
-> Maximo's similar work orders feature is built in and needs no training. We checked the work orders of 22 pilot requests: 10 with related past or planned work, and 12 controls with nothing related.
->
-> It found 6 of the 12 related work orders, the ones worded the same way: "1382 Larkspur Bay Dr: service line leak" next to "water line leak" at the same address.
->
-> It found none of the 4 planned projects. A capital project reads "Starling Cove Dr water main replacement"; a resident writes "low water pressure". Different words, so it doesn't match.
->
-> And every control request still got 10 matches, at 83 to 93. Related work scored 88 to 95. The score alone doesn't separate them, and Maximo keeps at most 10 results per work order.
+> Related and unrelated work score the same, in the high 80s and 90s. For a reviewer, that means: read the street, not the score.
 
 ## 7. Two fixes on the work order (about 1 minute 30 seconds)
 
@@ -131,9 +119,9 @@ Every record on the slides is the pilot's synthetic data on the TechZone Maximo 
 - Then **Select Action > Nearby work**. It lists WO2910012 and WO2910007, the closed service line leaks at the same address.
 - If time allows, open **WO2915004** and its Nearby work: the planned Starling Cove Dr water main replacement, WO2910037.
 
-## 8. Side by side (about 50 seconds)
+## 8. Side by side (about 1 minute 15 seconds)
 
-**On screen:** a scoreboard for the 22 requests: related work orders listed, related work ranked first, and control requests with a likely match. Columns: AI score only, match score, and Nearby work.
+**On screen:** a scoreboard for the 22 requests: related work orders listed, related work ranked first, and control requests with a likely match. Columns: AI score only, match score, and Nearby work. Below, a note that both are configuration the County would own, and that Nearby work is the lighter one.
 
 **Say:**
 
@@ -145,7 +133,9 @@ Every record on the slides is the pilot's synthetic data on the TechZone Maximo 
 >
 > So a reviewer gets both on the work order: Nearby work for the place, and similar work orders for the same problem worded the same way.
 >
-> And here's the link to the next part. Both fixes needed one thing the AI never had: the location as a field.
+> To be clear about what these are: both are set up in Maximo's own admin screens, with no code outside Maximo, but the County would own them through every upgrade. Nearby work is the lighter one: one relationship and one screen, with no script. The match score adds a script, a scheduled job and new fields.
+>
+> You don't have to adopt our screens to get value from this. Both fixes needed one thing the AI never had: the location as a field. With that, even the built-in Map tab and a reviewer's own check get easier. And that's the next part.
 
 ## 9. What reaches Maximo today (about 1 minute 20 seconds)
 
@@ -241,14 +231,14 @@ Every record on the slides is the pilot's synthetic data on the TechZone Maximo 
 
 ---
 
-**Total:** about 15 minutes, plus up to 3 minutes of live demos.
+**Total:** about 14 minutes, plus up to 3 minutes of live demos.
 
 ## Numbers on the slides and where they come from
 
 | Number | Source |
 |---|---|
 | SR810031's list, AI and duplicate scores | TechZone, read live on 2026-11-12 (`rel.aisimsrpair` on `MXAPISR`) |
-| 6 of 8 and 8 of 8 first reports on top; 12 of 12 duplicate pairs and 14 of 450 pairs at 85 or more; 6 of 12 pairs and 20 wrong at 93 | `docs/mas-ai-configuration.md`, configuration 4, "Observed on TechZone" |
+| 6 of 8 and 8 of 8 first reports on top; 12 of 12 duplicate pairs and 14 of 450 pairs at 85 or more | `docs/mas-ai-configuration.md`, configuration 4, "Observed on TechZone" |
 | 6 of 12 related WOs; 0 of 4 planned; controls 12 of 12; AI ranges 88–95, 83–95, 83–93 | `docs/mas-ai-configuration.md`, configuration 3, "Observed on TechZone" |
 | Match score ranges 62–80, 29–92, 29–56; cut at 60; WO2915021's list | `docs/mas-ai-configuration.md`, "Match score (place and time)", and the dialog checked on 2026-11-12 |
 | Nearby work 12 of 12, 10 of 10, controls 0 of 12 | `docs/mas-ai-configuration.md`, "Nearby work orders" |
