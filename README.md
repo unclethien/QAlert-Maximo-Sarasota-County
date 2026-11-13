@@ -69,7 +69,7 @@ npm install
 npm run dev     # http://localhost:5180, press F for full screen
 ```
 
-The similarity and data pipeline deck is plain HTML with no build step. Open [`assets/showoff/sarasota-similarity-data-pipeline/index.html`](assets/showoff/sarasota-similarity-data-pipeline/index.html) in a browser. Use the arrow keys to change slides, N for speaker cues, T for light or dark, and F for full screen.
+The similarity and data pipeline deck is plain HTML with no build step. Open [`assets/showoff/sarasota-similarity-data-pipeline/index.html`](assets/showoff/sarasota-similarity-data-pipeline/index.html) in a browser. Use the arrow keys to change slides, N for speaker cues, and F for full screen.
 
 To load the dataset into a Maximo Manage test instance, follow the step-by-step [`docs/maximo-import-guide.md`](docs/maximo-import-guide.md). Every command is a dry run unless you pass `--apply`, and nothing is ever deleted. How the loader maps each column is in [`docs/maximo-load.md`](docs/maximo-load.md).
 

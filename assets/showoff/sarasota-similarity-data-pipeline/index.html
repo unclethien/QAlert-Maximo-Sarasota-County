@@ -12,14 +12,6 @@
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/components.css" />
     <script>
-      // Apply a saved theme before first paint; the page works without it.
-      try {
-        var saved = localStorage.getItem('srq-deck-theme');
-        if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
-      } catch (e) {}
-      // ?theme=light or ?theme=dark forces a theme for this visit, without saving it
-      var asked = new URLSearchParams(location.search).get('theme');
-      if (asked === 'light' || asked === 'dark') document.documentElement.dataset.theme = asked;
       if (navigator.webdriver) document.documentElement.classList.add('is-capture');
     </script>
   </head>
@@ -845,10 +837,6 @@
     <div class="controls" role="toolbar" aria-label="Presenter controls">
       <button class="ctl" type="button" data-action="notes" aria-pressed="false" aria-label="Show speaker cue (N)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6 H19 M5 12 H19 M5 18 H13" /></svg>
-      </button>
-      <button class="ctl" type="button" data-action="theme" aria-label="Theme: system (T)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 4 V20" /></svg>
-        <span class="label" data-theme-label>System</span>
       </button>
       <button class="ctl" type="button" data-action="prev" aria-label="Previous slide">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 L8 12 L15 19" /></svg>

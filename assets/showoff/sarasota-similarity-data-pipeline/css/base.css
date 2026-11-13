@@ -1,7 +1,7 @@
 /*
-  Base layer: fonts, tokens, themes, the slide frame and the presenter controls.
-  Built on the IBM Carbon Design System (v11): the White theme for light, Gray 100
-  for dark, IBM Plex type, Carbon's spacing scale and productive motion. Values
+  Base layer: fonts, tokens, the slide frame and the presenter controls.
+  Built on the IBM Carbon Design System (v11): the Gray 100 theme only, IBM Plex
+  type, Carbon's spacing scale and productive motion. Values
   come from @carbon/themes, @carbon/type and @carbon/motion.
 
   Color roles:
@@ -31,52 +31,52 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* Carbon White theme */
-  --bg: #ffffff; /* background */
-  --surface: #f4f4f4; /* layer-01 */
-  --surface-2: #e0e0e0; /* layer-accent-01 */
-  --surface-hover: #e8e8e8; /* layer-hover-01 */
-  --line: #e0e0e0; /* border-subtle-00 */
-  --line-strong: #8d8d8d; /* border-strong-01 */
-  --text: #161616; /* text-primary */
-  --text-soft: #525252; /* text-secondary */
-  --text-muted: #6f6f6f; /* text-helper */
-  --focus: #0f62fe; /* focus */
+  /* Carbon Gray 100 theme */
+  --bg: #161616; /* background */
+  --surface: #262626; /* layer-01 */
+  --surface-2: #393939; /* layer-accent-01 */
+  --surface-hover: #333333; /* layer-hover-01 */
+  --line: #393939; /* border-subtle-00 */
+  --line-strong: #6f6f6f; /* border-strong-01 */
+  --text: #f4f4f4; /* text-primary */
+  --text-soft: #c6c6c6; /* text-secondary */
+  --text-muted: #a8a8a8; /* text-helper */
+  --focus: #ffffff; /* focus */
 
-  /* Interactive blue: link-primary, highlight, blue 10 */
-  --accent: #0f62fe;
-  --accent-ink: #0043ce;
-  --accent-wash: #edf5ff;
+  /* Interactive blue: link-primary, highlight, blue 90 */
+  --accent: #78a9ff;
+  --accent-ink: #a6c8ff;
+  --accent-wash: #001d6c;
 
-  /* Support error red: support-error, red 30 for the lighter deduction, text-error, red 10 */
-  --flag: #da1e28;
-  --flag-soft: #ffb3b8;
-  --flag-ink: #da1e28;
-  --flag-wash: #fff1f1;
+  /* Support error red: support-error, red 70 for the lighter deduction, text-error, red 100 */
+  --flag: #fa4d56;
+  --flag-soft: #a2191f;
+  --flag-ink: #ff8389;
+  --flag-wash: #2d0709;
 
   /* Links stay blue; correct matches use support-success */
-  --water: #0f62fe;
-  --water-wash: #edf5ff;
-  --sewer: #198038;
-  --sewer-wash: #defbe6;
+  --water: #78a9ff;
+  --water-wash: #001d6c;
+  --sewer: #42be65;
+  --sewer-wash: #022d0d;
 
   /* Carbon tags: green, red and cool gray */
-  --tag-green-bg: #a7f0ba;
-  --tag-green-text: #0e6027;
-  --tag-red-bg: #ffd7d9;
-  --tag-red-text: #a2191f;
-  --tag-gray-bg: #dde1e6;
-  --tag-gray-text: #343a3f;
+  --tag-green-bg: #0e6027;
+  --tag-green-text: #a7f0ba;
+  --tag-red-bg: #a2191f;
+  --tag-red-text: #ffd7d9;
+  --tag-gray-bg: #4d5358;
+  --tag-gray-text: #dde1e6;
 
   /* The score bar: kept points, distance deduction, time deduction */
-  --bar-kept: #0043ce;
+  --bar-kept: #78a9ff;
   --bar-dist: var(--flag);
   --bar-time: var(--flag-soft);
-  --bar-track: #e0e0e0;
+  --bar-track: #393939;
 
-  /* The title slide is a Gray 100 theme zone in both themes */
+  /* The title slide map */
   --hero-bg: #161616;
   --hero-text: #f4f4f4;
   --hero-muted: #c6c6c6;
@@ -133,74 +133,6 @@
 
   --z-sticky: 10;
   --z-overlay: 20;
-}
-
-/* Carbon Gray 100 theme */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --bg: #161616;
-    --surface: #262626;
-    --surface-2: #393939;
-    --surface-hover: #333333;
-    --line: #393939;
-    --line-strong: #6f6f6f;
-    --text: #f4f4f4;
-    --text-soft: #c6c6c6;
-    --text-muted: #a8a8a8;
-    --focus: #ffffff;
-    --accent: #78a9ff;
-    --accent-ink: #a6c8ff;
-    --accent-wash: #001d6c;
-    --flag: #fa4d56;
-    --flag-soft: #a2191f;
-    --flag-ink: #ff8389;
-    --flag-wash: #2d0709;
-    --water: #78a9ff;
-    --water-wash: #001d6c;
-    --sewer: #42be65;
-    --sewer-wash: #022d0d;
-    --tag-green-bg: #0e6027;
-    --tag-green-text: #a7f0ba;
-    --tag-red-bg: #a2191f;
-    --tag-red-text: #ffd7d9;
-    --tag-gray-bg: #4d5358;
-    --tag-gray-text: #dde1e6;
-    --bar-kept: #78a9ff;
-    --bar-track: #393939;
-  }
-}
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #161616;
-  --surface: #262626;
-  --surface-2: #393939;
-  --surface-hover: #333333;
-  --line: #393939;
-  --line-strong: #6f6f6f;
-  --text: #f4f4f4;
-  --text-soft: #c6c6c6;
-  --text-muted: #a8a8a8;
-  --focus: #ffffff;
-  --accent: #78a9ff;
-  --accent-ink: #a6c8ff;
-  --accent-wash: #001d6c;
-  --flag: #fa4d56;
-  --flag-soft: #a2191f;
-  --flag-ink: #ff8389;
-  --flag-wash: #2d0709;
-  --water: #78a9ff;
-  --water-wash: #001d6c;
-  --sewer: #42be65;
-  --sewer-wash: #022d0d;
-  --tag-green-bg: #0e6027;
-  --tag-green-text: #a7f0ba;
-  --tag-red-bg: #a2191f;
-  --tag-red-text: #ffd7d9;
-  --tag-gray-bg: #4d5358;
-  --tag-gray-text: #dde1e6;
-  --bar-kept: #78a9ff;
-  --bar-track: #393939;
 }
 
 /* Portrait: a taller canvas, so the root may grow with the width */
@@ -419,10 +351,6 @@ p {
 }
 .ctl[aria-pressed='true'] {
   background: var(--surface-2);
-}
-.ctl .label {
-  font-size: var(--t-xs);
-  letter-spacing: 0.02em;
 }
 
 .counter {

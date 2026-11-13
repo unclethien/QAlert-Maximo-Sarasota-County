@@ -1,6 +1,6 @@
-// Presenter controls: keyboard and button navigation, the slide counter, the theme
-// cycle (system, light, dark) and the speaker-cue overlay. Every slide renders in
-// full without this script; it only adds navigation on top.
+// Presenter controls: keyboard and button navigation, the slide counter and the
+// speaker-cue overlay. Every slide renders in full without this script; it only
+// adds navigation on top.
 (() => {
   const root = document.documentElement;
   const slides = Array.from(document.querySelectorAll('.slide'));
@@ -9,36 +9,12 @@
   const counter = document.querySelector('[data-counter]');
   const prevBtn = document.querySelector('[data-action="prev"]');
   const nextBtn = document.querySelector('[data-action="next"]');
-  const themeBtn = document.querySelector('[data-action="theme"]');
-  const themeLabel = document.querySelector('[data-theme-label]');
   const notesBtn = document.querySelector('[data-action="notes"]');
   const notes = document.querySelector('[data-notes]');
   const notesWhen = document.querySelector('[data-notes-when]');
   const notesCue = document.querySelector('[data-notes-cue]');
 
-  const THEME_KEY = 'srq-deck-theme';
-  const THEMES = ['system', 'light', 'dark'];
-  const THEME_NAMES = { system: 'System', light: 'Light', dark: 'Dark' };
-
   let current = 0;
-
-  const store = {
-    get(key) {
-      try {
-        return localStorage.getItem(key);
-      } catch (e) {
-        return null;
-      }
-    },
-    set(key, value) {
-      try {
-        if (value === null) localStorage.removeItem(key);
-        else localStorage.setItem(key, value);
-      } catch (e) {
-        /* storage unavailable: the choice lasts for this visit only */
-      }
-    },
-  };
 
   // ---------- Navigation ----------
 
@@ -87,28 +63,6 @@
   prevBtn?.addEventListener('click', () => goTo(current - 1));
   nextBtn?.addEventListener('click', () => goTo(current + 1));
 
-  // ---------- Theme ----------
-
-  function currentTheme() {
-    return root.dataset.theme === 'light' || root.dataset.theme === 'dark' ? root.dataset.theme : 'system';
-  }
-
-  function applyTheme(theme) {
-    if (theme === 'system') delete root.dataset.theme;
-    else root.dataset.theme = theme;
-    store.set(THEME_KEY, theme === 'system' ? null : theme);
-    if (themeLabel) themeLabel.textContent = THEME_NAMES[theme];
-    themeBtn?.setAttribute('aria-label', `Theme: ${THEME_NAMES[theme].toLowerCase()} (T)`);
-  }
-
-  function cycleTheme() {
-    const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
-    applyTheme(next);
-  }
-
-  themeBtn?.addEventListener('click', cycleTheme);
-  applyTheme(currentTheme());
-
   // ---------- Speaker cues ----------
 
   function toggleNotes(force) {
@@ -145,8 +99,6 @@
       toggleFullscreen();
     } else if (key === 'n' || key === 'N') {
       toggleNotes();
-    } else if (key === 't' || key === 'T') {
-      cycleTheme();
     } else {
       handled = false;
     }

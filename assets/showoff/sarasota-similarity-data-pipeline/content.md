@@ -11,7 +11,7 @@ Every record on the slides is the pilot's synthetic data on the TechZone Maximo 
   - Next slide: right arrow, down arrow, Space or Page Down (most clickers send Page Down).
   - Previous slide: left arrow, up arrow or Page Up.
   - First and last slides: Home and End.
-  - **N** shows the time budget and the demo cue for the current slide; **T** switches the theme between system, light and dark.
+  - **N** shows the time budget and the demo cue for the current slide.
 - **For the demos,** sign in to TechZone Maximo before the meeting, in a second browser tab:
   - one tab on classic **Service Requests** (Service Desk > Service Requests);
   - one tab on classic **Work Order Tracking**.
