@@ -30,6 +30,7 @@ You don't need a GitHub account to view this project. GitHub works like a shared
 | [`data/reference/`](data/reference) | A stand-in for the County's address list. |
 | [`scripts/`](scripts) | The programs that create the data. You can ignore this folder. |
 | [`presentation/`](presentation) | A 13-minute slide deck about the dataset. [View it online](https://unclethien.github.io/QAlert-Maximo-Sarasota-County/). Its speaker script is [`docs/presentation-script.md`](docs/presentation-script.md). |
+| [`assets/showoff/sarasota-similarity-data-pipeline/`](assets/showoff/sarasota-similarity-data-pipeline) | A 15-minute deck on finding similar service requests and work orders, and on why QAlert's details should reach Maximo as separate fields instead of one description. [View it online](https://unclethien.github.io/QAlert-Maximo-Sarasota-County/similarity-pipeline/). Its speaker script is [`content.md`](assets/showoff/sarasota-similarity-data-pipeline/content.md). |
 
 ## Reading the data
 
@@ -68,6 +69,8 @@ npm install
 npm run dev     # http://localhost:5180, press F for full screen
 ```
 
+The similarity and data pipeline deck is plain HTML with no build step. Open [`assets/showoff/sarasota-similarity-data-pipeline/index.html`](assets/showoff/sarasota-similarity-data-pipeline/index.html) in a browser. Use the arrow keys to change slides, N for speaker cues, T for light or dark, and F for full screen.
+
 To load the dataset into a Maximo Manage test instance, follow the step-by-step [`docs/maximo-import-guide.md`](docs/maximo-import-guide.md). Every command is a dry run unless you pass `--apply`, and nothing is ever deleted. How the loader maps each column is in [`docs/maximo-load.md`](docs/maximo-load.md).
 
 To set up MAS AI for AI-assisted vetting and classification, follow [`docs/mas-ai-configuration.md`](docs/mas-ai-configuration.md).
@@ -76,4 +79,4 @@ To set up MAS AI for AI-assisted vetting and classification, follow [`docs/mas-a
 - Its recommendations are scored against the answer key with `scripts/score_ai_results.py`.
 - Questions to try with the Maximo Assistant at reviews are in [`docs/mas-ai-assistant-prompts.md`](docs/mas-ai-assistant-prompts.md).
 
-Every push to `main` that changes `presentation/` or `data/` republishes the deck to https://unclethien.github.io/QAlert-Maximo-Sarasota-County/. See [`docs/deployment.md`](docs/deployment.md).
+Every push to `main` that changes `presentation/`, `data/`, or the similarity deck republishes both decks: the dataset deck at https://unclethien.github.io/QAlert-Maximo-Sarasota-County/ and the similarity deck at https://unclethien.github.io/QAlert-Maximo-Sarasota-County/similarity-pipeline/. See [`docs/deployment.md`](docs/deployment.md).
