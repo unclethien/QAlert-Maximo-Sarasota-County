@@ -141,3 +141,64 @@ def test_results_csv_lists_missed_and_extra_gaps(tmp_path):
                          "dropped": [], "invented": [], "error": ""}], {"B": {"ONE-ISSUE"}})
     row = next(csv.DictReader(open(out)))
     assert (row["MISSED"], row["EXTRA"], row["AI_GAPS"]) == ("ONE-ISSUE", "METER-PROBLEM", "METER-PROBLEM")
+
+
+def _result(ticket="SR810002", status="QUEUED", known=(), kept=(), question="", invented=(), error=""):
+    return {"ticketid": ticket, "status": status, "known": list(known), "hint": "", "kept": list(kept),
+            "dropped": [], "question": question, "invented": list(invented), "error": error}
+
+
+class WriteClient:
+    def __init__(self, worklogs=()):
+        self.worklogs, self.merged = list(worklogs), []
+
+    def query(self, structure, where=None, **k):
+        assert structure == "mxapiworklog"
+        return [w for w in self.worklogs if w["match"] in where]
+
+    def merge(self, href, payload):
+        self.merged.append((href, payload))
+
+
+def test_load_notes_reads_missinfo_entries_and_ai_summaries():
+    client = WriteClient([{"recordkey": "SR1", "description": "Missing information: ADDR", "match": 'logtype="MISSINFO"'},
+                          {"recordkey": "SR2", "description": ami.WORKLOG_SUMMARY, "match": "AI check"}])
+    assert ami.load_notes(client) == {"SR1": {"Missing information: ADDR"}, "SR2": {ami.WORKLOG_SUMMARY}}
+
+
+def test_the_scheduled_run_skips_srs_already_checked():
+    srs = [{"ticketid": "SR3"}, {"ticketid": "SR1"}, {"ticketid": "SR2"}]
+    notes = {"SR2": {ami.WORKLOG_SUMMARY}, "SR3": {"Missing information: ADDR"}}
+    assert [s["ticketid"] for s in ami.not_checked(srs, notes)] == ["SR1", "SR3"]
+
+
+def test_each_gap_gets_its_own_missinfo_entry_and_the_summary_is_not_a_missinfo_entry():
+    r = _result(known=[("ADDR", "No house number.")],
+                kept=[{"rule": "ONE-ISSUE", "evidence": "and also", "reason": "Two problems."}], question="Which house?")
+    entries = ami.worklog_entries(r, "m", noted={"Missing information: ADDR"})  # the launch point noted ADDR
+    assert [(e["logtype"], e["description"]) for e in entries] == [
+        ("MISSINFO", "Missing information: ONE-ISSUE"), ("UPDATE", ami.WORKLOG_SUMMARY)]
+    assert not any(e["clientviewable"] for e in entries)
+    assert "Question for the resident: Which house?" in entries[-1]["description_longdescription"]
+
+
+def test_a_complete_sr_gets_only_the_summary():
+    entries = ami.worklog_entries(_result(), "m", noted=set())
+    assert [e["logtype"] for e in entries] == ["UPDATE"]
+    assert "No missing information found." in entries[0]["description_longdescription"]
+
+
+def test_a_question_with_an_invented_number_is_withheld_but_the_gaps_are_noted():
+    r = _result(known=[("ADDR", "No house number.")], question="Is it 2500 Main St?", invented=["2500"])
+    entries = ami.worklog_entries(r, "m", noted=set())
+    assert entries[0]["description"] == "Missing information: ADDR"
+    text = entries[-1]["description_longdescription"]
+    assert "2500 Main" not in text and "withheld" in text
+
+
+def test_apply_skips_closed_errored_and_already_checked_srs():
+    client = WriteClient()
+    srs = [{"ticketid": t, "href": "h/" + t} for t in ("SR1", "SR2", "SR3", "SR4")]
+    results = [_result("SR1"), _result("SR2", status="CLOSED"), _result("SR3", error="timeout"), _result("SR4")]
+    failed = ami.apply(client, srs, results, "m", notes={"SR4": {ami.WORKLOG_SUMMARY}})
+    assert failed == 0 and [h for h, _ in client.merged] == ["h/SR1"]

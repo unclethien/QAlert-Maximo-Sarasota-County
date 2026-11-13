@@ -17,14 +17,18 @@ a gap whose evidence is not copied word for word from the request. A question th
 number found neither in the request nor in the address lookup is reported as invented, and is
 never written to Maximo. The resident's contact line is removed before the text is sent.
 
-Nothing changes in Maximo unless --apply is given. Then each open SR with a gap gets one internal
-MISSINFO work log with the gaps, their evidence and the question. A reviewer decides what to do.
+Nothing changes in Maximo unless --apply is given. Then each open SR gets internal work logs a
+reviewer reads: one MISSINFO entry per gap, "Missing information: <rule>", the same entry the
+SRQMISSINFO launch point writes, so the Start Center counts both by rule; and one UPDATE entry,
+"AI check: missing information", with the evidence and the drafted question, or "No missing
+information found". That entry also marks the SR as checked, so --new skips it next time.
 
     uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py
     ... --model ibm/granite-4-h-small        # another watsonx.ai chat model
     ... --only SR810027 SR810048             # some SRs only
     ... --csv data/maximo/sr.csv             # read the SRs from the load file, not from Maximo
     ... --apply                              # add the work logs
+    ... --new --apply --limit 25             # the scheduled job: open SRs not checked yet
 
 Settings, read from the environment or the gitignored env file at the repository root:
 WATSONX_URL, WATSONX_PROJECT_ID and WATSONX_API_KEY.
@@ -64,6 +68,10 @@ RECORD_RULES = {"ADDR", "ADDR-VALID", "LS-ID"}
 DROPPED_LINES = ("customer:", "entered by:")
 STREET_MATCH = 0.85  # difflib ratio for "the same street, spelled differently"
 WORKLOG_SUMMARY = "AI check: missing information"
+# The summary is the check's own record, not a gap, so it is not a MISSINFO entry: the Work Queue
+# and the Start Center count MISSINFO entries.
+SUMMARY_LOG_TYPE = "UPDATE"
+OPEN_WHERE = 'siteid="SRQSITE" and status in ["NEW","QUEUED","PENDING","INPROG"]'
 
 SYSTEM_PROMPT = (
     "You check service requests sent to Sarasota County Utilities for information a field crew "
@@ -286,16 +294,33 @@ def srs_from_csv(path):
 CLASS_CODE = {name: code for code, (name, _) in cat.CLASSIFICATIONS.items()}
 
 
-def srs_from_maximo(client):
-    """The pilot SRs. Maximo's CLASSSTRUCTUREID is its own number, so the catalog code is found
-    from the classification's name."""
-    found = client.query("mxapisr", where=fmi.PILOT_WHERE, page_size=100,
+def srs_from_maximo(client, where=fmi.PILOT_WHERE):
+    """The SRs matching `where`, the pilot SRs by default. Maximo's CLASSSTRUCTUREID is its own
+    number, so the catalog code is found from the classification's name."""
+    found = client.query("mxapisr", where=where, page_size=100,
                          select="ticketid,status,description,description_longdescription,classstructure.hierarchypath,"
                                 + fmi.ADDRESS_SELECT)
     return [{"ticketid": s["ticketid"], "status": s.get("status", ""), "description": s.get("description"),
              "longdesc": s.get("description_longdescription"),
              "classid": CLASS_CODE.get((s.get("classstructure") or {}).get("hierarchypath", ""), ""),
              "address": fmi.service_address(s), "href": s["href"]} for s in found]
+
+
+def load_notes(client):
+    """The MISSINFO entries and AI check summaries already on SRs: {ticket: {description}}.
+    The SR's own worklog child lists only client-viewable entries, so read MXAPIWORKLOG."""
+    notes = {}
+    for clause in (f'logtype="{rules["LOG_TYPE"]}"', f'description="{WORKLOG_SUMMARY}"'):
+        for w in client.query("mxapiworklog", select="recordkey,description", page_size=500,
+                              where='class="SR" and siteid="SRQSITE" and ' + clause):
+            notes.setdefault(w.get("recordkey"), set()).add(w.get("description"))
+    return notes
+
+
+def not_checked(srs, notes):
+    """The SRs without an AI check summary, in ticket order."""
+    return sorted((s for s in srs if WORKLOG_SUMMARY not in notes.get(s["ticketid"], ())),
+                  key=lambda s: s["ticketid"])
 
 
 def check_sr(sr, points, ai):
@@ -365,39 +390,57 @@ def write_csv(path, results, key):
 
 
 def worklog_text(r, model):
-    lines = [f"Suggested by watsonx.ai ({model}) for a reviewer to confirm. Nothing was changed or sent."]
+    lines = [f"Checked by watsonx.ai ({model}) for a reviewer to confirm. Nothing was changed or sent."]
+    if not (r["known"] or r["kept"]):
+        lines.append("No missing information found.")
     for rule, msg in r["known"]:
         lines.append(f"- {rule}: {msg}")
     for g in r["kept"]:
         lines.append(f'- {g["rule"]}: {g["reason"]} Evidence: "{g["evidence"]}"')
     if r["hint"]:
         lines.append(f"Address file: {r['hint']}")
-    if r["question"]:
+    if r["invented"]:
+        lines.append("The drafted question was withheld: it has a number that is in neither the request "
+                     f"nor the address file ({', '.join(r['invented'])}).")
+    elif r["question"]:
         lines.append(f"Question for the resident: {r['question']}")
     return "\n".join(lines)
 
 
-def apply(client, srs, results, model):
-    """One internal work log per open SR with a gap, unless the SR already has one."""
-    noted = {w.get("recordkey") for w in client.query(
-        "mxapiworklog", select="recordkey,description", page_size=500,
-        where=f'class="SR" and siteid="SRQSITE" and logtype="{rules["LOG_TYPE"]}" and description="{WORKLOG_SUMMARY}"')}
+def _entry(logtype, description, text):
+    return {"logtype": logtype, "description": description, "description_longdescription": text,
+            "clientviewable": False}
+
+
+def worklog_entries(r, model, noted):
+    """The internal work logs for one checked SR: a MISSINFO entry per gap not yet noted, then
+    the summary."""
+    entries = [_entry(rules["LOG_TYPE"], rules["_summary"](rule), msg) for rule, msg in r["known"]
+               if rules["_summary"](rule) not in noted]
+    entries += [_entry(rules["LOG_TYPE"], rules["_summary"](g["rule"]),
+                       f'Suggested by watsonx.ai ({model}): {g["reason"]} Evidence: "{g["evidence"]}"')
+                for g in r["kept"] if rules["_summary"](g["rule"]) not in noted]
+    return entries + [_entry(SUMMARY_LOG_TYPE, WORKLOG_SUMMARY, worklog_text(r, model))]
+
+
+def apply(client, srs, results, model, notes):
+    """Add the work logs to each open SR checked without an error and not checked before.
+    Returns the number of SRs that failed."""
     href = {s["ticketid"]: s.get("href") for s in srs}
-    added = failed = 0
+    checked = gaps = failed = 0
     for r in results:
-        if not (r["known"] or r["kept"]) or r["error"] or r["invented"]:
+        noted = notes.get(r["ticketid"], set())
+        if r["error"] or r["status"] in fmi.HISTORY_STATUSES or WORKLOG_SUMMARY in noted:
             continue
-        if r["status"] in fmi.HISTORY_STATUSES or r["ticketid"] in noted:
-            continue
+        entries = worklog_entries(r, model, noted)
         try:
-            client.merge(href[r["ticketid"]], {"worklog": [{
-                "logtype": rules["LOG_TYPE"], "description": WORKLOG_SUMMARY,
-                "description_longdescription": worklog_text(r, model), "clientviewable": False}]})
-            added += 1
+            client.merge(href[r["ticketid"]], {"worklog": entries})
+            checked += 1
+            gaps += len(entries) - 1
         except MaximoError as e:
             failed += 1
             print(f"  FAILED    {r['ticketid']} - {e}")
-    print(f"{added} work logs added, {failed} SRs failed")
+    print(f"{checked} SRs marked as checked, {gaps} missing-information entries added, {failed} SRs failed")
     return failed
 
 
@@ -408,21 +451,26 @@ def main():
     ap.add_argument("--csv", type=Path, help="read the SRs from a load file instead of Maximo")
     ap.add_argument("--out", type=Path, help="results CSV (default evaluation/ai-missing-info-<model>.csv)")
     ap.add_argument("--apply", action="store_true", help="add the work logs in Maximo (default: preview)")
+    ap.add_argument("--new", action="store_true",
+                    help="check the open SRs at SRQSITE that have no AI check summary yet (the scheduled job)")
+    ap.add_argument("--limit", type=int, help="check at most this many SRs")
     args = ap.parse_args()
-    if args.apply and args.csv:
-        sys.exit("--apply needs the SRs from Maximo; leave out --csv.")
+    if (args.apply or args.new) and args.csv:
+        sys.exit("--apply and --new need the SRs from Maximo; leave out --csv.")
 
     ai = Watsonx(*watsonx_settings(), model=args.model)
-    client = None
+    client, notes = None, {}
     if args.csv:
         srs = srs_from_csv(args.csv)
     else:
         s = load_settings()
         client = MaximoClient(s.url, s.api_key, s.api_path, verify_tls=s.verify_tls)
-        srs = srs_from_maximo(client)
+        srs = srs_from_maximo(client, OPEN_WHERE if args.new else fmi.PILOT_WHERE)
+        notes = load_notes(client)
     if args.only:
         srs = [s for s in srs if s["ticketid"] in set(args.only)]
-    srs.sort(key=lambda s: s["ticketid"])
+    srs = not_checked(srs, notes) if args.new else sorted(srs, key=lambda s: s["ticketid"])
+    srs = srs[:args.limit] if args.limit else srs
 
     points, key = load_address_points(), load_answer_key()
     results = []
@@ -433,15 +481,19 @@ def main():
         note = r["error"] or ("INVENTED " + ",".join(r["invented"]) if r["invented"] else "")
         print(f"  {r['ticketid']} {','.join(gaps) or '-':28} expected {','.join(sorted(key.get(r['ticketid'], []))) or '-':22} {note}", flush=True)
 
-    out = args.out or ROOT / "evaluation" / f"ai-missing-info-{args.model.split('/')[-1]}.csv"
-    write_csv(out, results, key)
+    print(f"\n{len(results)} SRs checked with {args.model}; {ai.tokens} tokens.")
+    if args.out or not args.new:
+        out = args.out or ROOT / "evaluation" / f"ai-missing-info-{args.model.split('/')[-1]}.csv"
+        write_csv(out, results, key)
+        print(f"Results: {out}")
     s = score(results, key)
-    print(f"\n{len(results)} SRs checked with {args.model}; {ai.tokens} tokens. Results: {out}")
-    print(f"Answer-key gaps found: {s['found']} of {s['expected']} (the rules alone: {s['by_rules']})")
-    print(f"Complete SRs flagged: {s['complete_flagged']} of {s['complete']}; flags not in the key: {s['extra']}")
-    print(f"Questions with an invented number: {s['invented']}; model errors: {s['errors']}")
+    if s["expected"] or s["complete"]:
+        print(f"Answer-key gaps found: {s['found']} of {s['expected']} (the rules alone: {s['by_rules']})")
+        print(f"Complete SRs flagged: {s['complete_flagged']} of {s['complete']}; flags not in the key: {s['extra']}")
+    print(f"Questions with an invented number: {sum(bool(r['invented']) for r in results)}; "
+          f"model errors: {sum(bool(r['error']) for r in results)}")
     if args.apply:
-        return 1 if apply(client, srs, results, args.model) else 0
+        return 1 if apply(client, srs, results, args.model, notes) else 0
     print("Preview only; run with --apply to add the work logs.")
     return 0
 
