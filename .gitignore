@@ -29,3 +29,6 @@ loader-state/
 .bob/
 logs/
 audit.log
+
+# Show-off section captures are generated and large. Recreate them locally.
+assets/showoff/*/images/

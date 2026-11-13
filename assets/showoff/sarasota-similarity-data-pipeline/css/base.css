@@ -1,0 +1,495 @@
+/*
+  Base layer: fonts, tokens, themes, the slide frame and the presenter controls.
+  Built on the IBM Carbon Design System (v11): the White theme for light, Gray 100
+  for dark, IBM Plex type, Carbon's spacing scale and productive motion. Values
+  come from @carbon/themes, @carbon/type and @carbon/motion.
+
+  Color roles:
+  - interactive blue: what to look at, the proposal, the map, links and focus
+  - support-error red: points lost, wrong matches, values the text cannot give
+  - support-success green: correct matches and values recovered
+  Sizes are rem on a fluid root, so every slide scales with the viewport.
+*/
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('../fonts/ibm-plex-sans-variable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/ibm-plex-mono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/ibm-plex-mono-600.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light;
+
+  /* Carbon White theme */
+  --bg: #ffffff; /* background */
+  --surface: #f4f4f4; /* layer-01 */
+  --surface-2: #e0e0e0; /* layer-accent-01 */
+  --surface-hover: #e8e8e8; /* layer-hover-01 */
+  --line: #e0e0e0; /* border-subtle-00 */
+  --line-strong: #8d8d8d; /* border-strong-01 */
+  --text: #161616; /* text-primary */
+  --text-soft: #525252; /* text-secondary */
+  --text-muted: #6f6f6f; /* text-helper */
+  --focus: #0f62fe; /* focus */
+
+  /* Interactive blue: link-primary, highlight, blue 10 */
+  --accent: #0f62fe;
+  --accent-ink: #0043ce;
+  --accent-wash: #edf5ff;
+
+  /* Support error red: support-error, red 30 for the lighter deduction, text-error, red 10 */
+  --flag: #da1e28;
+  --flag-soft: #ffb3b8;
+  --flag-ink: #da1e28;
+  --flag-wash: #fff1f1;
+
+  /* Links stay blue; correct matches use support-success */
+  --water: #0f62fe;
+  --water-wash: #edf5ff;
+  --sewer: #198038;
+  --sewer-wash: #defbe6;
+
+  /* Carbon tags: green, red and cool gray */
+  --tag-green-bg: #a7f0ba;
+  --tag-green-text: #0e6027;
+  --tag-red-bg: #ffd7d9;
+  --tag-red-text: #a2191f;
+  --tag-gray-bg: #dde1e6;
+  --tag-gray-text: #343a3f;
+
+  /* The score bar: kept points, distance deduction, time deduction */
+  --bar-kept: #0043ce;
+  --bar-dist: var(--flag);
+  --bar-time: var(--flag-soft);
+  --bar-track: #e0e0e0;
+
+  /* The title slide is a Gray 100 theme zone in both themes */
+  --hero-bg: #161616;
+  --hero-text: #f4f4f4;
+  --hero-muted: #c6c6c6;
+  --hero-line: #393939;
+  --hero-street: #525252;
+  --hero-accent: #4589ff;
+  --hero-link: #78a9ff;
+  --hero-brand: #0f62fe;
+
+  --font-display: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-raw: 'IBM Plex Mono', 'Menlo', 'DejaVu Sans Mono', monospace;
+  --weight-body: 400;
+
+  /* Carbon weights: light for display and large numerals, regular for headings,
+     semibold for compact labels */
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-semibold: 600;
+
+  /* Fluid root: tracks the smaller of width and height, so a 16:9 projector and a
+     1:1 or 9:16 capture all hold a whole slide */
+  --root: clamp(11px, min(1.18vw, 2vh), 30px);
+
+  /* Type scale: steps of Carbon's type scale at a 16px reference
+     (12, 14, 16, 20, 36, 60) */
+  --t-xs: 0.75rem;
+  --t-s: 0.875rem;
+  --t-m: 1rem;
+  --t-l: 1.25rem;
+  --t-xl: 2.25rem;
+  --t-xxl: 3.75rem;
+
+  /* Carbon spacing tokens 02 to 12 (4 to 96px at a 16px reference) */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4rem;
+  --s-9: 6rem;
+
+  --hairline: 1px solid var(--line);
+  --rule: 1px solid var(--text);
+
+  /* Carbon productive motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0.38, 0.9);
+  --ease-entrance: cubic-bezier(0, 0, 0.38, 0.9);
+  --dur-press: 110ms; /* fast-02 */
+  --dur-state: 150ms; /* moderate-01 */
+  --dur-enter: 400ms; /* slow-01 */
+
+  --z-sticky: 10;
+  --z-overlay: 20;
+}
+
+/* Carbon Gray 100 theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #161616;
+    --surface: #262626;
+    --surface-2: #393939;
+    --surface-hover: #333333;
+    --line: #393939;
+    --line-strong: #6f6f6f;
+    --text: #f4f4f4;
+    --text-soft: #c6c6c6;
+    --text-muted: #a8a8a8;
+    --focus: #ffffff;
+    --accent: #78a9ff;
+    --accent-ink: #a6c8ff;
+    --accent-wash: #001d6c;
+    --flag: #fa4d56;
+    --flag-soft: #a2191f;
+    --flag-ink: #ff8389;
+    --flag-wash: #2d0709;
+    --water: #78a9ff;
+    --water-wash: #001d6c;
+    --sewer: #42be65;
+    --sewer-wash: #022d0d;
+    --tag-green-bg: #0e6027;
+    --tag-green-text: #a7f0ba;
+    --tag-red-bg: #a2191f;
+    --tag-red-text: #ffd7d9;
+    --tag-gray-bg: #4d5358;
+    --tag-gray-text: #dde1e6;
+    --bar-kept: #78a9ff;
+    --bar-track: #393939;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #161616;
+  --surface: #262626;
+  --surface-2: #393939;
+  --surface-hover: #333333;
+  --line: #393939;
+  --line-strong: #6f6f6f;
+  --text: #f4f4f4;
+  --text-soft: #c6c6c6;
+  --text-muted: #a8a8a8;
+  --focus: #ffffff;
+  --accent: #78a9ff;
+  --accent-ink: #a6c8ff;
+  --accent-wash: #001d6c;
+  --flag: #fa4d56;
+  --flag-soft: #a2191f;
+  --flag-ink: #ff8389;
+  --flag-wash: #2d0709;
+  --water: #78a9ff;
+  --water-wash: #001d6c;
+  --sewer: #42be65;
+  --sewer-wash: #022d0d;
+  --tag-green-bg: #0e6027;
+  --tag-green-text: #a7f0ba;
+  --tag-red-bg: #a2191f;
+  --tag-red-text: #ffd7d9;
+  --tag-gray-bg: #4d5358;
+  --tag-gray-text: #dde1e6;
+  --bar-kept: #78a9ff;
+  --bar-track: #393939;
+}
+
+/* Portrait: a taller canvas, so the root may grow with the width */
+@media (max-aspect-ratio: 4/5) {
+  :root {
+    --root: clamp(11px, min(1.9vw, 1.25vh), 30px);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: var(--root);
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+  background: var(--bg);
+}
+@media (min-aspect-ratio: 1/1) {
+  html {
+    scroll-snap-type: y mandatory;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: var(--weight-body);
+  font-size: var(--t-m);
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p,
+ol,
+ul,
+dl,
+dd,
+figure,
+blockquote {
+  margin: 0;
+  padding: 0;
+}
+ol,
+ul {
+  list-style: none;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+h1,
+h2 {
+  font-weight: var(--weight-light);
+}
+h3 {
+  font-weight: var(--weight-regular);
+}
+b,
+strong {
+  font-weight: var(--weight-semibold);
+}
+p {
+  text-wrap: pretty;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- Slide frame ---------- */
+
+.slide {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--s-5);
+  padding: var(--s-6) var(--s-8) var(--s-7);
+  scroll-snap-align: start;
+  border-bottom: var(--hairline);
+  container-type: inline-size;
+}
+
+/* Carbon label-01 */
+.chrome {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: var(--hairline);
+  font-size: var(--t-xs);
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.chrome b {
+  font-weight: var(--weight-semibold);
+  color: var(--text-soft);
+}
+.chrome .count {
+  font-variant-numeric: tabular-nums;
+}
+
+.slide-body {
+  display: grid;
+  align-content: center;
+  gap: var(--s-6);
+}
+
+.slide-title {
+  font-size: var(--t-xl);
+  max-width: 60ch;
+}
+.lede {
+  font-size: var(--t-l);
+  line-height: 1.4;
+  color: var(--text-soft);
+  max-width: 56ch;
+}
+.head {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--s-7);
+  align-items: start;
+}
+
+@media (max-aspect-ratio: 4/5) {
+  .slide {
+    padding: var(--s-6) var(--s-5) var(--s-7);
+  }
+  .split {
+    grid-template-columns: 1fr;
+    gap: var(--s-6);
+  }
+}
+
+/* ---------- Presenter controls: Carbon ghost icon buttons ---------- */
+
+.controls {
+  position: fixed;
+  right: var(--s-5);
+  bottom: var(--s-4);
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: var(--bg);
+  border: var(--hairline);
+  font-size: var(--t-s);
+}
+
+.ctl {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-width: 48px;
+  height: 48px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-press) var(--ease-standard);
+}
+.ctl svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: square;
+}
+.ctl:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.ctl:active:not(:disabled) {
+  background: var(--surface-2);
+}
+.ctl:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.ctl:disabled {
+  color: var(--line-strong);
+  cursor: not-allowed;
+}
+.ctl[aria-pressed='true'] {
+  background: var(--surface-2);
+}
+.ctl .label {
+  font-size: var(--t-xs);
+  letter-spacing: 0.02em;
+}
+
+.counter {
+  min-width: 4.5rem;
+  padding: 0 var(--s-2);
+  text-align: center;
+  color: var(--text-soft);
+}
+
+/* Carbon tile on layer-01, with a blue lead edge */
+.notes {
+  position: fixed;
+  left: var(--s-5);
+  bottom: var(--s-4);
+  z-index: var(--z-overlay);
+  width: min(34rem, calc(100vw - 2 * var(--s-5)));
+  padding: var(--s-4) var(--s-5);
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  font-size: var(--t-s);
+  line-height: 1.45;
+}
+.notes[hidden] {
+  display: none;
+}
+.notes .when {
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+.notes .cue {
+  margin-top: var(--s-2);
+  color: var(--text-soft);
+}
+
+/* Screenshot runs hide everything that is not slide content */
+.is-capture .controls,
+.is-capture .notes {
+  display: none;
+}
+
+/* Screenshot runs: no scrollbar, so every slide captures at the full viewport width */
+.is-capture,
+.is-capture body {
+  scrollbar-width: none;
+}
+.is-capture::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+@media print {
+  .controls,
+  .notes {
+    display: none;
+  }
+  .slide {
+    break-after: page;
+  }
+}

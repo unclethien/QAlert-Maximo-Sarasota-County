@@ -6,6 +6,7 @@ on:
     paths:
       - 'presentation/**'
       - 'data/**'
+      - 'assets/showoff/sarasota-similarity-data-pipeline/**'
       - '.github/workflows/deploy-presentation.yml'
   workflow_dispatch:
 
@@ -35,6 +36,14 @@ jobs:
       - run: npm ci
       # The deck reads its numbers from ../data at build time.
       - run: npm run build
+      # The similarity and data pipeline deck is static HTML; it ships as-is
+      # under its own path next to the dataset deck.
+      - name: Add the similarity and data pipeline deck
+        run: |
+          src=../assets/showoff/sarasota-similarity-data-pipeline
+          out=dist/similarity-pipeline
+          mkdir -p "$out"
+          cp -R "$src/index.html" "$src/css" "$src/js" "$src/fonts" "$out/"
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
