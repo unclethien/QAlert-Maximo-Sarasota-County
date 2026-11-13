@@ -74,6 +74,8 @@ The similarity and data pipeline deck is plain HTML with no build step. Open [`a
 To load the dataset into a Maximo Manage test instance, follow the step-by-step [`docs/maximo-import-guide.md`](docs/maximo-import-guide.md). Every command is a dry run unless you pass `--apply`, and nothing is ever deleted. How the loader maps each column is in [`docs/maximo-load.md`](docs/maximo-load.md).
 
 To set up MAS AI for AI-assisted vetting and classification, follow [`docs/mas-ai-configuration.md`](docs/mas-ai-configuration.md).
+
+To set up the missing-information check (the rule script, the scheduled watsonx.ai check on the cluster and the Missing Information Start Center), or to remove it, follow [`docs/missing-information-check.md`](docs/missing-information-check.md).
 - The AI learns from a separate training history in `data/maximo/history/`, built by `scripts/generate_training_history.py`.
 - Draft work orders for open pilot SRs, so team recommendations and similar work orders can be tried, are in `data/maximo/drafts/`, built by `scripts/generate_draft_work_orders.py`.
 - Its recommendations are scored against the answer key with `scripts/score_ai_results.py`.

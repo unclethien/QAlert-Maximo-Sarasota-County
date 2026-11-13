@@ -9,7 +9,7 @@ This guide sets up use case 1 from the Workshop Playback on the TechZone Maximo 
 | Several residents reporting one problem (duplicates) | Similar service requests (`similarity` template on `MXAPISR`), then a Global Issue groups them onto one work order | **Select Action > Similar service requests from AI** on a service request. We build this dialog; see configuration 4 |
 | Related past or planned work | Similar work orders (`WOSIMILARITY`), and an address match that is not AI | **Actions > View similar work orders** on a work order, with IBM's text-only score. In classic Work Order Tracking, **Select Action > Similar work orders from AI** lists the same results sorted by a match score that adds place and time, and **Select Action > Nearby work** lists work within about 150 m. We build the last two; see configuration 3 and "Nearby work orders" |
 | Questions in plain language during reviews | Maximo Assistant | The AI icon in Service Requests and Work Order Tracking |
-| Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries, and a Work Queue lists them. A watsonx.ai check outside Maximo reads the request for the rest and drafts the question to the resident. See "Missing information" below |
+| Missing information | No built-in AI feature on 9.1 or 9.2 | A rule script flags gaps as `MISSINFO` work log entries. A watsonx.ai check, run every 15 minutes on the cluster, reads the request for the rest and drafts the question to the resident. A "Missing Information" Start Center counts the open SRs by type of gap for every user. See [missing-information-check.md](missing-information-check.md) |
 
 The AI only recommends. A person accepts or ignores each recommendation, and no configuration here changes a record by itself. That is the pilot guardrail from the Playback.
 
@@ -643,151 +643,12 @@ Observed on TechZone (2026-11-08, cluster B, before the reload):
 
 ## Missing information
 
-No Maximo version has a built-in AI check for missing details, on service requests or work orders. The pilot splits the check by what it takes to decide a gap:
-- **Rules that plain text can decide:** an automation script, [scripts/autoscript/srqmissinfo.py](../scripts/autoscript/srqmissinfo.py), runs when an SR is saved. It never blocks the save, so a report from QAlert is never lost. Each gap becomes a work log entry of type `MISSINFO` on the SR, and a Work Queue lists the open SRs that have one.
-- **Rules that need the request to be read and understood:** for example, what the meter problem is, or two problems in one request. A script outside Maximo asks watsonx.ai, and the reviewer decides. See "AI check with watsonx.ai" below.
+No Maximo version has a built-in AI check for missing details, on service requests or work orders. The pilot builds one from three parts:
+- a rule script, `SRQMISSINFO`, that notes the gaps a record shows when an SR is saved;
+- a watsonx.ai check, run every 15 minutes on the OpenShift cluster, that reads each new open SR for the gaps that need the text understood and drafts the question to the resident;
+- a "Missing Information" Start Center tab that counts the open SRs by type of gap and lists them.
 
-What the script checks, from [required-information.csv](../data/reference/required-information.csv):
-
-| Rule | The script flags | Pilot SRs flagged |
-|---|---|---|
-| `ADDR` | No house number in the address | SR810001, SR810005, SR810008, SR810020 |
-| `LS-ID` | A lift station alarm with no street and no station name or number | SR810020 |
-| `ADDR-VALID` | An address in a city outside Sarasota County, or a house number and street with no address code, meaning it matched nothing in the County address file | SR810002, SR810012 (Bradenton), SR810033 |
-
-- Against the answer key, the script finds every `ADDR` and `LS-ID` gap and flags nothing that is complete, in the pilot or the training history. `tests/test_missing_info_rules.py` checks this.
-- It catches the misspelled or unknown streets, SR810002 and SR810033, from the service address: each has a house number and a street but no address code. The text alone can't tell, so an SR without a service address would miss them.
-- The other 10 gaps in the answer key break only rules that need the text to be understood. The script catches 8 of the 18 gaps, against 6 from the text alone.
-- The script reads the SR's service address first. When the address is empty, as on the text-only history or an SR typed into Maximo without one, it falls back to the `Address:` line of the long description. On an SR being added, it reads the row Maximo holds in memory. Otherwise it reads a set scoped to the SR by ticket and class.
-
-### Set it up
-
-1. **Log type.** In **Domains**, open `LOGTYPE` (a synonym domain) and add a row:
-
-   | Value | Internal Value | Description |
-   |---|---|---|
-   | `MISSINFO` | `UPDATE` | Missing information |
-
-2. **The script.** In **Automation Scripts**, click **More actions > Create > Script with Object Launch Point**:
-
-   | Field | Value |
-   |---|---|
-   | Launch Point | `SRQMISSINFO` |
-   | Object | `SR` |
-   | Events | **Save**, with **Add** and **Update** ticked, **Before Save** |
-   | Script | `SRQMISSINFO` |
-   | Script Language | `python` |
-   | Source | the whole of `scripts/autoscript/srqmissinfo.py` |
-
-   Make sure both the script and the launch point are **Active**.
-
-   - The wizard leaves the script's **status** at `Draft` even with **Active?** ticked, and a Draft script does not run. Use **Change Status > Active**.
-   - To replace the source later without the UI, merge `{"source": "<the file>"}` into the script's `MXAPIAUTOSCRIPT` record. The API accepts `source` but does not return it on a read.
-   - The script must import nothing. Maximo's Jython has no standard library, so `import re` fails, and a failing Before Save script blocks **every** SR save. If a new version fails, switch the launch point off first (merge `{"scriptlaunchpoint": [{"launchpointname": "SRQMISSINFO", "active": false}]}`), then fix it.
-   - **Deploy it before loading SRs.** The loader closes some pilot SRs, and a closed SR refuses new work logs. With the script live, each SR is noted when it is created. On 2026-11-11 the reload noted all 7 expected SRs this way, SR810033 included, although it ends up Closed.
-   - **How the script reads the service address.**
-     - A new SR's address row is still only in memory, so the script reads it through the SR's relationship `SERVICEADDRESS`. That is the relationship `MXAPISR` uses for its `TKSERVICEADDRESS` child. There is no relationship named `TKSERVICEADDRESS` on SR.
-     - A saved SR is read through a set the script scopes itself, by ticket and class.
-     - If either lookup fails, the script falls back to the text without an error. So test a new version on a canary SR whose flag depends on the address row, such as SR810002 (`ADDR-VALID`).
-
-3. **Check the SRs already loaded.** The launch point only runs on saves from now on. Run [scripts/flag_missing_info.py](../scripts/flag_missing_info.py) once. It reads the 65 pilot SRs through the REST API, applies the same rules, and adds the missing notes. Without `--apply` it only previews. A second run adds nothing, because gaps already noted are skipped.
-   - The SR's `worklog` child in `MXAPISR` lists only client-viewable notes, and `MISSINFO` notes are internal. Read them through `MXAPIWORKLOG` instead.
-   - Calling the script itself through `/maximo/api/script/SRQMISSINFO` returns BMXAA4216E "Unknown Object" on TechZone, so the backfill runs from outside.
-
-4. **The reviewer's list.** A Work Queue lists the results of a saved query, so the query comes first.
-   1. In **Service Requests**, open **Advanced Search > Where Clause**, paste this clause and run it. It should list the open flagged SRs: on TechZone SR810001, SR810002, SR810005, SR810012 and SR810020. SR810008 is also flagged, but it is Resolved, and SR810033 is Closed.
-
-      ```sql
-      siteid='SRQSITE'
-      and status in (select value from synonymdomain where domainid='SRSTATUS' and maxvalue in ('NEW','QUEUED','PENDING','INPROG'))
-      and exists (select 1 from worklog w where w.recordkey=ticketid and w.class='SR' and w.siteid='SRQSITE' and w.logtype='MISSINFO')
-      ```
-
-      - `ticketid` is unqualified on purpose: the application queries the `SR` view, so a `ticket.` prefix may not resolve. Inside the subquery it still means the SR's ticket, because `WORKLOG` has no `TICKETID` column.
-   2. **Save Query** as `SRQMISSINFO`, with description "Missing information", and tick **Public**.
-      - The API cannot create saved queries: `MXAPIQUERY` refuses ADD (BMXAA0024E).
-   3. In **Work Queue Manager**, create a queue named `SRQ MISSING INFO`:
-      - application **Service Requests** (`SR`), object structure `MXAPISR`
-      - query `SRQMISSINFO`, unique column `TICKETUID`
-      - columns `TICKETID`, `DESCRIPTION`, `STATUS` and `REPORTDATE`
-      - the reviewers' security group
-   4. **Activate** the queue. New queues start inactive.
-
-   - The public query on its own is the fallback if a Work Queue cannot be used.
-   - When the resident answers, the reviewer updates the SR and closes the gap by adding a CLIENTNOTE. The MISSINFO note stays as the record of what was asked.
-
-5. **Check it:** open SR810020 in Service Requests. Its **Log** tab should show two `MISSINFO` entries, `ADDR` and `LS-ID`.
-
-Observed on TechZone (2026-11-09, before the reload):
-- The `MISSINFO` log type, the script and its launch point are in place. The backfill added 6 notes to 5 SRs, exactly the local test's result: SR800001, SR800005 and SR800008 (`ADDR`), SR800012 (`ADDR-VALID`) and SR800020 (`ADDR` and `LS-ID`). A second run added none.
-- The launch point works on new and updated SRs. Tested with five test SRs, which were then closed:
-  - A new lift station alarm with only "North Port, FL" got `ADDR` and `LS-ID`.
-  - A new SR with a full address got nothing.
-  - An existing SR with no house number got `ADDR` when it was updated. Saving it again added nothing.
-- The first version deployed did nothing, for two reasons:
-  - It never ran. It imported `re`, which fails in Maximo, yet SR saves still succeeded. It started running only after the script record was saved again through the API.
-    - The status had been set to Active through the API, which may not have reloaded Maximo's script cache. This is not proven.
-    - If a script seems to do nothing, save its record again.
-  - SR's `WORKLOG` relationship returns every SR's work logs (2,333 rows), not just this SR's. The duplicate check found the backfill's notes and skipped every gap.
-  - The script now uses a relationship scoped to the SR (`recordkey=:ticketid and class=:class and siteid=:siteid`).
-- While those were being fixed, a version with `import re` blocked SR saves for about two minutes (15:44 to 15:46 UTC), until its launch point was switched off.
-
-### AI check with watsonx.ai
-
-[scripts/ai_missing_info.py](../scripts/ai_missing_info.py) runs outside Maximo. It reads the open pilot SRs through the REST API and handles each one in three steps:
-1. **The rules above** find the gaps the record shows.
-2. **An address lookup** in the County address file runs for an address the file does not have. It finds the resident's own house number on a similarly spelled street, as with SR810002's "Glenn" for Glen, or it says which house numbers the street has, as with SR810033. It never proposes a house number the resident did not give.
-3. **One watsonx.ai chat call** checks the rules that need the text read: one problem per request, and the rule for the request type. It also drafts one question to the resident covering every gap.
-
-Guardrails:
-- **What is sent.** The resident's name, phone and email line is removed before the text is sent.
-- **What the reply must show.** A gap must quote its evidence word for word from the request, or it is dropped.
-- **Only gaps that block dispatch count.** The model marks each gap as blocking or not, and gaps that only lack a second detail are set aside.
-- **No invented values.** A question with a number that is not in the request or the address lookup is reported, and never written.
-- **Nothing changes without `--apply`.** Without it, the script writes only `evaluation/ai-missing-info-<model>.csv` and prints the score. With `--apply`, each open SR with a gap gets one internal `MISSINFO` work log, "AI check: missing information", holding the gaps, the evidence and the question. A reviewer decides what to send.
-- **Credentials.** The script uses AI Service's own watsonx.ai connection (Step 0). The URL, project ID and key go in `WATSONX_URL`, `WATSONX_PROJECT_ID` and `WATSONX_API_KEY` in `.env`.
-
-```bash
-uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py   # preview
-uv run -q --no-project --with-requirements requirements.txt python scripts/ai_missing_info.py --model ibm/granite-4-h-small
-```
-
-Observed on TechZone (2026-11-12, all 65 pilot SRs, scored against the answer key):
-
-| Prompt version | `openai/gpt-oss-120b`: gaps found | Complete SRs flagged | `ibm/granite-4-h-small`: gaps found | Complete SRs flagged |
-|---|---|---|---|---|
-| The rules alone | 8 of 18 | 0 of 48 | 8 of 18 | 0 of 48 |
-| Flag a rule the request clearly fails | 18 of 18 | 22 of 48 | 13 of 18 | 40 of 48 |
-| Plus: do not flag a missing second detail | 18 of 18 | 23 of 48 | 13 of 18 | 20 of 48 |
-| Grade each gap as blocking dispatch or not (kept) | **18 of 18** | **12 of 48** | 17 of 18 | 27 of 48 |
-
-- **Use `openai/gpt-oss-120b`.** It finds every gap, including all 10 the rules cannot see. No drafted question had an invented number in any run, and in the kept version every street named in a question comes from the request or the address file. It used about 940 tokens per SR, or 61,000 for the 65.
-- **Granite is not reliable enough.** It flags far more complete SRs, and its results swing between prompt versions.
-- **The 12 complete SRs gpt-oss flags:**
-  - 3 are fair to raise on reading. SR810004 reports low pressure and brown water. SR810029 describes a leak under a kitchen sink, which is the owner's side. SR810018, clear water bubbling up near the meter, is filed as a sewer issue.
-  - 8 ask for the second half of a two-part rule, such as a meter lock (`NOWATER-SCOPE`, three SRs), the exact source of an odor (`ODOR-SOURCE`, two SRs), or how much water is flowing (`MAIN-WHERE`). Whether those halves are required is the County's call. If they are not, shorter rule wording in `required-information.csv` would remove these flags.
-  - 1 is a plain misreading: SR810051 says the meter spins with every fixture off, which names the problem.
-- On SRs that do have a gap, it adds a second gap to two: SR810005 (the odor's source) and SR810027 (which meter problem).
-- The model only reads the description text, so it misses nothing the service address shows. The rules and the address lookup cover that.
-- The prompt was changed twice, both times with general wording and never for a particular SR. The third version is the one in the script.
-
-### AI test: can the 9.2 Assistant judge the gaps that need reading?
-
-Ask the Maximo Assistant (the AI icon in Service Requests) about three SRs whose gaps the script cannot see. Compare its answer with the answer key:
-
-| SR | Ask | The answer key says is missing |
-|---|---|---|
-| SR810048 | "Read service request SR810048. What information is missing for a crew to act on it, and what should we ask the resident?" | What the meter problem is: high bill, leak, damage or reading |
-| SR810027 | Same question for SR810027 | It reports two problems (high pressure and meter accuracy); they need separate requests |
-| SR810021 | Same question for SR810021 | The symptom (backup, overflow or odor) and whether it is inside or outside the house |
-
-- If it names the gap in at least two of the three, the 9.2 route (an agent that calls this script and explains the rest) is worth building.
-- If it only restates the request, the reviewer judges these gaps until IBM says how to call the `almwatsonx` template.
-- On TechZone the agent route is blocked for now: the Assistant can call no tools (Step 0). The watsonx.ai check above covers these gaps without it.
-
-Observed on TechZone: _pending_
-
-The research is in `plans/reports/research-synthesis-261106-1307-maximo-ai-duplicates-and-missing-info.md`.
+The setup, what it creates, how to check it and how to remove it are in [missing-information-check.md](missing-information-check.md).
 
 ## Maximo Assistant (talk track)
 
