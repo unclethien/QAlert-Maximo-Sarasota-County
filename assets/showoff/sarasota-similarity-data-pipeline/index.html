@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Related Work and Data</title>
+    <meta
+      name="description"
+      content="Sarasota County MAS AI pilot: similar service requests, similar work orders, and why QAlert's details should reach Maximo as fields."
+    />
+    <link rel="preload" href="fonts/ibm-plex-sans-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <script>
+      // Apply a saved theme before first paint; the page works without it.
+      try {
+        var saved = localStorage.getItem('srq-deck-theme');
+        if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+      // ?theme=light or ?theme=dark forces a theme for this visit, without saving it
+      var asked = new URLSearchParams(location.search).get('theme');
+      if (asked === 'light' || asked === 'dark') document.documentElement.dataset.theme = asked;
+      if (navigator.webdriver) document.documentElement.classList.add('is-capture');
+    </script>
+  </head>
+  <body>
+    <main>
+      <!-- 1. Title -->
+      <section
+        class="slide hero"
+        id="hero"
+        aria-labelledby="hero-title"
+        data-time="about 30 seconds"
+        data-cue="Everything on screen is the pilot's practice data. No real resident appears."
+      >
+        <header class="chrome">
+          <span><b>Sarasota County MAS AI pilot</b></span>
+          <span>November 13, 2026</span>
+        </header>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 id="hero-title">Finding related work, and the data it depends on</h1>
+            <p class="sub">Pilot results on similar requests and work orders, and what the data needs next.</p>
+            <ol class="topics" aria-label="Topics">
+              <li><b>1</b> Similar service requests</li>
+              <li><b>2</b> Similar work orders</li>
+              <li><b>3</b> The data pipeline</li>
+            </ol>
+          </div>
+          <div class="map-wrap">
+            <svg class="map" viewBox="0 0 720 560" role="img" aria-labelledby="map-title">
+              <title id="map-title">
+                Three reports on Corvina Bay Dr on September 14, at 6:55 AM, 9:33 AM and 12:19 PM, all within 150 meters,
+                lead to one work order, WO2910028.
+              </title>
+              <path class="street" d="M210 20 L240 540" />
+              <path class="street" d="M480 30 L450 540" />
+              <path class="street" d="M0 120 L720 96" />
+              <path class="street" d="M0 476 L720 452" />
+              <path class="street main" d="M20 300 C200 262 420 246 700 286" />
+              <text class="label" x="28" y="330">Corvina Bay Dr</text>
+              <text class="label" x="34" y="506">Bramblewick Ln</text>
+              <text class="label" x="560" y="80">Glimmerton Ave</text>
+              <rect class="pin-far" x="104" y="460" width="14" height="14" />
+              <rect class="pin-far" x="612" y="104" width="14" height="14" />
+              <rect class="pin-far" x="640" y="430" width="14" height="14" />
+              <circle class="ring" cx="352" cy="262" r="118" />
+              <text class="label" x="446" y="166">150 m</text>
+              <g class="links">
+                <path class="link" d="M286 270 L322 404" />
+                <path class="link" d="M352 268 L352 404" />
+                <path class="link" d="M418 270 L382 404" />
+              </g>
+              <g class="pins">
+                <g class="drop">
+                  <rect class="pin" x="278" y="256" width="16" height="16" />
+                  <text class="label strong" x="226" y="232">1364 · 6:55 AM</text>
+                </g>
+                <g class="drop">
+                  <rect class="pin" x="344" y="252" width="16" height="16" />
+                  <text class="label strong" x="300" y="300">1370 · 9:33 AM</text>
+                </g>
+                <g class="drop">
+                  <rect class="pin" x="410" y="256" width="16" height="16" />
+                  <text class="label strong" x="380" y="232">1376 · 12:19 PM</text>
+                </g>
+              </g>
+              <g class="wo">
+                <rect x="272" y="404" width="160" height="44" />
+                <text x="352" y="434" text-anchor="middle">WO2910028</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Three questions -->
+      <section
+        class="slide"
+        id="agenda"
+        aria-labelledby="agenda-title"
+        data-time="about 30 seconds"
+        data-cue="Three questions; the third sits under the first two."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count">02 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="agenda-title">Three questions about every new request</h2>
+          <ol class="questions">
+            <li>
+              <span class="num">1</span>
+              <q>Has someone already reported this?</q>
+              <p class="answer"><b>Similar service requests</b>AI, plus place and time</p>
+            </li>
+            <li>
+              <span class="num">2</span>
+              <q>Has a crew been here before, or is work planned?</q>
+              <p class="answer"><b>Similar work orders</b>AI, plus nearby work by address</p>
+            </li>
+            <li>
+              <span class="num">3</span>
+              <q>Can Maximo answer from fields, or only from text?</q>
+              <p class="answer"><b>The data pipeline</b>What QAlert sends, and how</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- 3. Three neighbors, one main break -->
+      <section
+        class="slide"
+        id="sr-case"
+        aria-labelledby="sr-case-title"
+        data-time="about 1 minute"
+        data-cue="Maximo ships AI for similar work orders, not service requests. We set up IBM's similarity template on SRs."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Similar service requests</b> · 03 / 13</span>
+        </header>
+        <div class="slide-body">
+          <div class="head">
+            <h2 class="slide-title" id="sr-case-title">Three neighbors, one main break</h2>
+            <p class="lede">September 14 on Corvina Bay Dr. Three reports in five and a half hours should become one work order.</p>
+          </div>
+          <div class="timeline" aria-label="Reports on September 14">
+            <div class="axis" aria-hidden="true">
+              <span class="tick" style="left: 0%">6 AM</span>
+              <span class="tick" style="left: 28.6%">8 AM</span>
+              <span class="tick" style="left: 57.1%">10 AM</span>
+              <span class="tick" style="left: 85.7%">12 PM</span>
+              <span class="tick" style="left: 100%">1 PM</span>
+            </div>
+            <ol class="reports">
+              <li class="report" style="--at: 13.1%">
+                <p class="when">6:55 AM</p>
+                <p class="what"><b>SR810030</b> · 1364 Corvina Bay Dr<br />Water Main Break</p>
+              </li>
+              <li class="report" style="--at: 50.7%">
+                <p class="when">9:33 AM</p>
+                <p class="what"><b>SR810031</b> · 1370 Corvina Bay Dr<br />Water Main Break</p>
+              </li>
+              <li class="report" style="--at: 90.2%">
+                <p class="when">12:19 PM</p>
+                <p class="what"><b>SR810032</b> · 1376 Corvina Bay Dr<br /><mark>Filed as Water Line Leak</mark></p>
+              </li>
+            </ol>
+          </div>
+          <p class="converge">All three become one work order <span class="wo">WO2910028</span> and one crew.</p>
+          <ol class="steps">
+            <li><b>Find</b><span>The AI lists other reports that read like this one.</span></li>
+            <li><b>Check</b><span>A reviewer confirms which are the same problem.</span></li>
+            <li><b>Link</b><span>Each duplicate joins the first report as a Global Issue.</span></li>
+            <li><b>Dispatch</b><span>One work order goes out. Linked reports follow its status.</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- 4. Text alone -->
+      <section
+        class="slide"
+        id="sr-text"
+        aria-labelledby="sr-text-title"
+        data-time="about 1 minute 15 seconds"
+        data-cue="The real neighbor SR810032 is fifth. At a cut of 93: half the duplicate pairs, 20 wrong ones."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Similar service requests</b> · 04 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="sr-text-title">Text alone ranks a break across town second</h2>
+          <div class="split">
+            <div class="dialog">
+              <div class="dialog-head">
+                <b>The AI's list for SR810031, by AI score</b>
+                <span>Water Main Break, 1370 Corvina Bay Dr</span>
+              </div>
+              <ol class="rows">
+                <li class="row th" aria-hidden="true">
+                  <span>#</span><span>Request</span><span>Summary</span><span>AI score</span><span></span><span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">1</span><span class="id">SR810030</span>
+                  <span class="summary">Water Main Break, 1364 Corvina Bay Dr<span class="meta">Same morning</span></span>
+                  <div class="bar" style="--kept: 95"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">95</span><span class="verdict"><span class="tag ok">Duplicate</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">2</span><span class="id">SR810065</span>
+                  <span class="summary">Water Main Break, 3912 Bramblewick Ln<span class="meta">6 weeks later</span></span>
+                  <div class="bar" style="--kept: 93"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">93</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">3</span><span class="id">SR810059</span>
+                  <span class="summary">Water Line Leak, 1382 Corvina Bay Dr<span class="meta">6 weeks later</span></span>
+                  <div class="bar" style="--kept: 92"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">92</span><span class="verdict"><span class="tag alike">Look-alike</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">4</span><span class="id">SR810058</span>
+                  <span class="summary">Water Main Break, 6430 Glimmerton Ave<span class="meta">6 weeks later</span></span>
+                  <div class="bar" style="--kept: 92"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">92</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">5</span><span class="id">SR810032</span>
+                  <span class="summary">Water Line Leak, 1376 Corvina Bay Dr<span class="meta">Same day</span></span>
+                  <div class="bar" style="--kept: 91"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">91</span><span class="verdict"><span class="tag ok">Duplicate</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">6</span><span class="id">SR810026</span>
+                  <span class="summary">Water Main Break, 3994 Quillfeather Rd<span class="meta">4 days earlier</span></span>
+                  <div class="bar" style="--kept: 90"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">90</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                </li>
+              </ol>
+            </div>
+            <div class="aside">
+              <p class="callout">
+                <b>83 to 97</b>Almost every pair scores here. The AI compares words, and every request arrives in one layout:
+              </p>
+              <p class="raw">
+                Water Main Break, 1370 Corvina Bay Dr<br />
+                <em>Customer:</em> name, email, phone<br />
+                <em>Address:</em> number, street, city, <em>Map</em> link<br />
+                What the resident wrote
+              </p>
+              <p class="callout">
+                <b>6 of 12</b>duplicate pairs kept at a cut of 93, with 20 wrong pairs. No cut-off fixes it.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Place and time -->
+      <section
+        class="slide"
+        id="sr-score"
+        aria-labelledby="sr-score-title"
+        data-time="about 1 minute 30 seconds, plus an optional 1-minute demo"
+        data-cue="Demo: Service Requests > SR810031 > Select Action > Similar service requests from AI. SR810030 at 95, SR810032 at 91."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Similar service requests</b> · 05 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="sr-score-title">Add place and time: duplicates rise, look-alikes fall</h2>
+          <div class="formula">
+            <p class="eq">Duplicate score = AI score <span>×</span> place <span>×</span> time</p>
+            <figure class="factor">
+              <b>Place: distance between the two addresses</b>
+              <svg viewBox="0 0 200 90" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Full score up to 150 meters, falling to half at 1 kilometer and beyond">
+                <line class="grid-line" x1="20" y1="15" x2="190" y2="15" />
+                <line class="grid-line" x1="20" y1="70" x2="190" y2="70" />
+                <path class="curve" d="M20 15 H41 L162 70 H190" />
+                <text x="0" y="19">×1</text>
+                <text x="0" y="74">×.5</text>
+                <text x="30" y="88">150 m</text>
+                <text x="152" y="88">1 km</text>
+              </svg>
+            </figure>
+            <figure class="factor">
+              <b>Time: days between the two reports</b>
+              <svg viewBox="0 0 200 90" preserveAspectRatio="xMinYMid meet" role="img" aria-label="Full score within 3 days, 0.85 up to 14 days, 0.7 after">
+                <line class="grid-line" x1="20" y1="15" x2="190" y2="15" />
+                <line class="grid-line" x1="20" y1="48" x2="190" y2="48" />
+                <path class="curve" d="M20 15 H37 V31.5 H99 V48 H190" />
+                <text x="0" y="19">×1</text>
+                <text x="0" y="52">×.7</text>
+                <text x="28" y="88">3 d</text>
+                <text x="88" y="88">14 d</text>
+              </svg>
+            </figure>
+          </div>
+          <div class="score-split">
+            <div class="dialog has-cut" style="--cut: 85">
+              <div class="dialog-head">
+                <b>Similar service requests from AI · SR810031</b>
+                <span>By duplicate score</span>
+              </div>
+              <ol class="rows">
+                <li class="row th" aria-hidden="true">
+                  <span>#</span><span>Request</span><span>Summary</span><span>AI score, split</span><span>Score</span><span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">1</span><span class="id">SR810030</span>
+                  <span class="summary">1364 Corvina Bay Dr<span class="meta">AI 95 · nothing off</span></span>
+                  <div class="bar" style="--kept: 95"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">95</span><span class="verdict"><span class="tag ok">Duplicate</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">2</span><span class="id">SR810032</span>
+                  <span class="summary">1376 Corvina Bay Dr<span class="meta">AI 91 · nothing off</span></span>
+                  <div class="bar" style="--kept: 91"><span class="fill"><i class="k"></i></span></div>
+                  <span class="score">91</span><span class="verdict"><span class="tag ok">Duplicate</span></span>
+                </li>
+                <li class="row">
+                  <span class="rank">3</span><span class="id">SR810059</span>
+                  <span class="summary">1382 Corvina Bay Dr, 6 weeks later<span class="meta">AI 92 · −28 time</span></span>
+                  <div class="bar" style="--kept: 64; --time: 28"><span class="fill"><i class="k"></i><i class="t"></i></span></div>
+                  <span class="score">64</span><span class="verdict"><span class="tag alike">Look-alike</span></span>
+                </li>
+                <li class="row is-low">
+                  <span class="rank">4</span><span class="id">SR810026</span>
+                  <span class="summary">3994 Quillfeather Rd<span class="meta">AI 90 · −45 distance · −7 time</span></span>
+                  <div class="bar" style="--kept: 38; --dist: 45; --time: 7"><span class="fill"><i class="k"></i><i class="d"></i><i class="t"></i></span></div>
+                  <span class="score">38</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                </li>
+                <li class="row is-low">
+                  <span class="rank">5</span><span class="id">SR810065</span>
+                  <span class="summary">3912 Bramblewick Ln<span class="meta">AI 93 · −46 distance · −14 time</span></span>
+                  <div class="bar" style="--kept: 33; --dist: 46; --time: 14"><span class="fill"><i class="k"></i><i class="d"></i><i class="t"></i></span></div>
+                  <span class="score">33</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                </li>
+                <li class="row is-low">
+                  <span class="rank">6</span><span class="id">SR810058</span>
+                  <span class="summary">6430 Glimmerton Ave<span class="meta">AI 92 · −46 distance · −14 time</span></span>
+                  <div class="bar" style="--kept: 32; --dist: 46; --time: 14"><span class="fill"><i class="k"></i><i class="d"></i><i class="t"></i></span></div>
+                  <span class="score">32</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                </li>
+              </ol>
+              <p class="legend">
+                <span><i class="k"></i>Kept</span><span><i class="d"></i>Off for distance</span><span><i class="t"></i>Off for time</span
+                ><span><i class="cut"></i>85: likely duplicate</span>
+              </p>
+            </div>
+            <div class="facts">
+              <p class="fact">
+                <span class="num">8 of 8</span><span>open duplicates show their first report on top</span>
+                <span class="was">Text alone: 6 of 8</span>
+              </p>
+              <p class="fact">
+                <span class="num">14 of 450</span><span>pairs reach 85: all 12 duplicate pairs, and one pair 12 m and 4 hours apart</span>
+              </p>
+              <p class="fact">
+                <span class="num">64 to 82</span><span>look-alikes stay visible, below the line, for the reviewer</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Similar work orders, text only -->
+      <section
+        class="slide"
+        id="wo-text"
+        aria-labelledby="wo-text-title"
+        data-time="about 1 minute 15 seconds"
+        data-cue="22 requests checked: 10 with related work, 12 controls. Maximo keeps at most 10 results per work order."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Similar work orders</b> · 06 / 13</span>
+        </header>
+        <div class="slide-body">
+          <div class="head">
+            <h2 class="slide-title" id="wo-text-title">Similar work orders: text finds repeats, not places</h2>
+            <p class="lede">Maximo's built-in feature, on the work orders of 22 pilot requests: 10 with related work, 12 with none.</p>
+          </div>
+          <div class="wo-text">
+            <div class="facts">
+              <p class="fact"><span class="num">6 of 12</span><span>related work orders listed, the ones worded alike</span></p>
+              <p class="fact"><span class="num">0 of 4</span><span>planned projects listed</span></p>
+              <p class="fact"><span class="num">12 of 12</span><span>requests with nothing related still got 10 matches each</span></p>
+            </div>
+            <div class="right">
+              <div class="words">
+                <figure>
+                  <blockquote>LOW WATER PRESSURE</blockquote>
+                  <figcaption>A resident's request on Starling Cove Dr</figcaption>
+                </figure>
+                <span class="neq" aria-label="does not match">≠</span>
+                <figure>
+                  <blockquote>Starling Cove Dr water main replacement</blockquote>
+                  <figcaption>The capital project on the same street, Nov 16 to Dec 18</figcaption>
+                </figure>
+              </div>
+              <div class="ranges" aria-label="AI score ranges">
+                <div class="range related">
+                  <span>Related work</span>
+                  <span class="track"><span class="span" style="--lo: 88; --hi: 95"></span></span><span class="val">88–95</span>
+                </div>
+                <div class="range">
+                  <span>Unrelated, same requests</span>
+                  <span class="track"><span class="span" style="--lo: 83; --hi: 95"></span></span><span class="val">83–95</span>
+                </div>
+                <div class="range">
+                  <span>Requests with nothing related</span>
+                  <span class="track"><span class="span" style="--lo: 83; --hi: 93"></span></span><span class="val">83–93</span>
+                </div>
+                <div class="range-axis" aria-hidden="true">
+                  <span>AI score</span><span class="ends"><span>80</span><span>90</span><span>100</span></span><span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. Two fixes -->
+      <section
+        class="slide"
+        id="wo-fixes"
+        aria-labelledby="wo-fixes-title"
+        data-time="about 1 minute 30 seconds, plus an optional 1-minute demo"
+        data-cue="Demo: Work Order Tracking > WO2915021 > Similar work orders from AI, then Nearby work. Optional: WO2915004 Nearby work lists WO2910037."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Similar work orders</b> · 07 / 13</span>
+        </header>
+        <div class="slide-body">
+          <div class="head">
+            <h2 class="slide-title" id="wo-fixes-title">Two fixes on the work order</h2>
+            <p class="lede">WO2915021, a new leak at 1382 Larkspur Bay Dr. Two earlier leaks at that address should come first.</p>
+          </div>
+          <div class="pair">
+            <div>
+              <div class="dialog has-cut" style="--cut: 60">
+                <div class="dialog-head">
+                  <b>Similar work orders from AI</b>
+                  <span>By match score, the same place and time rule</span>
+                </div>
+                <ol class="rows">
+                  <li class="row th" aria-hidden="true">
+                    <span>AI #</span><span>Work order</span><span>Summary</span><span>AI score, split</span><span>Score</span><span></span>
+                  </li>
+                  <li class="row">
+                    <span class="rank">3</span><span class="id">WO2910007</span>
+                    <span class="summary">Service line leak, same address<span class="meta">Closed · Feb 2026 · AI 92 · −28 time</span></span>
+                    <div class="bar" style="--kept: 64; --time: 28"><span class="fill"><i class="k"></i><i class="t"></i></span></div>
+                    <span class="score">64</span><span class="verdict"><span class="tag ok">Related</span></span>
+                  </li>
+                  <li class="row">
+                    <span class="rank">4</span><span class="id">WO2910012</span>
+                    <span class="summary">Service line leak, same address<span class="meta">Closed · Jul 2026 · AI 92 · −28 time</span></span>
+                    <div class="bar" style="--kept: 64; --time: 28"><span class="fill"><i class="k"></i><i class="t"></i></span></div>
+                    <span class="score">64</span><span class="verdict"><span class="tag ok">Related</span></span>
+                  </li>
+                  <li class="row is-low">
+                    <span class="rank">1</span><span class="id">WO2915028</span>
+                    <span class="summary">Water line leak, 4328 Lumen Palm Ct<span class="meta">AI 95 · −47 distance · −15 time</span></span>
+                    <div class="bar" style="--kept: 33; --dist: 47; --time: 15"><span class="fill"><i class="k"></i><i class="d"></i><i class="t"></i></span></div>
+                    <span class="score">33</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                  </li>
+                  <li class="row is-low">
+                    <span class="rank">2</span><span class="id">WO2915033</span>
+                    <span class="summary">Water line leak, 1382 Corvina Bay Dr<span class="meta">AI 93 · −46 distance · −14 time</span></span>
+                    <div class="bar" style="--kept: 33; --dist: 46; --time: 14"><span class="fill"><i class="k"></i><i class="d"></i><i class="t"></i></span></div>
+                    <span class="score">33</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                  </li>
+                  <li class="row is-low">
+                    <span class="rank">5</span><span class="id">WO2910020</span>
+                    <span class="summary">Leak at meter, 1984 Ashcombe Dr<span class="meta">AI 92 · −46 distance · −14 time</span></span>
+                    <div class="bar" style="--kept: 32; --dist: 46; --time: 14"><span class="fill"><i class="k"></i><i class="d"></i><i class="t"></i></span></div>
+                    <span class="score">32</span><span class="verdict"><span class="tag bad">Other street</span></span>
+                  </li>
+                </ol>
+                <p class="legend">
+                  <span><i class="k"></i>Kept</span><span><i class="d"></i>Off for distance</span><span><i class="t"></i>Off for time</span
+                  ><span><i class="cut"></i>60: likely related</span>
+                </p>
+              </div>
+              <p class="note"><b>Past work loses 30% for age,</b> so related work scores in the 60s. Nothing on a control request reaches 60.</p>
+            </div>
+            <div>
+              <div class="dialog nearby">
+                <div class="dialog-head">
+                  <b>Nearby work</b>
+                  <span>Within about 150 m, no AI</span>
+                </div>
+                <ol class="rows">
+                  <li class="row th" aria-hidden="true"><span>Work order</span><span>Summary</span><span>Status</span></li>
+                  <li class="row">
+                    <span class="id">WO2910012</span>
+                    <span class="summary">Service line leak, Jul 2026<span class="meta">1382 Larkspur Bay Dr</span></span>
+                    <span>Closed</span>
+                  </li>
+                  <li class="row">
+                    <span class="id">WO2910007</span>
+                    <span class="summary">Service line leak, Feb 2026<span class="meta">1382 Larkspur Bay Dr</span></span>
+                    <span>Closed</span>
+                  </li>
+                </ol>
+              </div>
+              <p class="note">
+                It reads the work order's service address, so it also finds work worded differently. On <b>WO2915004</b> it lists the
+                planned <b>Starling Cove Dr water main replacement</b>, which the AI never matched.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. Side by side -->
+      <section
+        class="slide"
+        id="wo-board"
+        aria-labelledby="wo-board-title"
+        data-time="about 50 seconds"
+        data-cue="Both fixes needed the location as a field. That leads into the data pipeline."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Similar work orders</b> · 08 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="wo-board-title">Side by side, on the same 22 requests</h2>
+          <table class="board">
+            <thead>
+              <tr>
+                <th scope="col"><span class="visually-hidden">Measure</span></th>
+                <th scope="col">AI score only</th>
+                <th scope="col">Match score</th>
+                <th scope="col">Nearby work</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Related work orders listed</th>
+                <td><span class="num">6 of 12</span></td>
+                <td><span class="num">6 of 12</span><small>The same list, re-sorted</small></td>
+                <td class="best"><span class="num">12 of 12</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Planned projects listed</th>
+                <td><span class="num">0 of 4</span></td>
+                <td><span class="num">0 of 4</span></td>
+                <td class="best"><span class="num">4 of 4</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Related work first, where the AI found it</th>
+                <td><span class="num">3 of 5</span></td>
+                <td class="best"><span class="num">4 of 5</span><small>Not first: a look-alike 78 m away, same week</small></td>
+                <td><span class="num">n/a</span><small>Lists nearby work by date</small></td>
+              </tr>
+              <tr>
+                <th scope="row">Requests with nothing related that get a likely match</th>
+                <td class="worse"><span class="num">12 of 12</span><small>10 matches each, AI 83 to 93</small></td>
+                <td class="best"><span class="num">0 of 12</span><small>None reaches 60</small></td>
+                <td class="best"><span class="num">0 of 12</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="both">
+            A reviewer gets both: <b>Nearby work for the place</b>, and <b>similar work orders for the same problem</b> worded the same
+            way. Both fixes needed one thing the AI never had: the location as a field.
+          </p>
+        </div>
+      </section>
+
+      <!-- 9. What reaches Maximo today -->
+      <section
+        class="slide"
+        id="data-today"
+        aria-labelledby="data-today-title"
+        data-time="about 1 minute 20 seconds"
+        data-cue="Optional demo: open SR800031 (the closed before copy) next to SR810031. Service Address is empty on the first."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>The data pipeline</b> · 09 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="data-today-title">What reaches Maximo today</h2>
+          <div class="flow">
+            <div class="card">
+              <div class="card-head">QAlert keeps each value <span>Request 710031</span></div>
+              <dl class="kv">
+                <dt>streetNum</dt><dd>1370</dd>
+                <dt>streetName</dt><dd>CORVINA BAY DR</dd>
+                <dt>cityName</dt><dd>Sarasota</dd>
+                <dt>latitude, longitude</dt><dd>27.335001, −82.435681</dd>
+                <dt>origin</dt><dd>QAlert Mobile Android</dd>
+                <dt>priority</dt><dd>1</dd>
+                <dt>typeName</dt><dd>Water Main Break</dd>
+                <dt>name</dt><dd>CURTIS JESSUP</dd>
+                <dt>email, phone</dt><dd>cjessup53@example.net, 941-555-0146</dd>
+                <dt>comments</dt><dd class="muted">Water running down the street from the corner, looks like a lot of water.</dd>
+              </dl>
+            </div>
+            <div class="pipe" aria-hidden="true">
+              <b>Integration</b>
+              <svg viewBox="0 0 96 24"><path d="M2 12 H90 M80 4 L92 12 L80 20" /></svg>
+              <span>packs it into text</span>
+            </div>
+            <div class="card">
+              <div class="card-head">Maximo receives <span>The same request, today's shape</span></div>
+              <dl class="kv">
+                <dt>Summary</dt><dd>Water Main Break, 1370 Corvina Bay Dr</dd>
+                <dt>Service address</dt><dd><span class="empty">empty</span></dd>
+                <dt>Source</dt><dd><span class="empty">empty</span></dd>
+                <dt>Reported priority</dt><dd><span class="empty">empty</span></dd>
+                <dt>Reported by</dt><dd>QAlert Integration</dd>
+                <dt>Reporter phone</dt><dd><span class="empty">empty</span></dd>
+                <dt>Details</dt><dd class="muted">everything else, as one block of text:</dd>
+              </dl>
+              <p class="raw">
+                &lt;div&gt;Customer: CURTIS JESSUP cjessup53@example.net 941-555-0146&lt;/div&gt;&lt;div&gt;Address: 1370 Corvina Bay Dr,
+                Sarasota, FL &lt;a href="https://www.google.com/maps/search/27.335001,-82.435681"&gt;Map&lt;/a&gt;&lt;/div&gt;&lt;div&gt;Water
+                running down the street from the corner, looks like a lot of water.&lt;/div&gt;
+              </p>
+            </div>
+          </div>
+          <div class="strip">
+            <p><span class="num">51 of 116</span><br />columns hold a value on the County's sample requests. Address, source and priority are not among them.</p>
+            <p><span class="num">0 of 1,243</span><br />requests on the pilot instance had a priority or a source, before the reload.</p>
+            <blockquote>
+              <p>“why LOCATION, OWNERGROUP, ASSETNUM, priority, and SOURCE are blank”</p>
+              <p>IBM's review of the County sample, which also asks which details should be fields rather than text.</p>
+            </blockquote>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. Five costs -->
+      <section
+        class="slide"
+        id="data-cost"
+        aria-labelledby="data-cost-title"
+        data-time="about 1 minute 20 seconds"
+        data-cue="Five costs, then the ceiling: channel, priority and address validity are not in the text at all."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>The data pipeline</b> · 10 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="data-cost-title">Why one text block holds everyone back</h2>
+          <div class="tiles">
+            <article class="tile ai">
+              <h3>The AI reads layout, not place</h3>
+              <p>Similarity compares text, and every request shares one layout. The Maximo Assistant searches fields, so address questions find nothing.</p>
+              <div class="vs">
+                <div><span class="num">97</span><span class="small">the real duplicate</span></div>
+                <div><span class="num bad">93</span><span class="small">same problem, 6 km away</span></div>
+              </div>
+            </article>
+            <article class="tile">
+              <h3>Search and reports</h3>
+              <p>No field to list requests on a street, the ones that came in by phone, or the urgent ones this week.</p>
+            </article>
+            <article class="tile">
+              <h3>Callbacks</h3>
+              <p>The phone number sits inside the text, and Reported by names the integration. Every callback starts with copying.</p>
+            </article>
+            <article class="tile">
+              <h3>Upkeep</h3>
+              <p>Pilot scripts pick the address back out of the text. A planner's edit or a new text layout breaks them.</p>
+            </article>
+            <article class="tile">
+              <h3>Privacy</h3>
+              <p>Names and phones are copied into free text on the request and its work order, and into whatever reads it, AI included.</p>
+            </article>
+          </div>
+          <div class="ceiling">
+            <p>Read back out of the text, in the best case: 65 pilot requests in one clean layout</p>
+            <div><span class="num">65 of 65</span><span class="meter" style="--got: 65"><i></i></span><span>Address, coordinates, phone, email</span></div>
+            <div class="none"><span class="num">0 of 65</span><span class="meter" style="--got: 0"><i></i></span><span>How it came in</span></div>
+            <div class="none"><span class="num">0 of 65</span><span class="meter" style="--got: 0"><i></i></span><span>Priority</span></div>
+            <div class="none"><span class="num">0 of 65</span><span class="meter" style="--got: 0"><i></i></span><span>Is the address real?</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 11. What we changed -->
+      <section
+        class="slide"
+        id="data-changed"
+        aria-labelledby="data-changed-title"
+        data-time="about 1 minute 15 seconds"
+        data-cue="Same requests, same text, plus the fields. The 7 without an address point are the ones the AI should flag."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>The data pipeline</b> · 11 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="data-changed-title">What we changed in the pilot data</h2>
+          <div class="changed">
+            <table class="compare">
+              <thead>
+                <tr><th scope="col">SR810031</th><th scope="col">Today's shape</th><th scope="col">Pilot data now</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Service address</th><td class="today"><span class="empty">empty</span></td><td class="now">1370 Corvina Bay Dr, Sarasota 34241 · address point AP00042</td></tr>
+                <tr><th scope="row">Coordinates</th><td class="today">a Map link in the text</td><td class="now">27.335001, −82.435681</td></tr>
+                <tr><th scope="row">Source</th><td class="today"><span class="empty">empty</span></td><td class="now">APP-ANDROID</td></tr>
+                <tr><th scope="row">Reported priority</th><td class="today"><span class="empty">empty</span></td><td class="now">1, urgent</td></tr>
+                <tr><th scope="row">Contact phone and email</th><td class="today">the integration account</td><td class="now">941-555-0146 · cjessup53@example.net</td></tr>
+                <tr><th scope="row">Reported by</th><td class="today">QAlert Integration</td><td class="now">the employee, for phone and email requests</td></tr>
+                <tr><th scope="row">Details text</th><td class="today">everything</td><td class="now">unchanged, kept as it is</td></tr>
+                <tr><th scope="row">Its work orders</th><td class="today">no address</td><td class="now">the request's service address</td></tr>
+              </tbody>
+            </table>
+            <ol class="unlocks">
+              <li><span class="num">8 of 8</span><span><b>Duplicate score</b>first report on top, from the coordinates</span></li>
+              <li><span class="num">12 of 12</span><span><b>Nearby work</b>related work orders, from the work order's address</span></li>
+              <li><span class="num">8 of 18</span><span><b>Missing information</b>answer-key gaps the rules catch, up from 6</span></li>
+              <li><span class="num">58 of 65</span><span><b>Address check</b>requests matched to a County address point; the other 7 are the ones to flag</span></li>
+            </ol>
+          </div>
+          <p class="pull">Every gain today came from a field, not from a bigger model.</p>
+        </div>
+      </section>
+
+      <!-- 12. Proposal -->
+      <section
+        class="slide"
+        id="data-proposal"
+        aria-labelledby="data-proposal-title"
+        data-time="about 1 minute 15 seconds"
+        data-cue="A mapping change by the integration's owner, not new software. Keep writing the text as today."
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>The data pipeline</b> · 12 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="data-proposal-title">Our proposal: send QAlert's values to Maximo's fields</h2>
+          <div class="pipeline">
+            <div class="stage">
+              <h3>311 channels</h3>
+              <ul><li>311Connect app</li><li>311 web portal</li><li>Phone to 311</li><li>Email</li></ul>
+            </div>
+            <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12 H34 M26 4 L36 12 L26 20" /></svg>
+            <div class="stage">
+              <h3>QAlert</h3>
+              <ul><li>Each value kept on its own</li></ul>
+            </div>
+            <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12 H34 M26 4 L36 12 L26 20" /></svg>
+            <div class="stage change">
+              <h3>Integration mapping</h3>
+              <ul><li>Each value to its Maximo field</li><li>The text, as today</li></ul>
+            </div>
+            <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12 H34 M26 4 L36 12 L26 20" /></svg>
+            <div class="stage">
+              <h3>Maximo request</h3>
+              <ul>
+                <li>Service address and coordinates</li>
+                <li>Source and reported priority</li>
+                <li>Contact phone and email</li>
+                <li>QAlert request number</li>
+              </ul>
+              <p class="kept">Details text kept</p>
+            </div>
+            <span></span><span></span><span></span><span></span>
+            <div class="gis">
+              <svg class="arrow" viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12 H34 M26 4 L36 12 L26 20" /></svg>
+              <div class="stage">
+                <h3>County GIS address list</h3>
+                <ul><li>Loaded as Maximo service addresses</li></ul>
+              </div>
+            </div>
+          </div>
+          <ol class="plan">
+            <li><b>Map the values</b>A mapping change by the integration's owner. No new software, and it helps every request from day one.</li>
+            <li><b>Load the address list</b>Each request is matched to a known address on arrival; one that matches nothing is flagged.</li>
+            <li><b>AI where rules can't</b>Suggestions a reviewer accepts, such as reading an unclear description. Not rebuilding values QAlert has.</li>
+            <li class="standard">
+              The Open311 standard for 311 requests keeps <code>lat</code>, <code>long</code>, <code>address_id</code>, <code>email</code>,
+              <code>phone</code> and the name apart from <code>description</code>.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- 13. Decisions -->
+      <section
+        class="slide"
+        id="decisions"
+        aria-labelledby="decisions-title"
+        data-time="about 1 minute 30 seconds"
+        data-cue="Six answers, then: we rerun the same checks and show the difference. Thank you. Questions?"
+      >
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count"><b>Next</b> · 13 / 13</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="decisions-title">What we need from the County</h2>
+          <ol class="asks">
+            <li><span><b>Who owns the QAlert-to-Maximo integration?</b>The QAlert connector, County middleware, or a Maximo job. It decides how and when.</span></li>
+            <li><span><b>Which values does the County's QAlert send?</b>We assumed the channel, how a call or email was taken, who entered it, and the resident's phone.</span></li>
+            <li><span><b>Where should the resident's name live?</b>Only in the text, in a custom field, or as a person record.</span></li>
+            <li><span><b>Can we load the County address list from GIS?</b>Your attribute list already maps the GIS address columns to Maximo.</span></li>
+            <li><span><b>How do QAlert's priorities match Maximo's 1 to 4?</b>So Reported Priority means the same thing in both.</span></li>
+            <li><span><b>Do our lines match your reviewers?</b>85 or more for a likely duplicate, 60 or more for likely related work.</span></li>
+          </ol>
+          <div class="close">
+            <p>With your answers, we rerun the same checks and show you the difference.</p>
+            <p class="thanks">Thank you. Questions?</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sources (not presented) -->
+      <section class="slide" id="sources" aria-labelledby="sources-title" data-time="not presented" data-cue="Reference only.">
+        <header class="chrome">
+          <span>Sarasota County MAS AI pilot</span>
+          <span class="count">Sources</span>
+        </header>
+        <div class="slide-body">
+          <h2 class="slide-title" id="sources-title">Sources</h2>
+          <ol class="refs">
+            <li><span>IBM, Enabling locating of similar work orders: compares description and long description, keeps up to 10 results, no training. <a href="https://www.ibm.com/docs/SSRHPA_cd/appsuite/admin/t_ai_config_similarity.html">ibm.com/docs, t_ai_config_similarity</a></span></li>
+            <li><span>IBM, Finding other types of similar data (service request similarity). <a href="https://www.ibm.com/docs/en/masv-and-l/cd?topic=orders-finding-other-types-data">ibm.com/docs, orders-finding-other-types-data</a></span></li>
+            <li><span>IBM, Service request related records and global issues. <a href="https://www.ibm.com/support/pages/service-request-related-records">ibm.com/support, service-request-related-records</a></span></li>
+            <li><span>Open311, GeoReport v2: a service request's location, name, email and phone are separate arguments. <a href="https://webarchive.library.unt.edu/web/20170118233000mp_/http://wiki.open311.org/GeoReport_v2">wiki.open311.org/GeoReport_v2 (archived)</a></span></li>
+            <li><span>FGDC, United States Thoroughfare, Landmark, and Postal Address Data Standard (FGDC-STD-016-2011). <a href="https://fgdc.gov/standards/projects/address-data">fgdc.gov/standards/projects/address-data</a></span></li>
+            <li><span>IBM, Sarasota County Pilot Data Review, in the County's workbook: blank location, priority and source fields, and data minimization.</span></li>
+            <li><span>Pilot measurements on TechZone Maximo, 2026-11-08 to 2026-11-12: <code>docs/mas-ai-configuration.md</code>, <code>docs/qalert-integration-proposal.md</code> and <code>docs/sample-dataset.md</code> in the project repository. Every record shown is synthetic.</span></li>
+          </ol>
+        </div>
+      </section>
+    </main>
+
+    <div class="controls" role="toolbar" aria-label="Presenter controls">
+      <button class="ctl" type="button" data-action="notes" aria-pressed="false" aria-label="Show speaker cue (N)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6 H19 M5 12 H19 M5 18 H13" /></svg>
+      </button>
+      <button class="ctl" type="button" data-action="theme" aria-label="Theme: system (T)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 4 V20" /></svg>
+        <span class="label" data-theme-label>System</span>
+      </button>
+      <button class="ctl" type="button" data-action="prev" aria-label="Previous slide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 L8 12 L15 19" /></svg>
+      </button>
+      <span class="counter" aria-live="polite" data-counter>1 / 14</span>
+      <button class="ctl" type="button" data-action="next" aria-label="Next slide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 L16 12 L9 19" /></svg>
+      </button>
+    </div>
+    <aside class="notes" hidden aria-live="polite" data-notes>
+      <p class="when" data-notes-when></p>
+      <p class="cue" data-notes-cue></p>
+    </aside>
+
+    <script src="js/deck.js" defer></script>
+  </body>
+</html>
